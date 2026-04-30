@@ -46,6 +46,12 @@
     "delete": "删除",
     "generateSubtitles": "生成字幕"
   },
+  "update": {
+    "restartResolveServer": {
+      "title": "更新已安装",
+      "description": "AutoSubs 已重新启动并与 Resolve 断开连接。请在 DaVinci Resolve 中再次运行 Workspace -> Scripts -> AutoSubs，以启动更新后的 Lua 服务器。"
+    }
+  },
   "importExport": {
     "button": "导出 / 导入",
     "importTab": "导入",
@@ -456,7 +462,9 @@
     },
     "update": {
       "downloading": "正在下载更新",
-      "installUpdateNow": "立即安装更新"
+      "installing": "正在安装更新",
+      "restarting": "正在重启 AutoSubs",
+      "installUpdateNow": "安装并重启"
     },
     "resolve": {
       "productName": "DaVinci Resolve",

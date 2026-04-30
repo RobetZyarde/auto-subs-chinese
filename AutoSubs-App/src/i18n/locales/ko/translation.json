@@ -101,6 +101,12 @@
     "next": "다음",
     "saveChanges": "변경사항 저장"
   },
+  "update": {
+    "restartResolveServer": {
+      "title": "업데이트가 설치되었습니다",
+      "description": "AutoSubs가 다시 시작되어 Resolve와의 연결이 끊어졌습니다. 업데이트된 Lua 서버를 시작하려면 DaVinci Resolve에서 작업 공간 -> 스크립트 -> AutoSubs를 다시 실행하세요."
+    }
+  },
   "completion": {
     "addToTimeline": "타임라인에 추가",
     "exportToFile": "파일로 내보내기",
@@ -466,7 +472,9 @@
     },
     "update": {
       "downloading": "업데이트 다운로드 중",
-      "installUpdateNow": "지금 업데이트 설치"
+      "installing": "업데이트 설치 중",
+      "restarting": "AutoSubs 다시 시작 중",
+      "installUpdateNow": "설치 후 다시 시작"
     }
   },
   "workspace": {

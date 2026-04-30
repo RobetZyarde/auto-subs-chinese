@@ -46,6 +46,12 @@
     "delete": "Löschen",
     "generateSubtitles": "Untertitel generieren"
   },
+  "update": {
+    "restartResolveServer": {
+      "title": "Update installiert",
+      "description": "AutoSubs wurde neu gestartet und von Resolve getrennt. Führe in DaVinci Resolve erneut Arbeitsbereich -> Skripte -> AutoSubs aus, um den aktualisierten Lua-Server zu starten."
+    }
+  },
   "importExport": {
     "button": "Exportieren / Importieren",
     "importTab": "Import",
@@ -456,7 +462,9 @@
     },
     "update": {
       "downloading": "Update wird heruntergeladen",
-      "installUpdateNow": "Update jetzt installieren"
+      "installing": "Update wird installiert",
+      "restarting": "AutoSubs wird neu gestartet",
+      "installUpdateNow": "Installieren und neu starten"
     },
     "resolve": {
       "productName": "DaVinci Resolve",

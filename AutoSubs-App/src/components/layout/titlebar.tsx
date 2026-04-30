@@ -39,7 +39,10 @@ import { ManageModelsDialog } from "@/components/settings/model-manager";
 import { SupportDialog } from "@/components/dialogs/support-dialog";
 import { ArchiveIcon } from "../ui/archive";
 import { Spinner } from "@/components/ui/spinner";
-import { useUpdateStatus } from "@/hooks/use-update-status";
+import {
+  UPDATE_RESTART_NOTICE_KEY,
+  useUpdateStatus,
+} from "@/hooks/use-update-status";
 import { invoke } from "@tauri-apps/api/core";
 import { diarizeModel } from "@/lib/models";
 import { TranscriptSearchPopover } from "@/components/common/transcript-search-popover";
@@ -328,6 +331,11 @@ function UpdateStatusIndicator({
 }) {
   const { t } = useTranslation();
 
+  const handleInstallUpdate = () => {
+    localStorage.setItem(UPDATE_RESTART_NOTICE_KEY, "1");
+    invoke("trigger_install_update");
+  };
+
   if (phase === "downloading") {
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -340,15 +348,28 @@ function UpdateStatusIndicator({
     );
   }
 
+  if (phase === "installing" || phase === "restarting") {
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Spinner className="h-3 w-3" />
+        <span>
+          {phase === "installing"
+            ? t("titlebar.update.installing", "Installing Update")
+            : t("titlebar.update.restarting", "Restarting AutoSubs")}
+        </span>
+      </div>
+    );
+  }
+
   if (phase === "ready") {
     return (
       <Button
         variant="ghost"
         className="flex items-center gap-2 h-7 text-xs text-green-600 dark:text-green-400 hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900 dark:hover:text-green-300"
-        onClick={() => invoke("trigger_install_update")}
+        onClick={handleInstallUpdate}
       >
         <RotateCcw className="h-3 w-3" />
-        {t("titlebar.update.installUpdateNow", "Install Update Now")}
+        {t("titlebar.update.installUpdateNow", "Install and Restart")}
       </Button>
     );
   }
@@ -387,6 +408,8 @@ export function Titlebar({ timelineInfo, onOpenCompactViewer }: TitlebarProps) {
   const centerContent =
     phase === "downloading" ||
     phase === "ready" ||
+    phase === "installing" ||
+    phase === "restarting" ||
     phase === "available-link" ? (
       <UpdateStatusIndicator
         phase={phase}

@@ -112,6 +112,13 @@ fn main() {
                 }
             }
 
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = app.handle().show();
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+
             // Startup sidecar health check: ffmpeg availability & version
             {
                 let app_handle = app.handle().clone();
@@ -251,10 +258,15 @@ fn main() {
                                 let _ = handle_for_dl.emit("update-ready", json!({}));
                                 signal.notified().await;
 
+                                let _ = handle_for_dl.emit("update-installing", json!({}));
                                 if let Err(e) = update2.install(bytes) {
                                   tracing::error!("Update install failed: {}", e);
                                   let _ = handle_for_dl.emit("update-error", json!({ "error": e.to_string() }));
+                                  return;
                                 }
+
+                                let _ = handle_for_dl.emit("update-restarting", json!({}));
+                                handle_for_dl.request_restart();
                               }
                             }
                           });
@@ -284,6 +296,20 @@ fn main() {
         .expect("error while building Tauri application")
         .run(|app, event| {
             match event {
+                RunEvent::Ready => {
+                    let app_handle = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        for delay_ms in [100_u64, 500, 1200] {
+                            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                            if let Some(window) = app_handle.get_webview_window("main") {
+                                let _ = app_handle.show();
+                                let _ = window.show();
+                                let _ = window.unminimize();
+                                let _ = window.set_focus();
+                            }
+                        }
+                    });
+                }
                 RunEvent::ExitRequested { api, .. } => {
                     // If we're already exiting, don't intercept again; allow exit to proceed
                     if EXITING.swap(true, AtomicOrdering::SeqCst) {

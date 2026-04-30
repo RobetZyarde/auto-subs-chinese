@@ -46,6 +46,12 @@
     "delete": "Supprimer",
     "generateSubtitles": "Générer les sous-titres"
   },
+  "update": {
+    "restartResolveServer": {
+      "title": "Mise à jour installée",
+      "description": "AutoSubs a redémarré et s’est déconnecté de Resolve. Dans DaVinci Resolve, relancez Espace de travail -> Scripts -> AutoSubs pour démarrer le serveur Lua mis à jour."
+    }
+  },
   "importExport": {
     "button": "Exporter / Importer",
     "importTab": "Importer",
@@ -428,7 +434,9 @@
     },
     "update": {
       "downloading": "Téléchargement de la mise à jour",
-      "installUpdateNow": "Installer la mise à jour maintenant"
+      "installing": "Installation de la mise à jour",
+      "restarting": "Redémarrage d’AutoSubs",
+      "installUpdateNow": "Installer et redémarrer"
     },
     "resolve": {
       "productName": "DaVinci Resolve",

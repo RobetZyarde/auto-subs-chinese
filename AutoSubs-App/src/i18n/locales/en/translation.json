@@ -46,6 +46,12 @@
     "delete": "Delete",
     "generateSubtitles": "Generate Subtitles"
   },
+  "update": {
+    "restartResolveServer": {
+      "title": "Update installed",
+      "description": "AutoSubs restarted and disconnected from Resolve. In DaVinci Resolve, run Workspace -> Scripts -> AutoSubs again to start the updated Lua server."
+    }
+  },
   "importExport": {
     "button": "Export / Import",
     "importTab": "Import",
@@ -459,7 +465,9 @@
     },
     "update": {
       "downloading": "Downloading Update",
-      "installUpdateNow": "Install Update Now"
+      "installing": "Installing Update",
+      "restarting": "Restarting AutoSubs",
+      "installUpdateNow": "Install and Restart"
     },
     "resolve": {
       "productName": "DaVinci Resolve",
