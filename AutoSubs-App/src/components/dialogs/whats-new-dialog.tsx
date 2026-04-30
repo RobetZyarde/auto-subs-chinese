@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getVersion } from "@tauri-apps/api/app";
 import { open as openExternal } from "@tauri-apps/plugin-shell";
+import { useTranslation } from "react-i18next";
 
 import { useSettings } from "@/contexts/SettingsContext";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ExternalLink, Loader2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ExternalLink, Loader2, AlertCircle, Server } from "lucide-react";
 
 const RELEASE_API_URL =
   "https://api.github.com/repos/tmoroney/auto-subs/releases/latest";
@@ -31,6 +33,7 @@ interface ReleaseInfo {
 }
 
 export function WhatsNewDialog() {
+  const { t } = useTranslation();
   const { settings, updateSetting, isHydrated } = useSettings();
 
   const [currentVersion, setCurrentVersion] = React.useState<string>("");
@@ -133,6 +136,21 @@ export function WhatsNewDialog() {
             <DialogDescription>Released {formattedDate}</DialogDescription>
           )}
         </DialogHeader>
+
+        {!!settings.lastSeenVersion && (
+          <Alert className="border-blue-200 bg-blue-50 text-blue-950 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+            <Server className="h-4 w-4" />
+            <AlertTitle>
+              {t("update.restartResolveServer.title", "Update installed")}
+            </AlertTitle>
+            <AlertDescription>
+              {t(
+                "update.restartResolveServer.description",
+                "AutoSubs restarted and disconnected from Resolve. In DaVinci Resolve, run Workspace -> Scripts -> AutoSubs again to start the updated Lua server.",
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <ScrollArea className="h-[55vh] max-h-[480px] px-2">
           {loading && (

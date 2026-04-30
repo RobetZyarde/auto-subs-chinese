@@ -46,6 +46,12 @@
     "delete": "Delete",
     "generateSubtitles": "Generate Subtitles"
   },
+  "update": {
+    "restartResolveServer": {
+      "title": "Update installed",
+      "description": "AutoSubs restarted and disconnected from Resolve. In DaVinci Resolve, run Workspace -> Scripts -> AutoSubs again to start the updated Lua server."
+    }
+  },
   "importExport": {
     "button": "Export / Import",
     "importTab": "Import",
@@ -108,7 +114,16 @@
         "custom": "Custom"
       },
       "customCharsTitle": "Max Characters",
-      "customCharsDescription": "Characters per line"
+      "customCharsDescription": "Characters per line",
+      "customPromptTitle": "Vocabulary & Context",
+      "customPromptDescription": "Helps Whisper recognize names, brands, jargon, acronyms, and preferred spellings.",
+      "customPromptTermsTitle": "Key Terms",
+      "customPromptTermsPlaceholder": "Add names, brands, acronyms, or jargon...",
+      "customPromptTermsExample": "Example: OpenAI, DaVinci Resolve, SubSlate, FFmpeg",
+      "customPromptContextTitle": "Context / Style Note",
+      "customPromptContextPlaceholder": "Add a short topic or spelling preference...",
+      "customPromptContextExample": "Example: This is a DaVinci Resolve tutorial. Prefer “AutoSubs”, not “Auto Subs”.",
+      "customPromptWhisperOnly": "Only supported by Whisper models."
     },
     "censor": {
       "title": "Censor Words",
@@ -454,7 +469,9 @@
     },
     "update": {
       "downloading": "Downloading Update",
-      "installUpdateNow": "Install Update Now"
+      "installing": "Installing Update",
+      "restarting": "Restarting AutoSubs",
+      "installUpdateNow": "Install and Restart"
     },
     "resolve": {
       "productName": "DaVinci Resolve",

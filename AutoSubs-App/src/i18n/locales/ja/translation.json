@@ -44,7 +44,16 @@
         "custom": "カスタム"
       },
       "customCharsTitle": "最大文字数",
-      "customCharsDescription": "1行あたりの文字数"
+      "customCharsDescription": "1行あたりの文字数",
+      "customPromptTitle": "語彙とコンテキスト",
+      "customPromptDescription": "Whisperが名前、ブランド、専門用語、略語、優先表記を認識しやすくします。",
+      "customPromptTermsTitle": "重要な用語",
+      "customPromptTermsPlaceholder": "名前、ブランド、略語、専門用語を入力...",
+      "customPromptTermsExample": "例: OpenAI, DaVinci Resolve, SubSlate, FFmpeg",
+      "customPromptContextTitle": "コンテキスト / スタイルメモ",
+      "customPromptContextPlaceholder": "短い話題や表記の希望を入力...",
+      "customPromptContextExample": "例: DaVinci Resolveのチュートリアルです。「Auto Subs」ではなく「AutoSubs」を優先してください。",
+      "customPromptWhisperOnly": "Whisperモデルでのみサポートされています。"
     },
     "language": {
       "noLanguageFound": "言語が見つかりません。",
@@ -93,6 +102,12 @@
     "generateSubtitles": "字幕を生成",
     "next": "次へ",
     "saveChanges": "変更を保存"
+  },
+  "update": {
+    "restartResolveServer": {
+      "title": "アップデートがインストールされました",
+      "description": "AutoSubs が再起動し、Resolve との接続が切断されました。更新された Lua サーバーを起動するには、DaVinci Resolve で ワークスペース -> スクリプト -> AutoSubs をもう一度実行してください。"
+    }
   },
   "completion": {
     "addToTimeline": "タイムラインに追加",
@@ -450,7 +465,9 @@
     },
     "update": {
       "downloading": "アップデートをダウンロード中",
-      "installUpdateNow": "今すぐアップデートをインストール"
+      "installing": "アップデートをインストール中",
+      "restarting": "AutoSubs を再起動中",
+      "installUpdateNow": "インストールして再起動"
     }
   },
   "workspace": {

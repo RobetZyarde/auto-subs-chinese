@@ -46,6 +46,12 @@
     "delete": "Supprimer",
     "generateSubtitles": "Générer les sous-titres"
   },
+  "update": {
+    "restartResolveServer": {
+      "title": "Mise à jour installée",
+      "description": "AutoSubs a redémarré et s’est déconnecté de Resolve. Dans DaVinci Resolve, relancez Espace de travail -> Scripts -> AutoSubs pour démarrer le serveur Lua mis à jour."
+    }
+  },
   "importExport": {
     "button": "Exporter / Importer",
     "importTab": "Importer",
@@ -100,7 +106,16 @@
         "custom": "Personnalisé"
       },
       "customCharsTitle": "Max caractères",
-      "customCharsDescription": "Caractères par ligne"
+      "customCharsDescription": "Caractères par ligne",
+      "customPromptTitle": "Vocabulaire et contexte",
+      "customPromptDescription": "Aide Whisper à reconnaître les noms, marques, jargon, acronymes et orthographes préférées.",
+      "customPromptTermsTitle": "Termes clés",
+      "customPromptTermsPlaceholder": "Ajoutez des noms, marques, acronymes ou jargon...",
+      "customPromptTermsExample": "Exemple : OpenAI, DaVinci Resolve, SubSlate, FFmpeg",
+      "customPromptContextTitle": "Contexte / note de style",
+      "customPromptContextPlaceholder": "Ajoutez un sujet court ou une préférence d’orthographe...",
+      "customPromptContextExample": "Exemple : Tutoriel DaVinci Resolve. Préférer « AutoSubs » plutôt que « Auto Subs ».",
+      "customPromptWhisperOnly": "Pris en charge uniquement par les modèles Whisper."
     },
     "censor": {
       "title": "Censurer des mots",
@@ -423,7 +438,9 @@
     },
     "update": {
       "downloading": "Téléchargement de la mise à jour",
-      "installUpdateNow": "Installer la mise à jour maintenant"
+      "installing": "Installation de la mise à jour",
+      "restarting": "Redémarrage d’AutoSubs",
+      "installUpdateNow": "Installer et redémarrer"
     },
     "resolve": {
       "productName": "DaVinci Resolve",

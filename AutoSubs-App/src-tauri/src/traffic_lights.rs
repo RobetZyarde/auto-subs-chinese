@@ -15,6 +15,7 @@ use cocoa::appkit::{NSWindow, NSWindowButton};
 use cocoa::base::{id, nil};
 use cocoa::foundation::NSRect;
 use objc::{msg_send, sel, sel_impl};
+use std::time::Duration;
 use tauri::{Runtime, WebviewWindow, WindowEvent};
 
 /// Desired offset of the leftmost (close) traffic-light button from the
@@ -93,18 +94,26 @@ pub fn position<R: Runtime>(window: &WebviewWindow<R>) {
     }
 }
 
+fn position_on_main_thread<R: Runtime + 'static>(window: &WebviewWindow<R>) {
+    let w = window.clone();
+    let _ = window.run_on_main_thread(move || position(&w));
+}
+
 /// Apply the offset now and register a window-event listener that re-applies
 /// it whenever AppKit may have reset the button layout.
-pub fn install<R: Runtime>(window: &WebviewWindow<R>) {
-    // Defer the initial call to the main thread's next run-loop tick so AppKit
-    // has finished its first layout pass. In bundled `.app` builds the view
-    // hierarchy isn't fully sized during `setup()`, which previously caused
-    // the first `position()` call to no-op and leave the buttons at AppKit's
-    // default (visually too high).
-    {
-        let w = window.clone();
-        let _ = window.run_on_main_thread(move || position(&w));
-    }
+pub fn install<R: Runtime + 'static>(window: &WebviewWindow<R>) {
+    position_on_main_thread(window);
+
+    // Bundled `.app` startup can run an AppKit titlebar layout after Tauri's
+    // setup hook. A couple of delayed applies keep the initial visible
+    // position aligned with `tauri.conf.json` without continuously polling.
+    let startup_window = window.clone();
+    std::thread::spawn(move || {
+        for delay_ms in [150, 400] {
+            std::thread::sleep(Duration::from_millis(delay_ms));
+            position_on_main_thread(&startup_window);
+        }
+    });
 
     let w = window.clone();
     window.on_window_event(move |event| match event {
@@ -115,8 +124,7 @@ pub fn install<R: Runtime>(window: &WebviewWindow<R>) {
             // Hop to main thread — AppKit view mutations must not happen from
             // background threads, and Tauri's event callbacks are not
             // guaranteed to run on main.
-            let w2 = w.clone();
-            let _ = w.run_on_main_thread(move || position(&w2));
+            position_on_main_thread(&w);
         }
         _ => {}
     });

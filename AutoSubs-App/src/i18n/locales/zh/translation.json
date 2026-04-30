@@ -46,6 +46,12 @@
     "delete": "删除",
     "generateSubtitles": "生成字幕"
   },
+  "update": {
+    "restartResolveServer": {
+      "title": "更新已安装",
+      "description": "AutoSubs 已重新启动并与 Resolve 断开连接。请在 DaVinci Resolve 中再次运行 Workspace -> Scripts -> AutoSubs，以启动更新后的 Lua 服务器。"
+    }
+  },
   "importExport": {
     "button": "导出 / 导入",
     "importTab": "导入",
@@ -108,7 +114,16 @@
         "custom": "自定义"
       },
       "customCharsTitle": "最大字符数",
-      "customCharsDescription": "每行字符数"
+      "customCharsDescription": "每行字符数",
+      "customPromptTitle": "词汇和上下文",
+      "customPromptDescription": "帮助 Whisper 识别名称、品牌、术语、缩写和首选拼写。",
+      "customPromptTermsTitle": "关键术语",
+      "customPromptTermsPlaceholder": "添加名称、品牌、缩写或术语...",
+      "customPromptTermsExample": "示例：OpenAI, DaVinci Resolve, SubSlate, FFmpeg",
+      "customPromptContextTitle": "上下文 / 风格说明",
+      "customPromptContextPlaceholder": "添加简短主题或拼写偏好...",
+      "customPromptContextExample": "示例：这是 DaVinci Resolve 教程。优先使用“AutoSubs”，而不是“Auto Subs”。",
+      "customPromptWhisperOnly": "仅 Whisper 模型支持。"
     },
     "censor": {
       "title": "审查词汇",
@@ -451,7 +466,9 @@
     },
     "update": {
       "downloading": "正在下载更新",
-      "installUpdateNow": "立即安装更新"
+      "installing": "正在安装更新",
+      "restarting": "正在重启 AutoSubs",
+      "installUpdateNow": "安装并重启"
     },
     "resolve": {
       "productName": "DaVinci Resolve",

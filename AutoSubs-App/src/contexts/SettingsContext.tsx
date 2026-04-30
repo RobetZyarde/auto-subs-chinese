@@ -22,6 +22,10 @@ export const DEFAULT_SETTINGS: Settings = {
   timesDismissedSurvey: 0,
   lastSurveyDate: new Date().toISOString(),
 
+  // Milestone tracking
+  transcriptionsCompleted: 0,
+  subSlateMilestoneShown: false,
+
   // Processing settings
   model: 0,
   language: "auto",
@@ -41,6 +45,7 @@ export const DEFAULT_SETTINGS: Settings = {
   removePunctuation: false,
   enableCensor: false,
   censoredWords: [],
+  customPrompt: "",
   customMaxCharsPerLine: 38,
 
   // Resolve settings
