@@ -22,7 +22,7 @@ import { useResolve } from "@/contexts/ResolveContext"
 import { usePremiere } from "@/contexts/PremiereContext"
 import { useIntegration } from "@/contexts/IntegrationContext"
 import { useSettings } from "@/contexts/SettingsContext"
-import { Speaker, Track } from "@/types"
+import { Speaker, Template, Track } from "@/types"
 import { useTranslation } from "react-i18next"
 import { PlusIcon, type PlusIconHandle } from "../ui/plus"
 import { ArchiveIcon } from "../ui/archive"
@@ -506,6 +506,10 @@ interface AddToTimelineFooterProps {
   variant: SubtitleViewerVariant
   settings: ReturnType<typeof useSettings>["settings"]
   timelineInfo: ReturnType<typeof useResolve>["timelineInfo"]
+  templates: Template[]
+  templatesLoading: boolean
+  templatesLoaded: boolean
+  onLoadTemplates?: () => Promise<Template[]>
   layersIconRef: React.RefObject<PlusIconHandle>
   onAddToTimeline: (selectedOutputTrack: string, selectedTemplate: string, presetSettings?: Record<string, unknown>) => Promise<void>
   t: (key: string) => string
@@ -517,6 +521,10 @@ function AddToTimelineFooter({
   variant,
   settings,
   timelineInfo,
+  templates,
+  templatesLoading,
+  templatesLoaded,
+  onLoadTemplates,
   layersIconRef,
   onAddToTimeline,
   t,
@@ -528,6 +536,10 @@ function AddToTimelineFooter({
       <AddToTimelineDialog
         settings={settings}
         timelineInfo={timelineInfo}
+        templates={templates}
+        templatesLoading={templatesLoading}
+        templatesLoaded={templatesLoaded}
+        onLoadTemplates={onLoadTemplates}
         onAddToTimeline={onAddToTimeline}
         isAdding={isAdding}
         selectedIntegration={selectedIntegration}
@@ -570,7 +582,14 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
   const searchInputRef = React.useRef<HTMLInputElement>(null)
   const layersIconRef = React.useRef<PlusIconHandle>(null)
   const { subtitles, currentTranscriptFilename, updateSubtitles, exportSubtitlesAs, importSubtitles, reformatSubtitles, speakers, updateSpeakers } = useTranscript()
-  const { timelineInfo: resolveTimeline, pushToTimeline: resolvePush } = useResolve()
+  const {
+    timelineInfo: resolveTimeline,
+    templates: resolveTemplates,
+    templatesLoading: resolveTemplatesLoading,
+    templatesLoaded: resolveTemplatesLoaded,
+    refreshTemplates: refreshResolveTemplates,
+    pushToTimeline: resolvePush,
+  } = useResolve()
   const { timelineInfo: premiereTimeline, pushToTimeline: premierePush, isConnected: isPremiereConnected } = usePremiere()
 
   const { selectedIntegration } = useIntegration()
@@ -719,6 +738,10 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
           variant={variant}
           settings={settings}
           timelineInfo={timelineInfo}
+          templates={isPremiereActive ? [] : resolveTemplates}
+          templatesLoading={!isPremiereActive && resolveTemplatesLoading}
+          templatesLoaded={isPremiereActive || resolveTemplatesLoaded}
+          onLoadTemplates={isPremiereActive ? undefined : refreshResolveTemplates}
           layersIconRef={layersIconRef}
           onAddToTimeline={handleAddToTimeline}
           t={t}

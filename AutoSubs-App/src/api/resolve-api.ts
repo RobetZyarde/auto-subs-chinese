@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getTranscriptPath, getAudioExportDir } from '@/utils/file-utils';
-import { Speaker } from '@/types';
+import { Speaker, Template } from '@/types';
 
 /**
  * Error thrown when the AutoSubs Lua server (inside Resolve) reports a failure
@@ -113,7 +113,16 @@ export async function getTimelineInfo() {
   if (!data.timelineId) {
     throw new Error('No timeline detected in Resolve.');
   }
-  return data;
+  return {
+    ...data,
+    templates: [],
+  };
+}
+
+export async function getTemplates(): Promise<Template[]> {
+  const data = await callResolve({ func: 'GetTemplates' });
+  throwIfError(data, 'GetTemplates');
+  return Array.isArray(data) ? data : [];
 }
 
 export interface ConflictInfo {

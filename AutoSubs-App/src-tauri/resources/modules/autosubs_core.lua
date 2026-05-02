@@ -326,12 +326,17 @@ function GetTimelineInfo()
             timelineId = "",
             name = "No timeline selected"
         }
-    else -- get tracks and templates
+    else
         timelineInfo["outputTracks"] = get_video_tracks()
         timelineInfo["inputTracks"] = get_audio_tracks()
-        timelineInfo["templates"] = get_templates()
     end
     return timelineInfo
+end
+
+function GetTemplates()
+    project = projectManager:GetCurrentProject()
+    mediaPool = project:GetMediaPool()
+    return get_templates()
 end
 
 -- Get a list of possible output tracks for subtitles
@@ -1775,6 +1780,10 @@ function StartServer()
                                 print("[AutoSubs Server] Retrieving Timeline Info...")
                                 local timelineInfo = GetTimelineInfo()
                                 body = json.encode(timelineInfo)
+                            elseif data.func == "GetTemplates" then
+                                print("[AutoSubs Server] Retrieving Templates...")
+                                local templates = GetTemplates()
+                                body = json.encode(templates)
                             elseif data.func == "JumpToTime" then
                                 print("[AutoSubs Server] Jumping to time...")
                                 JumpToTime(data.seconds)

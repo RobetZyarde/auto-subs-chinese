@@ -164,7 +164,7 @@ export function ModelPicker({
             variant="outline"
             size="default"
             role="combobox"
-            className="p-2"
+            className="p-2 select-none"
             aria-expanded={open}
             data-tour="model-picker"
             onMouseEnter={() => {

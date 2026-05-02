@@ -9,7 +9,8 @@ import { loadFontForLanguage } from '@/lib/font-loader';
 
 export const DEFAULT_SETTINGS: Settings = {
   // Mode
-  isStandaloneMode: false,
+  audioInputMode: "timeline",
+  preferredEditorIntegration: "davinci",
 
   // UI settings
   uiLanguage: "en",
@@ -96,6 +97,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             uiLanguage: storedSettings.onboardingCompleted
               ? normalizeUiLanguage(storedSettings.uiLanguage)
               : getPreferredUiLanguage(),
+            // Migration: convert old isStandaloneMode boolean to audioInputMode enum
+            audioInputMode: storedSettings.audioInputMode ?? (storedSettings.isStandaloneMode ? "file" : "timeline"),
           } as Settings)
         : ({
             ...DEFAULT_SETTINGS,

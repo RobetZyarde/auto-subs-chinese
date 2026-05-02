@@ -9,6 +9,7 @@ import {
 import { Download, List, Plus } from "lucide-react"
 import { AddToTimelineDialog } from "@/components/dialogs/add-to-timeline-dialog"
 import { Settings, TimelineInfo } from "@/types"
+import { useResolve } from "@/contexts/ResolveContext"
 import { useTranslation } from "react-i18next"
 
 export interface CompletionStepProps {
@@ -29,6 +30,12 @@ export function CompletionStepItem({
     selectedIntegration
 }: CompletionStepProps) {
     const { t } = useTranslation()
+    const {
+        templates: resolveTemplates,
+        templatesLoading: resolveTemplatesLoading,
+        templatesLoaded: resolveTemplatesLoaded,
+        refreshTemplates: refreshResolveTemplates,
+    } = useResolve()
     const isResolveConnected = Boolean(timelineInfo?.timelineId) && selectedIntegration !== "premiere"
     const isPremiereConnected = Boolean(timelineInfo?.timelineId) && selectedIntegration === "premiere"
 
@@ -71,6 +78,10 @@ export function CompletionStepItem({
                             <AddToTimelineDialog
                                 settings={settings}
                                 timelineInfo={timelineInfo}
+                                templates={selectedIntegration === "premiere" ? [] : resolveTemplates}
+                                templatesLoading={selectedIntegration !== "premiere" && resolveTemplatesLoading}
+                                templatesLoaded={selectedIntegration === "premiere" || resolveTemplatesLoaded}
+                                onLoadTemplates={selectedIntegration === "premiere" ? undefined : refreshResolveTemplates}
                                 onAddToTimeline={onAddToTimeline}
                                 selectedIntegration={selectedIntegration}
                             >

@@ -16,7 +16,7 @@ interface PremiereContextType {
   exportProgress: number;
   refresh: () => Promise<void>;
   pushToTimeline: (filename?: string) => Promise<void>;
-  getSourceAudio: (isStandaloneMode: boolean, fileInput: string | null, inputTracks: string[]) => Promise<{ path: string, offset: number } | null>;
+  getSourceAudio: (audioInputMode: "file" | "timeline", fileInput: string | null, inputTracks: string[]) => Promise<{ path: string, offset: number } | null>;
 }
 
 const PremiereContext = createContext<PremiereContextType | null>(null);
@@ -180,11 +180,11 @@ export function PremiereProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function getSourceAudio(
-    isStandaloneMode: boolean,
+    audioInputMode: "file" | "timeline",
     fileInput: string | null,
     inputTracks: string[]
   ): Promise<{ path: string, offset: number } | null> {
-    if (isStandaloneMode || !isConnected) {
+    if (audioInputMode === "file" || !isConnected) {
       return { path: fileInput || "", offset: 0 };
     }
 

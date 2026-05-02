@@ -30,34 +30,42 @@ const TabsList = React.forwardRef<
   const [shouldAnimateTransition, setShouldAnimateTransition] = useState(false);
   const tabsListRef = useRef<HTMLDivElement | null>(null);
 
-  const updateIndicator = React.useCallback((shouldAnimate = false) => {
-    if (!tabsListRef.current) return;
+  const updateIndicator = React.useCallback(
+    (shouldAnimate = false) => {
+      if (!tabsListRef.current) return;
 
-    const activeTab = tabsListRef.current.querySelector<HTMLElement>(
-      '[data-state="active"]'
-    );
-    if (!activeTab) return;
+      const activeTab = tabsListRef.current.querySelector<HTMLElement>(
+        '[data-state="active"]',
+      );
+      if (!activeTab) return;
 
-    const activeRect = activeTab.getBoundingClientRect();
-    const tabsRect = tabsListRef.current.getBoundingClientRect();
+      // Use offset-based measurements which are transform-invariant.
+      // This prevents the indicator from "expanding" during popover animations
+      // that use scale transforms.
+      const listElement = activeTab.offsetParent as HTMLElement;
+      if (!listElement) return;
 
-    requestAnimationFrame(() => {
-      setIndicatorStyle({
-        left: activeRect.left - tabsRect.left,
-        top: activeRect.top - tabsRect.top,
-        width: activeRect.width,
-        height: activeRect.height,
-      });
-      
-      // Control animation state
-      setShouldAnimateTransition(shouldAnimate);
-      
-      // Mark as initialized after first positioning
-      if (!isInitialized) {
-        setIsInitialized(true);
+      const newStyle = {
+        left: activeTab.offsetLeft + listElement.offsetLeft,
+        top: activeTab.offsetTop + listElement.offsetTop,
+        width: activeTab.offsetWidth,
+        height: activeTab.offsetHeight,
+      };
+
+      const applyUpdate = () => {
+        setIndicatorStyle(newStyle);
+        setShouldAnimateTransition(shouldAnimate);
+        if (!isInitialized) setIsInitialized(true);
+      };
+
+      if (shouldAnimate) {
+        requestAnimationFrame(applyUpdate);
+      } else {
+        applyUpdate();
       }
-    });
-  }, [isInitialized]);
+    },
+    [isInitialized],
+  );
 
   const updateIndicatorWithAnimation = React.useCallback(() => {
     updateIndicator(true);
@@ -72,8 +80,6 @@ const TabsList = React.forwardRef<
   }, [updateIndicatorWithoutAnimation]);
 
   useEffect(() => {
-    setShouldAnimateTransition(true);
-
     // Event listeners
     window.addEventListener("resize", updateIndicatorWithAnimation);
     const observer = new MutationObserver(updateIndicatorWithAnimation);
@@ -99,18 +105,22 @@ const TabsList = React.forwardRef<
         data-slot="tabs-list"
         className={cn(
           "bg-muted text-muted-foreground relative inline-flex h-9 w-fit items-center justify-center rounded-md p-[3px]",
-          className
+          className,
         )}
         {...props}
       />
-      <div
-        data-indicator="true"
-        className={cn(
-          "absolute rounded-sm border border-transparent bg-background shadow-sm dark:border-input dark:bg-input/30",
-          shouldAnimateTransition ? "transition-all duration-300 ease-in-out" : "transition-none"
-        )}
-        style={indicatorStyle}
-      />
+      {isInitialized && (
+        <div
+          data-indicator="true"
+          className={cn(
+            "absolute rounded-sm border border-transparent bg-background shadow-sm dark:border-input dark:bg-input/30",
+            shouldAnimateTransition
+              ? "transition-all duration-300 ease-in-out"
+              : "transition-none",
+          )}
+          style={indicatorStyle}
+        />
+      )}
     </div>
   );
 });
@@ -125,7 +135,7 @@ const TabsTrigger = React.forwardRef<
     data-slot="tabs-trigger"
     className={cn(
       "data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-sm border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 z-10",
-      className
+      className,
     )}
     {...props}
   />

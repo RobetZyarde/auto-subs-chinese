@@ -32,7 +32,7 @@ interface TranscriptContextType {
   reformatSubtitles: (settings: Settings, fileInput: string | null, timelineId: string) => Promise<void>;
   exportSubtitlesAs: (format: 'srt' | 'txt', subtitles?: Subtitle[], speakers?: Speaker[]) => Promise<void>;
   importSubtitles: (settings: Settings, fileInput: string | null, timelineId: string) => Promise<void>;
-  loadSubtitles: (isStandaloneMode: boolean, fileInput: string | null, timelineId: string) => Promise<void>;
+  loadSubtitles: (audioInputMode: "file" | "timeline", fileInput: string | null, timelineId: string) => Promise<void>;
 }
 
 const TranscriptContext = createContext<TranscriptContextType | null>(null);
@@ -48,8 +48,8 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
   const timelineInfo = selectedIntegration === "premiere" ? premiereTimeline : resolveTimeline;
 
   // Load subtitles when timelineId or fileInput changes
-  const loadSubtitles = useCallback(async (isStandaloneMode: boolean, fileInput: string | null, timelineId: string) => {
-    const filename = await resolveTranscriptFilename(isStandaloneMode, fileInput, timelineId);
+  const loadSubtitles = useCallback(async (audioInputMode: "file" | "timeline", fileInput: string | null, timelineId: string) => {
+    const filename = await resolveTranscriptFilename(audioInputMode === "file", fileInput, timelineId);
     if (filename && filename.length > 0) {
       console.log("Loading subtitles:", filename);
       const transcript = await readTranscript(filename);
@@ -120,10 +120,10 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
   ): Promise<string> => {
     // Generate filename for new transcript based on mode and input
     const filename = generateTranscriptFilename(
-      settings.isStandaloneMode,
+      settings.audioInputMode === "file",
       fileInput,
       timelineId,
-      settings.isStandaloneMode ? undefined : timelineInfo?.name
+      settings.audioInputMode === "file" ? undefined : timelineInfo?.name
     )
 
     setCurrentTranscriptFilename(filename);
@@ -133,14 +133,14 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
     // Rust backend during transcription, so no post-processing is needed here.
     const { segments, speakers } = await saveTranscript(transcript, filename, {
       metadata: {
-        sourceType: settings.isStandaloneMode ? 'standalone' : 'resolve',
-        displayName: settings.isStandaloneMode
+        sourceType: settings.audioInputMode === "file" ? 'standalone' : 'resolve',
+        displayName: settings.audioInputMode === "file"
           ? (fileInput?.split(/[/\\]/).pop()?.replace(/\.[^/.\\]+$/, '') || 'transcript')
           : timelineInfo?.name || 'transcript',
-        timelineId: settings.isStandaloneMode ? undefined : timelineId,
-        timelineName: settings.isStandaloneMode ? undefined : timelineInfo?.name,
-        sourceFilePath: settings.isStandaloneMode ? fileInput || undefined : undefined,
-        sourceFileName: settings.isStandaloneMode && fileInput
+        timelineId: settings.audioInputMode === "file" ? undefined : timelineId,
+        timelineName: settings.audioInputMode === "file" ? undefined : timelineInfo?.name,
+        sourceFilePath: settings.audioInputMode === "file" ? fileInput || undefined : undefined,
+        sourceFileName: settings.audioInputMode === "file" && fileInput
           ? fileInput.split(/[/\\]/).pop() || undefined
           : undefined,
       }
@@ -161,7 +161,7 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
 
   const reformatSubtitles = async (settings: Settings, fileInput: string | null, timelineId: string) => {
     const filename = currentTranscriptFilename
-      ?? generateTranscriptFilename(settings.isStandaloneMode, fileInput, timelineId);
+      ?? generateTranscriptFilename(settings.audioInputMode === "file", fileInput, timelineId);
     const transcript = await readTranscript(filename);
     if (!transcript) {
       console.error("Failed to read transcript");
@@ -287,10 +287,10 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
 
       // Save transcript to file in Transcripts directory
       let filename = generateTranscriptFilename(
-        settings.isStandaloneMode,
+        settings.audioInputMode === "file",
         fileInput,
         timelineId,
-        settings.isStandaloneMode ? undefined : timelineInfo?.name,
+        settings.audioInputMode === "file" ? undefined : timelineInfo?.name,
       );
       console.log("Saving transcript to:", filename);
       // No speakers for imported subtitles.
@@ -298,14 +298,14 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
       // Users can apply formatting via the reformat flow after import.
       let { segments } = await saveTranscript(transcript, filename, {
         metadata: {
-          sourceType: settings.isStandaloneMode ? 'standalone' : 'resolve',
-          displayName: settings.isStandaloneMode
+          sourceType: settings.audioInputMode === "file" ? 'standalone' : 'resolve',
+          displayName: settings.audioInputMode === "file"
             ? (fileInput?.split(/[/\\]/).pop()?.replace(/\.[^/.\\]+$/, '') || 'transcript')
             : timelineInfo?.name || 'transcript',
-          timelineId: settings.isStandaloneMode ? undefined : timelineId,
-          timelineName: settings.isStandaloneMode ? undefined : timelineInfo?.name,
-          sourceFilePath: settings.isStandaloneMode ? fileInput || undefined : undefined,
-          sourceFileName: settings.isStandaloneMode && fileInput
+          timelineId: settings.audioInputMode === "file" ? undefined : timelineId,
+          timelineName: settings.audioInputMode === "file" ? undefined : timelineInfo?.name,
+          sourceFilePath: settings.audioInputMode === "file" ? fileInput || undefined : undefined,
+          sourceFileName: settings.audioInputMode === "file" && fileInput
             ? fileInput.split(/[/\\]/).pop() || undefined
             : undefined,
         }

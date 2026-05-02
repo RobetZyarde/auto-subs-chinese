@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext } from 'react';
+import { useSettings } from '@/contexts/SettingsContext';
 
 export type Integration = "davinci" | "premiere";
 
@@ -10,7 +11,11 @@ interface IntegrationContextType {
 const IntegrationContext = createContext<IntegrationContextType | null>(null);
 
 export function IntegrationProvider({ children }: { children: React.ReactNode }) {
-  const [selectedIntegration, setSelectedIntegration] = useState<Integration>("davinci");
+  const { settings, updateSetting } = useSettings();
+  const selectedIntegration = settings.preferredEditorIntegration;
+  const setSelectedIntegration = React.useCallback((integration: Integration) => {
+    updateSetting("preferredEditorIntegration", integration);
+  }, [updateSetting]);
 
   return (
     <IntegrationContext.Provider value={{ selectedIntegration, setSelectedIntegration }}>

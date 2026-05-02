@@ -82,7 +82,8 @@ export interface Model {
 // Settings Interface
 export interface Settings {
     // Mode
-    isStandaloneMode: boolean,
+    audioInputMode: "file" | "timeline",
+    preferredEditorIntegration: "davinci" | "premiere",
 
     // UI settings
     uiLanguage: SupportedUiLanguage;

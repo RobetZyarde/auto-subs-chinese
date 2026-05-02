@@ -1,19 +1,22 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { TimelineInfo } from '@/types';
-import { getTimelineInfo, cancelExport, addSubtitlesToTimeline } from '@/api/resolve-api';
+import { Template, TimelineInfo } from '@/types';
+import { getTimelineInfo, getTemplates, cancelExport, addSubtitlesToTimeline } from '@/api/resolve-api';
 import { useIntegration } from '@/contexts/IntegrationContext';
-import { useSettings } from '@/contexts/SettingsContext';
 
 interface ResolveContextType {
   timelineInfo: TimelineInfo;
+  templates: Template[];
+  templatesLoading: boolean;
+  templatesLoaded: boolean;
   markIn: number;
   isExporting: boolean;
   exportProgress: number;
   cancelRequestedRef: React.MutableRefObject<boolean>;
   refresh: () => Promise<void>;
+  refreshTemplates: () => Promise<Template[]>;
   pushToTimeline: (filename?: string, selectedTemplate?: string, selectedOutputTrack?: string, presetSettings?: Record<string, unknown>) => Promise<void>;
-  getSourceAudio: (isStandaloneMode: boolean, fileInput: string | null, inputTracks: string[]) => Promise<{ path: string, offset: number } | null>;
+  getSourceAudio: (audioInputMode: "file" | "timeline", fileInput: string | null, inputTracks: string[]) => Promise<{ path: string, offset: number } | null>;
   setIsExporting: (isExporting: boolean) => void;
   setExportProgress: (progress: number) => void;
   cancelExport: () => Promise<any>;
@@ -23,8 +26,10 @@ const ResolveContext = createContext<ResolveContextType | null>(null);
 
 export function ResolveProvider({ children }: { children: React.ReactNode }) {
   const { selectedIntegration } = useIntegration();
-  const { settings } = useSettings();
   const [timelineInfo, setTimelineInfo] = useState<TimelineInfo>({ name: "", timelineId: "", templates: [], inputTracks: [], outputTracks: [] });
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [markIn] = useState(0);
   
   // Export state
@@ -36,7 +41,7 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       let newTimelineInfo = await getTimelineInfo();
-      setTimelineInfo(newTimelineInfo);
+      setTimelineInfo({ ...newTimelineInfo, templates });
     } catch (error) {
       // Silently fail for connection errors to avoid console flooding
       // The calling context can handle UI updates if needed
@@ -48,21 +53,44 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
       // For other errors, still throw but don't log to console
       throw error;
     }
-  }, []);
+  }, [templates]);
+
+  const refreshTemplates = useCallback(async () => {
+    if (templatesLoaded) {
+      return templates;
+    }
+
+    setTemplatesLoading(true);
+    try {
+      const nextTemplates = await getTemplates();
+      setTemplates(nextTemplates);
+      setTemplatesLoaded(true);
+      setTimelineInfo((info) => ({ ...info, templates: nextTemplates }));
+      return nextTemplates;
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, [templates, templatesLoaded]);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (selectedIntegration !== "davinci" || settings.isStandaloneMode) {
+    if (selectedIntegration !== "davinci") {
       setTimelineInfo(emptyTimelineInfo);
+      setTemplates([]);
+      setTemplatesLoading(false);
+      setTemplatesLoaded(false);
       return;
     }
 
-    getTimelineInfo()
-      .then((info) => {
-        if (!cancelled) setTimelineInfo(info);
-      })
-      .catch((error) => {
+    let inFlight = false;
+    const pollTimeline = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      try {
+        const info = await getTimelineInfo();
+        if (!cancelled) setTimelineInfo({ ...info, templates });
+      } catch (error) {
         if (cancelled) return;
         const errorMessage = error instanceof Error ? error.message : String(error);
         if (
@@ -72,12 +100,26 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
         ) {
           setTimelineInfo(emptyTimelineInfo);
         }
-      });
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const startupTimers = [0, 1000, 3000].map((delay) =>
+      window.setTimeout(() => {
+        void pollTimeline();
+      }, delay),
+    );
+    const interval = window.setInterval(() => {
+      void pollTimeline();
+    }, 60000);
 
     return () => {
       cancelled = true;
+      startupTimers.forEach((timer) => window.clearTimeout(timer));
+      window.clearInterval(interval);
     };
-  }, [selectedIntegration, settings.isStandaloneMode, refresh]);
+  }, [selectedIntegration, templates, refresh]);
 
   async function pushToTimeline(
     filename?: string,
@@ -113,11 +155,11 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
 
   // Function to get source audio based on current mode
   const getSourceAudio = async (
-    isStandaloneMode: boolean,
+    audioInputMode: "file" | "timeline",
     fileInput: string | null,
     inputTracks: string[]
   ): Promise<{ path: string, offset: number } | null> => {
-    if (timelineInfo && !isStandaloneMode) {
+    if (timelineInfo && audioInputMode === "timeline") {
       // Reset cancellation flag at the start of export
       cancelRequestedRef.current = false;
       setIsExporting(true);
@@ -235,11 +277,15 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
   return (
     <ResolveContext.Provider value={{
       timelineInfo,
+      templates,
+      templatesLoading,
+      templatesLoaded,
       markIn,
       isExporting,
       exportProgress,
       cancelRequestedRef,
       refresh,
+      refreshTemplates,
       pushToTimeline,
       getSourceAudio,
       setIsExporting,

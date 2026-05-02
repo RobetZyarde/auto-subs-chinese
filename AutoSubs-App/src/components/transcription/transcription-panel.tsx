@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Speech, Type, AudioLines, Globe, X, PlayCircle, ChevronRight, ChevronDown, ScrollText } from "lucide-react"
+import { Speech, Type, AudioLines, Globe, X, PlayCircle, ChevronRight, ScrollText, Info, Airplay } from "lucide-react"
 import { open } from "@tauri-apps/plugin-dialog"
 import { invoke } from "@tauri-apps/api/core"
 import { downloadDir } from "@tauri-apps/api/path"
@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Textarea } from "@/components/ui/textarea"
 import { ModelPicker } from "@/components/settings/model-picker"
 import { LanguageSelector } from "@/components/settings/language-selector"
@@ -137,8 +137,8 @@ interface TranscriptionPanelViewProps {
   openModelSelector: boolean
   onOpenModelSelectorChange: (open: boolean) => void
   isSmallScreen: boolean
-  isStandaloneMode: boolean
-  onStandaloneModeChange: (standalone: boolean) => void
+  audioInputMode: "file" | "timeline"
+  onAudioInputModeChange: (mode: "file" | "timeline") => void
   processingSteps: ProcessingStep[]
   progressContainerRef: React.RefObject<HTMLDivElement>
   onExportToFile: () => void
@@ -153,7 +153,6 @@ interface TranscriptionPanelViewProps {
   onCancel?: () => void
   isProcessing?: boolean
   selectedIntegration: "davinci" | "premiere"
-  onSelectedIntegrationChange: (integration: "davinci" | "premiere") => void
 }
 
 function TranscriptionPanelView({
@@ -166,8 +165,8 @@ function TranscriptionPanelView({
   openModelSelector,
   onOpenModelSelectorChange,
   isSmallScreen,
-  isStandaloneMode,
-  onStandaloneModeChange,
+  audioInputMode,
+  onAudioInputModeChange,
   processingSteps,
   progressContainerRef,
   onExportToFile,
@@ -182,7 +181,6 @@ function TranscriptionPanelView({
   onCancel,
   isProcessing,
   selectedIntegration,
-  onSelectedIntegrationChange,
 }: TranscriptionPanelViewProps) {
   const { t, i18n } = useTranslation()
   const { settings: currentSettings, updateSetting } = useSettings()
@@ -286,51 +284,29 @@ function TranscriptionPanelView({
         </div>
 
         <Tabs
-          value={isStandaloneMode ? "file" : "timeline"}
-          onValueChange={(value) => onStandaloneModeChange(value === "file")}
+          value={audioInputMode}
+          onValueChange={(value) => onAudioInputModeChange(value as "file" | "timeline")}
           data-tour="mode-switcher"
           key={i18n.language}
         >
           <TabsList className="p-1 h-auto">
             <TabsTrigger
               value="file"
-              className="text-sm px-0"
+              className="text-sm"
               onMouseEnter={() => uploadIconRef.current?.startAnimation()}
               onMouseLeave={() => uploadIconRef.current?.stopAnimation()}
             >
-              <UploadIcon ref={uploadIconRef} size={14} />
+              <UploadIcon ref={uploadIconRef}/>
               {t("actionBar.mode.fileInput")}
             </TabsTrigger>
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild onPointerDown={() => onStandaloneModeChange(false)}>
-                <TabsTrigger value="timeline" data-state={!isStandaloneMode ? "active" : "inactive"} className="text-sm px-4 flex items-center gap-1" onPointerDown={() => onStandaloneModeChange(false)}>
-                  <img
-                    src={selectedIntegration === "premiere" ? "/premiere-logo.png" : "/davinci-resolve-logo.png"}
-                    alt={selectedIntegration === "premiere" ? "Premiere Pro" : "DaVinci Resolve"}
-                    className="w-5 h-5 mr-1"
-                  />
-                  {t("actionBar.mode.timeline")}
-                  <ChevronDown className="h-3 w-3 opacity-50 ml-1" />
-                </TabsTrigger>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="z-[100]">
-                <DropdownMenuItem onClick={() => {
-                  onStandaloneModeChange(false);
-                  onSelectedIntegrationChange("davinci");
-                }} className="cursor-pointer">
-                  <img src="/davinci-resolve-logo.png" alt="DaVinci" className="w-4 h-4 mr-2" />
-                  <span>DaVinci Resolve</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {
-                  onStandaloneModeChange(false);
-                  onSelectedIntegrationChange("premiere");
-                }} className="cursor-pointer">
-                  <img src="/premiere-logo.png" alt="Premiere" className="w-4 h-4 mr-2" />
-                  <span>Premiere Pro</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <TabsTrigger
+              value="timeline"
+              className=""
+              onPointerDown={() => onAudioInputModeChange("timeline")}
+            >
+              <Airplay className="h-4 w-4" />
+              {t("actionBar.mode.timeline")}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -480,24 +456,46 @@ function TranscriptionPanelView({
                       <p className="text-xs text-muted-foreground">{t("actionBar.format.customPromptDescription")}</p>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium">{t("actionBar.format.customPromptTermsTitle")}</Label>
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-xs font-medium">{t("actionBar.format.customPromptTermsTitle")}</Label>
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-[220px]">
+                              <p className="text-xs">{t("actionBar.format.customPromptTermsExample")}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                       <Textarea
                         value={localTerms}
                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setLocalTerms(e.target.value)}
                         placeholder={t("actionBar.format.customPromptTermsPlaceholder")}
                         className="min-h-[76px] resize-none text-sm"
                       />
-                      <p className="text-xs text-slate-500">{t("actionBar.format.customPromptTermsExample")}</p>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium">{t("actionBar.format.customPromptContextTitle")}</Label>
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-xs font-medium">{t("actionBar.format.customPromptContextTitle")}</Label>
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-[255px]">
+                              <p className="text-xs">{t("actionBar.format.customPromptContextExample")}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                       <Textarea
                         value={localContext}
                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setLocalContext(e.target.value)}
                         placeholder={t("actionBar.format.customPromptContextPlaceholder")}
                         className="min-h-[64px] resize-none text-sm"
                       />
-                      <p className="text-xs text-slate-500">{t("actionBar.format.customPromptContextExample")}</p>
                     </div>
                   </div>
                   <div className="border-t bg-muted/30">
@@ -509,7 +507,7 @@ function TranscriptionPanelView({
               </Popover>
             </div>
 
-            {!currentSettings.isStandaloneMode ? (
+            {currentSettings.audioInputMode === "timeline" ? (
               <Popover open={openTrackSelector} onOpenChange={handleTrackSelectorOpen} data-tour="audio-input">
                 <PopoverTrigger asChild>
                   <Button
@@ -640,22 +638,13 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
 
   const {
     timelineInfo: premiereTimeline,
-    isConnected: isPremiereConnected,
     pushToTimeline: premierePush,
     isExporting: premiereIsExporting,
     exportProgress: premiereExportProgress,
     getSourceAudio: premiereGetSourceAudio,
   } = usePremiere()
 
-  const { selectedIntegration, setSelectedIntegration } = useIntegration();
-  const [hasInitializedIntegration, setHasInitializedIntegration] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!hasInitializedIntegration && isPremiereConnected) {
-      setSelectedIntegration("premiere");
-      setHasInitializedIntegration(true);
-    }
-  }, [isPremiereConnected, hasInitializedIntegration]);
+  const { selectedIntegration } = useIntegration();
 
   const isPremiereActive = selectedIntegration === "premiere";
   const timelineInfo = isPremiereActive ? premiereTimeline : resolveTimeline;
@@ -698,18 +687,18 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
 
   React.useEffect(() => {
     const run = async () => {
-      if (!settings.isStandaloneMode) return
+      if (settings.audioInputMode !== "file") return
       if (!fileInput) return
 
       try {
-        await loadSubtitles(true, fileInput, timelineInfo?.timelineId ?? "standalone")
+        await loadSubtitles("file", fileInput, timelineInfo?.timelineId ?? "standalone")
       } catch (error) {
         console.error("Failed to load subtitles for selected file:", error)
       }
     }
 
     run()
-  }, [fileInputSelectionId, fileInput, loadSubtitles, settings.isStandaloneMode, timelineInfo?.timelineId])
+  }, [fileInputSelectionId, fileInput, loadSubtitles, settings.audioInputMode, timelineInfo?.timelineId])
 
   React.useEffect(() => {
     if (processingSteps.length > 0 && progressContainerRef.current) {
@@ -725,22 +714,22 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
     const cleanup = setupEventListeners({
       targetLanguage: settings.targetLanguage,
       language: settings.language,
-      isResolveMode: !settings.isStandaloneMode,
+      isResolveMode: settings.audioInputMode === "timeline",
       hasPendingDownloads,
       enableDiarize: settings.enableDiarize,
     })
 
     return cleanup
-  }, [setupEventListeners, settings.targetLanguage, settings.language, settings.isStandaloneMode, hasPendingDownloads, settings.enableDiarize])
+  }, [setupEventListeners, settings.targetLanguage, settings.language, settings.audioInputMode, hasPendingDownloads, settings.enableDiarize])
 
   React.useEffect(() => {
-    if (!settings.isStandaloneMode && isExporting) {
+    if (settings.audioInputMode === "timeline" && isExporting) {
       updateProgressStep({
         progress: exportProgress,
         type: 'Export'
       })
     }
-  }, [isExporting, exportProgress, settings.isStandaloneMode, updateProgressStep])
+  }, [isExporting, exportProgress, settings.audioInputMode, updateProgressStep])
 
   const handleExportToFile = async () => {
     try {
@@ -774,12 +763,12 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
   }
 
   const handleStartTranscription = async () => {
-    if (!settings.isStandaloneMode && !timelineInfo.timelineId) {
+    if (settings.audioInputMode === "timeline" && !timelineInfo.timelineId) {
       console.error("No timeline selected")
       return
     }
 
-    if (settings.isStandaloneMode && !fileInput) {
+    if (settings.audioInputMode === "file" && !fileInput) {
       console.error("No file selected")
       return
     }
@@ -791,14 +780,14 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
     setupEventListeners({
       targetLanguage: settings.targetLanguage,
       language: settings.language,
-      isResolveMode: !settings.isStandaloneMode,
+      isResolveMode: settings.audioInputMode === "timeline",
       hasPendingDownloads,
       enableDiarize: settings.enableDiarize,
     })
 
     try {
       const audioInfo = await getSourceAudio(
-        settings.isStandaloneMode,
+        settings.audioInputMode,
         fileInput,
         settings.selectedInputTracks,
       )
@@ -929,8 +918,8 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
           openModelSelector={openModelSelector}
           onOpenModelSelectorChange={setOpenModelSelector}
           isSmallScreen={isSmallScreen}
-          isStandaloneMode={settings.isStandaloneMode}
-          onStandaloneModeChange={(standalone) => updateSetting("isStandaloneMode", standalone)}
+          audioInputMode={settings.audioInputMode}
+          onAudioInputModeChange={(mode) => updateSetting("audioInputMode", mode)}
           processingSteps={processingSteps}
           progressContainerRef={progressContainerRef}
           onExportToFile={handleExportToFile}
@@ -945,7 +934,6 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
           onCancel={handleCancelTranscription}
           isProcessing={isProcessing}
           selectedIntegration={selectedIntegration}
-          onSelectedIntegrationChange={setSelectedIntegration}
         />
       </div>
     </div>
