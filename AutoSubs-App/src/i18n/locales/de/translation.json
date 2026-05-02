@@ -44,6 +44,7 @@
     "add": "Hinzufügen",
     "done": "Fertig",
     "delete": "Löschen",
+    "options": "Optionen",
     "generateSubtitles": "Untertitel generieren"
   },
   "update": {
@@ -115,6 +116,8 @@
       },
       "customCharsTitle": "Max. Zeichen",
       "customCharsDescription": "Zeichen pro Zeile",
+      "formatButton": "Format",
+      "customPromptButton": "Prompt",
       "customPromptTitle": "Vokabular & Kontext",
       "customPromptDescription": "Hilft Whisper, Namen, Marken, Fachsprache, Akronyme und bevorzugte Schreibweisen zu erkennen.",
       "customPromptTermsTitle": "Wichtige Begriffe",

@@ -45,6 +45,8 @@
       },
       "customCharsTitle": "最大文字数",
       "customCharsDescription": "1行あたりの文字数",
+      "formatButton": "書式",
+      "customPromptButton": "プロンプト",
       "customPromptTitle": "語彙とコンテキスト",
       "customPromptDescription": "Whisperが名前、ブランド、専門用語、略語、優先表記を認識しやすくします。",
       "customPromptTermsTitle": "重要な用語",
@@ -101,6 +103,7 @@
     "done": "完了",
     "generateSubtitles": "字幕を生成",
     "next": "次へ",
+    "options": "オプション",
     "saveChanges": "変更を保存"
   },
   "update": {

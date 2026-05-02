@@ -44,6 +44,7 @@
     "add": "Add",
     "done": "Done",
     "delete": "Delete",
+    "options": "Options",
     "generateSubtitles": "Generate Subtitles"
   },
   "update": {
@@ -115,6 +116,8 @@
       },
       "customCharsTitle": "Max Characters",
       "customCharsDescription": "Characters per line",
+      "formatButton": "Format",
+      "customPromptButton": "Prompt",
       "customPromptTitle": "Vocabulary & Context",
       "customPromptDescription": "Helps Whisper recognize names, brands, jargon, acronyms, and preferred spellings.",
       "customPromptTermsTitle": "Key Terms",

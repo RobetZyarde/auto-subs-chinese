@@ -44,6 +44,7 @@
     "add": "添加",
     "done": "完成",
     "delete": "删除",
+    "options": "选项",
     "generateSubtitles": "生成字幕"
   },
   "update": {
@@ -115,6 +116,8 @@
       },
       "customCharsTitle": "最大字符数",
       "customCharsDescription": "每行字符数",
+      "formatButton": "格式",
+      "customPromptButton": "提示",
       "customPromptTitle": "词汇和上下文",
       "customPromptDescription": "帮助 Whisper 识别名称、品牌、术语、缩写和首选拼写。",
       "customPromptTermsTitle": "关键术语",

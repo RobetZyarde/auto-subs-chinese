@@ -48,6 +48,8 @@
       },
       "customCharsTitle": "최대 문자 수",
       "customCharsDescription": "줄당 문자 수",
+      "formatButton": "서식",
+      "customPromptButton": "프롬프트",
       "customPromptTitle": "어휘 및 맥락",
       "customPromptDescription": "Whisper가 이름, 브랜드, 전문 용어, 약어, 선호 표기를 더 잘 인식하도록 돕습니다.",
       "customPromptTermsTitle": "주요 용어",
@@ -103,6 +105,7 @@
     "done": "완료",
     "generateSubtitles": "자막 생성",
     "next": "다음",
+    "options": "옵션",
     "saveChanges": "변경사항 저장"
   },
   "update": {

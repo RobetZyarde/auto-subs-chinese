@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Speech, Type, AudioLines, Globe, X, PlayCircle, ChevronRight, ScrollText, Info, Airplay, RefreshCw, SlidersHorizontal, ChevronDown, Pencil, SquarePen } from "lucide-react"
+import { Speech, Type, AudioLines, Globe, X, PlayCircle, ChevronRight, ScrollText, Info, Airplay, RefreshCw, SlidersHorizontal, ChevronDown } from "lucide-react"
 import { open } from "@tauri-apps/plugin-dialog"
 import { invoke } from "@tauri-apps/api/core"
 import { downloadDir } from "@tauri-apps/api/path"
@@ -307,7 +307,8 @@ function TranscriptionPanelView({
 
   const renderFileDropArea = (className = "h-[160px]") => (
     <div
-      className={`w-full ${className} flex flex-col items-center justify-center border-2 border-dashed rounded-lg py-4 px-2 cursor-pointer transition-colors hover:bg-muted/50 hover:dark:bg-muted outline-none`}
+      key="file-drop-area"
+      className={`group flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-muted-foreground/25 bg-muted/10 py-20 px-4 transition-colors hover:bg-muted/30 hover:border-muted-foreground/40 outline-none ${className}`}
       data-tour="audio-input"
       tabIndex={0}
       role="button"
@@ -320,30 +321,31 @@ function TranscriptionPanelView({
       onMouseLeave={() => dropAreaUploadIconRef.current?.stopAnimation()}
     >
       {selectedFile ? (
-        <div className="flex flex-col items-center gap-1">
-          <UploadIcon ref={dropAreaUploadIconRef} size={24} className="text-green-500" />
-          <span className="text-sm font-medium text-muted-foreground truncate px-2 text-center max-w-[280px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="rounded-full bg-green-500/10 p-3 text-green-500">
+            <UploadIcon ref={dropAreaUploadIconRef} size={24} />
+          </div>
+          <span className="text-sm font-medium text-foreground truncate px-2 text-center max-w-[280px]">
             {selectedFile.split("/").pop()}
           </span>
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-1">
-          <UploadIcon ref={dropAreaUploadIconRef} size={24} className="text-muted-foreground" />
-          <span className="text-sm font-medium text-muted-foreground">{t("actionBar.fileDrop.prompt")}</span>
-          <span className="text-xs text-muted-foreground">{t("actionBar.fileDrop.supports")}</span>
+        <div className="flex flex-col items-center gap-3">
+          <div className="rounded-full bg-black/5 dark:bg-white/5 p-3 text-muted-foreground group-hover:text-foreground transition-colors">
+            <UploadIcon ref={dropAreaUploadIconRef} size={24} />
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground transition-colors">{t("actionBar.fileDrop.prompt")}</span>
+            <span className="text-xs text-muted-foreground/80">{t("actionBar.fileDrop.supports")}</span>
+          </div>
         </div>
       )}
     </div>
   )
 
   const sourceSummary = React.useMemo(() => {
-    const languageLabel = currentSettings.language === "auto"
-      ? t("actionBar.common.auto")
-      : languages.find((l) => l.value === currentSettings.language)?.label ?? currentSettings.language
-
     if (currentSettings.audioInputMode === "file") {
-      const fileLabel = selectedFile?.split("/").pop() ?? t("actionBar.fileDrop.prompt")
-      return `${t("actionBar.mode.fileInput")} · ${fileLabel} · ${languageLabel}`
+      return selectedFile?.split("/").pop() ?? t("actionBar.fileDrop.prompt")
     }
 
     const rangeLabel = currentSettings.exportRange === "inout"
@@ -353,8 +355,8 @@ function TranscriptionPanelView({
       ? t("actionBar.tracks.trackN", { n: currentSettings.selectedInputTracks[0] })
       : t("actionBar.tracks.countSelected", { count: selectedTrackCount })
 
-    return `${rangeLabel} · ${tracksLabel} · ${languageLabel}`
-  }, [currentSettings.audioInputMode, currentSettings.exportRange, currentSettings.language, currentSettings.selectedInputTracks, selectedFile, selectedTrackCount, t])
+    return `${rangeLabel} · ${tracksLabel}`
+  }, [currentSettings.audioInputMode, currentSettings.exportRange, currentSettings.selectedInputTracks, selectedFile, selectedTrackCount, t])
 
   const renderCollapsedSourceSummary = () => (
     <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/35 pl-4 pr-3 py-2">
@@ -423,7 +425,7 @@ function TranscriptionPanelView({
       </div>
 
       {inputTracks.length > 0 ? (
-        <div className="max-h-44 space-y-2 overflow-y-auto">
+        <div className="max-h-[28vh] space-y-2 overflow-y-auto rounded-lg pr-2">
           {inputTracks.map((track, index) => {
             const isChecked = currentSettings.selectedInputTracks.includes(track.value)
 
@@ -435,7 +437,7 @@ function TranscriptionPanelView({
                 className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${
                   isChecked
                     ? "border-input bg-muted/60 shadow-sm"
-                    : "border-transparent bg-muted/35 hover:bg-muted/55"
+                    : "border-transparent bg-muted/35 dark:border-border dark:bg-muted/50 hover:bg-muted/55 dark:hover:bg-muted/60"
                 }`}
                 onClick={() => toggleInputTrack(track.value)}
                 onKeyDown={(e) => {
@@ -572,7 +574,7 @@ function TranscriptionPanelView({
 
       <div className="flex-shrink-0">
         <Card className={`p-3 ${isTourActive ? '' : 'sticky bottom-4'} mx-4 z-50 shadow-lg bg-card`}>
-          <div className="grid w-full gap-3" data-tour="transcription-controls">
+          <div className="grid w-full gap-4" data-tour="transcription-controls">
             {!isProcessing && (
               shouldShowExpandedSourceControls
                 ? currentSettings.audioInputMode === "timeline"
@@ -646,7 +648,7 @@ function TranscriptionPanelView({
                     </span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-72 p-0" side="top">
+                <PopoverContent className="w-72 p-0" align="start" side="top">
                   <SpeakerSelector />
                 </PopoverContent>
               </Popover>
@@ -661,9 +663,10 @@ function TranscriptionPanelView({
                     className="dark:bg-background dark:hover:bg-accent rounded-full"
                   >
                     <Type className="h-4 w-4" />
+                    <span className="text-xs">{t("actionBar.format.formatButton", "Format")}</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 p-0" align="center" onOpenAutoFocus={(e) => e.preventDefault()}>
+                <PopoverContent className="w-80 p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
                   <TextFormattingPanel />
                 </PopoverContent>
               </Popover>
@@ -680,6 +683,7 @@ function TranscriptionPanelView({
                     className="relative dark:bg-background dark:hover:bg-accent rounded-full"
                   >
                     <ScrollText />
+                    <span className="text-xs">{t("actionBar.format.customPromptButton", "Prompt")}</span>
                     {currentSettings.customPrompt.trim() ? (
                       <span className="absolute right-2.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
                     ) : null}
