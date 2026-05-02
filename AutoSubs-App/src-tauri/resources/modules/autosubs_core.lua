@@ -557,9 +557,7 @@ end
 -- Helper function to find clip boundaries on selected audio tracks within in/out markers.
 -- Clips entirely outside the marker region are ignored. Clips that overlap the
 -- region are clamped to the marker boundaries.
-local function get_clip_boundaries(timeline, selectedTracks)
-    local rangeStart, rangeEnd = get_marker_range(timeline)
-
+local function get_clip_boundaries(timeline, selectedTracks, rangeStart, rangeEnd)
     local earliestStart = nil
     local latestEnd = nil
 
@@ -591,11 +589,10 @@ end
 
 -- Helper function to get individual clips with their boundaries (for segment-based transcription)
 -- Returns a sorted array of clip segments: { { start, end, name }, ... }
-local function get_individual_clips(timeline, selectedTracks)
+local function get_individual_clips(timeline, selectedTracks, rangeStart, rangeEnd)
     local allClips = {}
     local timelineStart = timeline:GetStartFrame()
     local frameRate = timeline:GetSetting("timelineFrameRate")
-    local rangeStart, rangeEnd = get_marker_range(timeline)
 
     for trackIndex, _ in pairs(selectedTracks) do
         local clips = timeline:GetItemListInTrack("audio", trackIndex)
@@ -649,7 +646,7 @@ end
 
 -- Export audio from selected tracks
 -- inputTracks is a table of track indices to export
-function ExportAudio(outputDir, inputTracks)
+function ExportAudio(outputDir, inputTracks, exportRange)
     -- Check if another export is already in progress
     if project:IsRenderingInProgress() then
         return {
@@ -702,46 +699,34 @@ function ExportAudio(outputDir, inputTracks)
         timeline:SetTrackEnable("audio", i, isEnabled)
     end
 
-    -- Get in/out markers as the base export range
-    local inMarker, outMarker = timeline:GetMarkInOut()
-    local hasMarkers = inMarker and outMarker
+    local timelineStart = timeline:GetStartFrame()
+    local timelineEnd = timeline:GetEndFrame()
+    local rangeStart = timelineStart
+    local rangeEnd = timelineEnd
 
-    -- Find clip boundaries on selected tracks to potentially narrow the range (avoid exporting silence)
-    local clipStart, clipEnd = get_clip_boundaries(timeline, selected)
+    if exportRange == "inout" then
+        rangeStart, rangeEnd = get_marker_range(timeline)
+        print("[AutoSubs] Using in/out export range: " .. rangeStart .. " - " .. rangeEnd)
+    else
+        exportRange = "entire"
+        print("[AutoSubs] Using entire timeline export range: " .. rangeStart .. " - " .. rangeEnd)
+    end
+
+    -- Find clip boundaries on selected tracks within the chosen range for
+    -- segment-based transcription metadata.
+    local clipStart, clipEnd = get_clip_boundaries(timeline, selected, rangeStart, rangeEnd)
 
     -- Get individual clips for segment-based transcription
-    local individualClips = get_individual_clips(timeline, selected)
+    local individualClips = get_individual_clips(timeline, selected, rangeStart, rangeEnd)
     currentExportJob.individualClips = individualClips
     print("[AutoSubs] Found " .. #individualClips .. " individual clip(s) for transcription")
 
-    -- Determine the final export range
-    local exportStart, exportEnd
+    -- The user's selected range is authoritative. Clip boundaries are retained
+    -- only for progress/segment metadata, not to silently shorten the export.
+    local exportStart, exportEnd = rangeStart, rangeEnd
 
-    if hasMarkers then
-        -- Markers are set - use them as the base range
-        exportStart = inMarker
-        exportEnd = outMarker
-        print("[AutoSubs] Using marker region: " .. exportStart .. " - " .. exportEnd)
-
-        -- Narrow to clip boundaries if clips are found within the marker region
-        if clipStart and clipEnd then
-            exportStart = math.max(exportStart, clipStart)
-            exportEnd = math.min(exportEnd, clipEnd)
-            print("[AutoSubs] Narrowed to clip boundaries: " .. exportStart .. " - " .. exportEnd)
-        end
-    else
-        -- No markers - use clip boundaries if found, otherwise full timeline
-        if clipStart and clipEnd then
-            exportStart = clipStart
-            exportEnd = clipEnd
-            print("[AutoSubs] No markers, using clip boundaries: " .. exportStart .. " - " .. exportEnd)
-        else
-            print("[AutoSubs] No markers or clips found, using full timeline")
-        end
-    end
-
-    if exportStart and exportEnd then
-        currentExportJob.clipBoundaries = { start = exportStart, ["end"] = exportEnd }
+    if clipStart and clipEnd then
+        currentExportJob.clipBoundaries = { start = clipStart, ["end"] = clipEnd }
     end
 
     resolve:OpenPage("deliver")
@@ -759,12 +744,9 @@ function ExportAudio(outputDir, inputTracks)
         AudioSampleRate = 44100
     }
 
-    -- If we found clip boundaries, set the render range to only that portion
-    if clipStart and clipEnd then
-        renderSettings.MarkIn = clipStart
-        renderSettings.MarkOut = clipEnd
-        print("[AutoSubs] Setting render range in settings: " .. clipStart .. " - " .. clipEnd)
-    end
+    renderSettings.MarkIn = exportStart
+    renderSettings.MarkOut = exportEnd
+    print("[AutoSubs] Setting render range in settings: " .. exportStart .. " - " .. exportEnd)
 
     project:SetRenderSettings(renderSettings)
 
@@ -1792,7 +1774,7 @@ function StartServer()
                                 })
                             elseif data.func == "ExportAudio" then
                                 print("[AutoSubs Server] Exporting audio...")
-                                local audioInfo = ExportAudio(data.outputDir, data.inputTracks)
+                                local audioInfo = ExportAudio(data.outputDir, data.inputTracks, data.exportRange)
                                 body = json.encode(audioInfo)
                             elseif data.func == "GetExportProgress" then
                                 print("[AutoSubs Server] Getting export progress...")

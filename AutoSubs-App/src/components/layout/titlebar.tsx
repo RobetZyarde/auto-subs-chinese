@@ -135,7 +135,7 @@ function IntegrationStatus() {
                 className="cursor-pointer"
               >
                 <div className={`w-2 h-2 rounded-full ${item.connected ? 'bg-green-500' : 'bg-red-500'}`} />
-                <img src={item.logo} alt={item.productName} className="h-4 w-4 opacity-80" />
+                <img src={item.logo} alt={item.productName} className="h-4 w-4" />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span>{item.productName}</span>
                   <span className="truncate text-xs text-muted-foreground">

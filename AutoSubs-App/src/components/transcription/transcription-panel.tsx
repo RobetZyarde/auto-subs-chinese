@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Speech, Type, AudioLines, Globe, X, PlayCircle, ChevronRight, ScrollText, Info, Airplay } from "lucide-react"
+import { Speech, Type, AudioLines, Globe, X, PlayCircle, ChevronRight, ScrollText, Info, Airplay, RefreshCw, SlidersHorizontal, ChevronDown, Pencil, SquarePen } from "lucide-react"
 import { open } from "@tauri-apps/plugin-dialog"
 import { invoke } from "@tauri-apps/api/core"
 import { downloadDir } from "@tauri-apps/api/path"
@@ -10,14 +10,16 @@ import { UploadIcon, type UploadIconHandle } from "@/components/ui/icons/upload"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Textarea } from "@/components/ui/textarea"
 import { ModelPicker } from "@/components/settings/model-picker"
 import { LanguageSelector } from "@/components/settings/language-selector"
 import { SpeakerSelector } from "@/components/settings/diarize-selector"
 import { TextFormattingPanel } from "@/components/settings/text-formatting-panel"
-import { TrackSelector } from "@/components/settings/track-selector"
 import { ProcessingStepItem } from "@/components/processing/processing-step-item"
 import { useModels } from "@/contexts/ModelsContext"
 import { useProgress } from "@/contexts/ProgressContext"
@@ -151,6 +153,7 @@ interface TranscriptionPanelViewProps {
   onSelectedFileChange?: (file: string | null) => void
   onStart?: () => void
   onCancel?: () => void
+  onRefreshAudioTracks?: () => Promise<void>
   isProcessing?: boolean
   selectedIntegration: "davinci" | "premiere"
 }
@@ -179,21 +182,24 @@ function TranscriptionPanelView({
   onSelectedFileChange,
   onStart,
   onCancel,
+  onRefreshAudioTracks,
   isProcessing,
   selectedIntegration,
 }: TranscriptionPanelViewProps) {
   const { t, i18n } = useTranslation()
   const { settings: currentSettings, updateSetting } = useSettings()
-  const isPremiereActive = selectedIntegration === "premiere";
   const isTourActive = !currentSettings.tourCompleted
   const uploadIconRef = React.useRef<UploadIconHandle>(null)
   const dropAreaUploadIconRef = React.useRef<UploadIconHandle>(null)
   const [openLanguage, setOpenLanguage] = React.useState(false)
   const [localSelectedFile, setLocalSelectedFile] = React.useState<string | null>(null)
-  const [openTrackSelector, setOpenTrackSelector] = React.useState(false)
   const [openSpeakerPopover, setOpenSpeakerPopover] = React.useState(false)
   const [openTextFormattingPopover, setOpenTextFormattingPopover] = React.useState(false)
   const [openCustomPromptPopover, setOpenCustomPromptPopover] = React.useState(false)
+  const [sourceControlsExpanded, setSourceControlsExpanded] = React.useState(true)
+  const [optionsOpen, setOptionsOpen] = React.useState(false)
+  const [isRefreshingTracks, setIsRefreshingTracks] = React.useState(false)
+  const [refreshSpinKey, setRefreshSpinKey] = React.useState(0)
   const [localTerms, setLocalTerms] = React.useState("")
   const [localContext, setLocalContext] = React.useState("")
   const customPromptParts = React.useMemo(
@@ -262,9 +268,209 @@ function TranscriptionPanelView({
     setSelectedFile(file)
   }
 
-  const handleTrackSelectorOpen = async (open: boolean) => {
-    setOpenTrackSelector(open)
-  }
+  const selectedTrackCount = currentSettings.selectedInputTracks.length
+  const hasProcessingSteps = processingSteps.length > 0
+  const showProcessing = isProcessing || hasProcessingSteps
+  const hasCompletedRun = !isProcessing && hasProcessingSteps
+  const shouldShowExpandedSourceControls = !hasCompletedRun || sourceControlsExpanded
+
+  React.useEffect(() => {
+    if (isProcessing) {
+      setSourceControlsExpanded(false)
+    } else if (!hasProcessingSteps) {
+      setSourceControlsExpanded(true)
+    }
+  }, [hasProcessingSteps, isProcessing])
+
+  const handleRefreshAudioTracks = React.useCallback(async () => {
+    if (!onRefreshAudioTracks || isRefreshingTracks) return
+
+    setRefreshSpinKey((key) => key + 1)
+
+    try {
+      setIsRefreshingTracks(true)
+      await onRefreshAudioTracks()
+    } finally {
+      setIsRefreshingTracks(false)
+    }
+  }, [isRefreshingTracks, onRefreshAudioTracks])
+
+  const toggleInputTrack = React.useCallback((trackId: string) => {
+    const isSelected = currentSettings.selectedInputTracks.includes(trackId)
+    updateSetting(
+      "selectedInputTracks",
+      isSelected
+        ? currentSettings.selectedInputTracks.filter((id: string) => id !== trackId)
+        : [...currentSettings.selectedInputTracks, trackId],
+    )
+  }, [currentSettings.selectedInputTracks, updateSetting])
+
+  const renderFileDropArea = (className = "h-[160px]") => (
+    <div
+      className={`w-full ${className} flex flex-col items-center justify-center border-2 border-dashed rounded-lg py-4 px-2 cursor-pointer transition-colors hover:bg-muted/50 hover:dark:bg-muted outline-none`}
+      data-tour="audio-input"
+      tabIndex={0}
+      role="button"
+      aria-label={t("actionBar.fileDrop.aria")}
+      onClick={handleFileSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") handleFileSelect()
+      }}
+      onMouseEnter={() => dropAreaUploadIconRef.current?.startAnimation()}
+      onMouseLeave={() => dropAreaUploadIconRef.current?.stopAnimation()}
+    >
+      {selectedFile ? (
+        <div className="flex flex-col items-center gap-1">
+          <UploadIcon ref={dropAreaUploadIconRef} size={24} className="text-green-500" />
+          <span className="text-sm font-medium text-muted-foreground truncate px-2 text-center max-w-[280px]">
+            {selectedFile.split("/").pop()}
+          </span>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-1">
+          <UploadIcon ref={dropAreaUploadIconRef} size={24} className="text-muted-foreground" />
+          <span className="text-sm font-medium text-muted-foreground">{t("actionBar.fileDrop.prompt")}</span>
+          <span className="text-xs text-muted-foreground">{t("actionBar.fileDrop.supports")}</span>
+        </div>
+      )}
+    </div>
+  )
+
+  const sourceSummary = React.useMemo(() => {
+    const languageLabel = currentSettings.language === "auto"
+      ? t("actionBar.common.auto")
+      : languages.find((l) => l.value === currentSettings.language)?.label ?? currentSettings.language
+
+    if (currentSettings.audioInputMode === "file") {
+      const fileLabel = selectedFile?.split("/").pop() ?? t("actionBar.fileDrop.prompt")
+      return `${t("actionBar.mode.fileInput")} · ${fileLabel} · ${languageLabel}`
+    }
+
+    const rangeLabel = currentSettings.exportRange === "inout"
+      ? t("actionBar.tracks.exportRange.inout")
+      : t("actionBar.tracks.exportRange.entire")
+    const tracksLabel = selectedTrackCount === 1
+      ? t("actionBar.tracks.trackN", { n: currentSettings.selectedInputTracks[0] })
+      : t("actionBar.tracks.countSelected", { count: selectedTrackCount })
+
+    return `${rangeLabel} · ${tracksLabel} · ${languageLabel}`
+  }, [currentSettings.audioInputMode, currentSettings.exportRange, currentSettings.language, currentSettings.selectedInputTracks, selectedFile, selectedTrackCount, t])
+
+  const renderCollapsedSourceSummary = () => (
+    <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/35 pl-4 pr-3 py-2">
+      <div className="min-w-0">
+        <div className="truncate text-sm font-medium">
+          {sourceSummary}
+        </div>
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-8 shrink-0 px-2"
+        onClick={() => {
+          setSourceControlsExpanded(true)
+          handleRefreshAudioTracks()
+        }}
+      >
+        {t("common.edit", "Edit")}
+      </Button>
+    </div>
+  )
+
+  const renderTimelineTrackSelector = () => (
+    <div className="space-y-2.5" data-tour="audio-input">
+      <div className="flex items-center justify-between gap-2">
+        <Select
+          value={currentSettings.exportRange || "entire"}
+          onValueChange={(val) => updateSetting("exportRange", val as "entire" | "inout")}
+        >
+          <SelectTrigger className="h-8 w-fit max-w-full border-transparent bg-transparent px-2 text-sm shadow-none hover:bg-muted focus:ring-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="entire">
+              {t("actionBar.tracks.exportRange.entire")}
+            </SelectItem>
+            <SelectItem value="inout">
+              {t("actionBar.tracks.exportRange.inout")}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                onClick={handleRefreshAudioTracks}
+                disabled={isRefreshingTracks}
+                aria-label={t("common.refresh", "Refresh")}
+              >
+                <RefreshCw
+                  key={refreshSpinKey}
+                  className={`h-4 w-4 ${refreshSpinKey > 0 ? "[animation:spin_500ms_linear_1]" : ""}`}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{t("common.refresh", "Refresh")}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      {inputTracks.length > 0 ? (
+        <div className="max-h-44 space-y-2 overflow-y-auto">
+          {inputTracks.map((track, index) => {
+            const isChecked = currentSettings.selectedInputTracks.includes(track.value)
+
+            return (
+              <div
+                key={track.value}
+                role="button"
+                tabIndex={0}
+                className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${
+                  isChecked
+                    ? "border-input bg-muted/60 shadow-sm"
+                    : "border-transparent bg-muted/35 hover:bg-muted/55"
+                }`}
+                onClick={() => toggleInputTrack(track.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    toggleInputTrack(track.value)
+                  }
+                }}
+              >
+                <Checkbox
+                  checked={isChecked}
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  className="pointer-events-none border-muted-foreground/40 data-[state=checked]:border-foreground data-[state=checked]:bg-foreground data-[state=checked]:text-background"
+                />
+                <AudioLines className="h-4 w-4 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                  {track.label}
+                </span>
+                <span className="rounded-md border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground">
+                  {index + 1}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="flex min-h-24 items-center justify-center rounded-lg border border-dashed px-4 text-center">
+          <p className="text-sm text-muted-foreground">
+            {t("actionBar.tracks.createTrack")}
+          </p>
+        </div>
+      )}
+    </div>
+  )
 
   return (
     <div className="h-full flex flex-col relative pb-4">
@@ -285,7 +491,11 @@ function TranscriptionPanelView({
 
         <Tabs
           value={audioInputMode}
-          onValueChange={(value) => onAudioInputModeChange(value as "file" | "timeline")}
+          onValueChange={(value) => {
+            onAudioInputModeChange(value as "file" | "timeline")
+            setSourceControlsExpanded(true)
+            handleRefreshAudioTracks()
+          }}
           data-tour="mode-switcher"
           key={i18n.language}
         >
@@ -318,7 +528,7 @@ function TranscriptionPanelView({
           WebkitMaskImage: "linear-gradient(to bottom, black 90%, transparent 100%)",
         }}
       >
-        {processingSteps.length > 0 ? (
+        {showProcessing ? (
           <div ref={progressContainerRef} className="w-full px-4 pb-6 relative z-10">
             <div className="flex flex-col gap-2">
               {processingSteps.map((step) => (
@@ -363,7 +573,16 @@ function TranscriptionPanelView({
       <div className="flex-shrink-0">
         <Card className={`p-3 ${isTourActive ? '' : 'sticky bottom-4'} mx-4 z-50 shadow-lg bg-card`}>
           <div className="grid w-full gap-3" data-tour="transcription-controls">
-            <div className="flex items-center gap-1.5">
+            {!isProcessing && (
+              shouldShowExpandedSourceControls
+                ? currentSettings.audioInputMode === "timeline"
+                  ? renderTimelineTrackSelector()
+                  : renderFileDropArea("h-[140px]")
+                : renderCollapsedSourceSummary()
+            )}
+
+            <Collapsible open={optionsOpen} onOpenChange={setOptionsOpen} className="space-y-2">
+              <div className="flex items-center gap-1.5">
               <Popover open={openLanguage} onOpenChange={setOpenLanguage}>
                 <PopoverTrigger asChild>
                   <Button
@@ -393,6 +612,23 @@ function TranscriptionPanelView({
                 </PopoverContent>
               </Popover>
 
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="default"
+                  className="rounded-full dark:bg-background dark:hover:bg-accent"
+                  aria-expanded={optionsOpen}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="text-xs">{t("common.options", "Options")}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${optionsOpen ? "rotate-180" : ""}`} />
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+
+            <CollapsibleContent>
+              <div className="flex items-center gap-1.5">
               <Popover open={openSpeakerPopover} onOpenChange={setOpenSpeakerPopover}>
                 <PopoverTrigger asChild>
                   <Button
@@ -450,7 +686,7 @@ function TranscriptionPanelView({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" side="top" align="center" onOpenAutoFocus={(e) => e.preventDefault()}>
-                  <div className="px-4 py-3.5 space-y-2">
+                  <div className="px-4 py-3.5 space-y-4">
                     <div className="space-y-0.5">
                       <Label className="text-sm font-medium">{t("actionBar.format.customPromptTitle")}</Label>
                       <p className="text-xs text-muted-foreground">{t("actionBar.format.customPromptDescription")}</p>
@@ -505,65 +741,9 @@ function TranscriptionPanelView({
                   </div>
                 </PopoverContent>
               </Popover>
-            </div>
-
-            {currentSettings.audioInputMode === "timeline" ? (
-              <Popover open={openTrackSelector} onOpenChange={handleTrackSelectorOpen} data-tour="audio-input">
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={openTrackSelector}
-                    className="w-full h-[120px] justify-center dark:bg-background dark:hover:bg-accent"
-                    size="sm"
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <AudioLines className="h-6 w-6" />
-                      <div className="text-sm font-medium">
-                        {currentSettings.selectedInputTracks.length === 0
-                          ? t("actionBar.tracks.selectTracks")
-                          : currentSettings.selectedInputTracks.length === 1
-                            ? t("actionBar.tracks.trackN", { n: currentSettings.selectedInputTracks[0] })
-                            : t("actionBar.tracks.countSelected", { count: currentSettings.selectedInputTracks.length })}
-                      </div>
-                      <span className="text-xs text-muted-foreground">{t("actionBar.tracks.selectMultiple")}</span>
-                    </div>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="min-w-[320px] p-0 overflow-hidden" align="center">
-                  <TrackSelector inputTracks={inputTracks} isPremiereActive={isPremiereActive} />
-                </PopoverContent>
-              </Popover>
-            ) : (
-              <div
-                className="w-full h-[120px] flex flex-col items-center justify-center border-2 border-dashed rounded-lg py-4 px-2 cursor-pointer transition-colors hover:bg-muted/50 hover:dark:bg-muted outline-none"
-                data-tour="audio-input"
-                tabIndex={0}
-                role="button"
-                aria-label={t("actionBar.fileDrop.aria")}
-                onClick={handleFileSelect}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") handleFileSelect()
-                }}
-                onMouseEnter={() => dropAreaUploadIconRef.current?.startAnimation()}
-                onMouseLeave={() => dropAreaUploadIconRef.current?.stopAnimation()}
-              >
-                {selectedFile ? (
-                  <div className="flex flex-col items-center gap-1">
-                    <UploadIcon ref={dropAreaUploadIconRef} size={24} className="text-green-500" />
-                    <span className="text-sm font-medium text-muted-foreground truncate px-2 text-center max-w-[280px]">
-                      {selectedFile.split("/").pop()}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-1">
-                    <UploadIcon ref={dropAreaUploadIconRef} size={24} className="text-muted-foreground" />
-                    <span className="text-sm font-medium text-muted-foreground">{t("actionBar.fileDrop.prompt")}</span>
-                    <span className="text-xs text-muted-foreground">{t("actionBar.fileDrop.supports")}</span>
-                  </div>
-                )}
               </div>
-            )}
+            </CollapsibleContent>
+          </Collapsible>
 
             {isProcessing ? (
               <Button
@@ -584,7 +764,9 @@ function TranscriptionPanelView({
                 disabled={isProcessing}
               >
                 <PlayCircle className="h-4 w-4" />
-                {t("common.generateSubtitles")}
+                {currentSettings.audioInputMode === "timeline" && selectedTrackCount > 0
+                  ? `${t("common.generateSubtitles")} (${selectedTrackCount})`
+                  : t("common.generateSubtitles")}
               </Button>
             )}
           </div>
@@ -626,6 +808,7 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
   const { modelsState, downloadedModelValues, checkDownloadedModels } = useModels()
   const {
     timelineInfo: resolveTimeline,
+    refresh: refreshResolve,
     pushToTimeline: resolvePush,
     cancelExport: resolveCancelExport,
     isExporting: resolveIsExporting,
@@ -638,6 +821,7 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
 
   const {
     timelineInfo: premiereTimeline,
+    refresh: refreshPremiere,
     pushToTimeline: premierePush,
     isExporting: premiereIsExporting,
     exportProgress: premiereExportProgress,
@@ -648,6 +832,7 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
 
   const isPremiereActive = selectedIntegration === "premiere";
   const timelineInfo = isPremiereActive ? premiereTimeline : resolveTimeline;
+  const refreshAudioTracks = isPremiereActive ? refreshPremiere : refreshResolve;
   const getSourceAudio = isPremiereActive ? premiereGetSourceAudio : resolveGetSourceAudio;
   const pushToTimeline = isPremiereActive 
     ? (filename?: string, _selectedTemplate?: string, _selectedOutputTrack?: string, _presetSettings?: Record<string, unknown>) => premierePush(filename) 
@@ -932,6 +1117,7 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
           onSelectedFileChange={handleSelectedFileChange}
           onStart={handleStartTranscription}
           onCancel={handleCancelTranscription}
+          onRefreshAudioTracks={refreshAudioTracks}
           isProcessing={isProcessing}
           selectedIntegration={selectedIntegration}
         />

@@ -80,12 +80,13 @@ async function callResolve(
   }
 }
 
-export async function exportAudio(inputTracks: Array<string>) {
+export async function exportAudio(inputTracks: Array<string>, exportRange: 'entire' | 'inout' = 'entire') {
   const outputDir = await getAudioExportDir();
   const data = await callResolve({
     func: 'ExportAudio',
     outputDir,
     inputTracks,
+    exportRange,
   });
 
   // Surface any Resolve-side error with underlying detail so the frontend
