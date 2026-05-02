@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useRef, useEffect, useCallb
 import { toast } from 'sonner';
 import { TimelineInfo } from '@/types';
 import { getTimelineInfo, cancelExport, addSubtitlesToTimeline } from '@/api/resolve-api';
+import { useIntegration } from '@/contexts/IntegrationContext';
+import { useSettings } from '@/contexts/SettingsContext';
 
 interface ResolveContextType {
   timelineInfo: TimelineInfo;
@@ -20,6 +22,8 @@ interface ResolveContextType {
 const ResolveContext = createContext<ResolveContextType | null>(null);
 
 export function ResolveProvider({ children }: { children: React.ReactNode }) {
+  const { selectedIntegration } = useIntegration();
+  const { settings } = useSettings();
   const [timelineInfo, setTimelineInfo] = useState<TimelineInfo>({ name: "", timelineId: "", templates: [], inputTracks: [], outputTracks: [] });
   const [markIn] = useState(0);
   
@@ -28,53 +32,6 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
   const [exportProgress, setExportProgress] = useState<number>(0);
   const cancelRequestedRef = useRef<boolean>(false);
   const emptyTimelineInfo: TimelineInfo = { name: "", timelineId: "", templates: [], inputTracks: [], outputTracks: [] };
-
-  // Keep trying to connect to Resolve in the background.
-  // A single one-shot attempt on mount misses two common situations: the app
-  // rendering before the Lua server has finished binding (race on launch), and
-  // the user reopening the app after the server was shut down by a previous
-  // session's Exit command.  Polling every 5 s — GetTimelineInfo is a
-  // lightweight call — and gives the user an automatic reconnect rather than
-  // requiring a manual refresh click. Errors are suppressed to avoid console flooding.
-  useEffect(() => {
-    let cancelled = false;
-    let polling = false;
-    let intervalId: NodeJS.Timeout | null = null;
-
-    async function tryConnect() {
-      if (polling || cancelled) return;
-      polling = true;
-      try {
-        const info = await getTimelineInfo().catch(() => null);
-        if (!cancelled && info && info.timelineId) {
-          setTimelineInfo(info);
-        } else if (!cancelled) {
-          setTimelineInfo(emptyTimelineInfo);
-        }
-      } catch {
-        if (!cancelled) {
-          setTimelineInfo(emptyTimelineInfo);
-        }
-      } finally {
-        polling = false;
-      }
-    }
-
-    tryConnect();
-
-    intervalId = setInterval(() => {
-      if (!cancelled && !polling) {
-        tryConnect();
-      }
-    }, 5000);
-
-    return () => {
-      cancelled = true;
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -92,6 +49,35 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (selectedIntegration !== "davinci" || settings.isStandaloneMode) {
+      setTimelineInfo(emptyTimelineInfo);
+      return;
+    }
+
+    getTimelineInfo()
+      .then((info) => {
+        if (!cancelled) setTimelineInfo(info);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (
+          errorMessage.includes('Connection refused') ||
+          errorMessage.includes('tcp connect error') ||
+          errorMessage.includes('No timeline detected')
+        ) {
+          setTimelineInfo(emptyTimelineInfo);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedIntegration, settings.isStandaloneMode, refresh]);
 
   async function pushToTimeline(
     filename?: string,

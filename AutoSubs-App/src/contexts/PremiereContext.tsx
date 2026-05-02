@@ -7,6 +7,7 @@ import { getAudioExportDir, getTranscriptPath, loadTranscriptSubtitles } from '@
 import { generateSrt } from '@/utils/srt-utils';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useIntegration } from '@/contexts/IntegrationContext';
 
 interface PremiereContextType {
   timelineInfo: TimelineInfo;
@@ -22,6 +23,7 @@ const PremiereContext = createContext<PremiereContextType | null>(null);
 
 export function PremiereProvider({ children }: { children: React.ReactNode }) {
   const { settings: currentSettings } = useSettings();
+  const { selectedIntegration } = useIntegration();
   const [isConnected, setIsConnected] = useState(false);
   const [timelineInfo, setTimelineInfo] = useState<TimelineInfo>({
     name: "",
@@ -41,9 +43,15 @@ export function PremiereProvider({ children }: { children: React.ReactNode }) {
       setIsConnected(event.payload.status === 'connected');
       if (event.payload.status === 'connected') {
         toast.success('Connected to Premiere Pro');
-        refresh();
       } else {
         toast.error('Disconnected from Premiere Pro');
+        setTimelineInfo({
+          name: "",
+          timelineId: "",
+          templates: [],
+          inputTracks: [],
+          outputTracks: []
+        });
       }
     });
 
@@ -136,6 +144,12 @@ export function PremiereProvider({ children }: { children: React.ReactNode }) {
       toast.error("Failed to communicate with Premiere Pro");
     }
   }, []);
+
+  useEffect(() => {
+    if (selectedIntegration === "premiere" && isConnected) {
+      refresh();
+    }
+  }, [selectedIntegration, isConnected, refresh]);
 
   async function pushToTimeline(filename?: string) {
     if (!filename) return;

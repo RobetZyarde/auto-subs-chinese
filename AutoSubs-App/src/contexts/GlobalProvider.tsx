@@ -14,18 +14,20 @@ interface GlobalProviderProps {
   children: React.ReactNode;
 }
 
+interface EditorWorkspaceProvidersProps {
+  children: React.ReactNode;
+}
+
 /**
  * GlobalProvider - Composition wrapper that nests all context providers
  * 
- * Provider nesting order (from outermost to innermost):
+ * Root provider nesting order (from outermost to innermost):
  * 1. SettingsProvider - Core settings and persistence (leaf context)
  * 2. ModelsProvider - Model management (depends on settings)
- * 3. ResolveProvider - DaVinci Resolve integration (depends on settings)
- * 4. TranscriptProvider - Subtitle/speaker management (depends on settings, resolve)
- * 5. ProgressProvider - Progress tracking and events (depends on settings)
+ * 3. IntegrationProvider - Active host app selection
  * 
- * This nesting ensures that inner contexts can access outer context data
- * without creating circular dependencies.
+ * Editor-specific providers are mounted by EditorWorkspaceProviders, closer to
+ * the UI that actually needs host app state, transcript data, and progress.
  */
 export function GlobalProvider({ children }: GlobalProviderProps) {
   // ErrorDialogProvider is mounted at the outermost layer so any inner
@@ -35,21 +37,27 @@ export function GlobalProvider({ children }: GlobalProviderProps) {
     <ErrorDialogProvider>
       <SettingsProvider>
         <ModelsProvider>
-          <ResolveProvider>
-            <PremiereProvider>
-              <IntegrationProvider>
-                <TranscriptProvider>
-                  <ProgressProvider>
-                    <PresetsProvider>
-                      {children}
-                    </PresetsProvider>
-                  </ProgressProvider>
-                </TranscriptProvider>
-              </IntegrationProvider>
-            </PremiereProvider>
-          </ResolveProvider>
+          <IntegrationProvider>
+            {children}
+          </IntegrationProvider>
         </ModelsProvider>
       </SettingsProvider>
     </ErrorDialogProvider>
+  );
+}
+
+export function EditorWorkspaceProviders({ children }: EditorWorkspaceProvidersProps) {
+  return (
+    <ResolveProvider>
+      <PremiereProvider>
+        <TranscriptProvider>
+          <ProgressProvider>
+            <PresetsProvider>
+              {children}
+            </PresetsProvider>
+          </ProgressProvider>
+        </TranscriptProvider>
+      </PremiereProvider>
+    </ResolveProvider>
   );
 }

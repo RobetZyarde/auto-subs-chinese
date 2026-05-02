@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranscript } from "@/contexts/TranscriptContext"
-import { Subtitle } from "@/types"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { ArrowDown, ArrowUp, X } from "lucide-react"
@@ -11,7 +11,7 @@ import { SpeakerSettings } from "@/components/common/speaker-settings"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 const ESTIMATED_SUBTITLE_ROW_HEIGHT = 96;
-const SUBTITLE_ROW_OVERSCAN = 24;
+const SUBTITLE_ROW_OVERSCAN = 8;
 
 interface SubtitleListProps {
     searchQuery?: string;
@@ -49,8 +49,6 @@ const SubtitleList = ({
     const [editingSubtitleId, setEditingSubtitleId] = React.useState<number | null>(null);
 
     const containerRef = useRef<HTMLDivElement>(null);
-    const [viewport, setViewport] = useState({ scrollTop: 0, height: 0 });
-    const [rowHeights, setRowHeights] = useState<Record<number, number>>({});
 
     const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -119,75 +117,13 @@ const SubtitleList = ({
             });
     }, [subtitles, searchQuery, matchesQuery, searchCaseSensitive, speakers, getSpeakerIndex]);
 
-    const virtualLayout = useMemo(() => {
-        const offsets: number[] = [];
-        let totalHeight = 0;
-
-        for (const { subtitle } of filteredSubtitleItems) {
-            offsets.push(totalHeight);
-            totalHeight += rowHeights[subtitle.id] ?? ESTIMATED_SUBTITLE_ROW_HEIGHT;
-        }
-
-        const visibleTop = Math.max(0, viewport.scrollTop - ESTIMATED_SUBTITLE_ROW_HEIGHT * SUBTITLE_ROW_OVERSCAN);
-        const visibleBottom = viewport.scrollTop + viewport.height + ESTIMATED_SUBTITLE_ROW_HEIGHT * SUBTITLE_ROW_OVERSCAN;
-        let startIndex = 0;
-        let endIndex = filteredSubtitleItems.length;
-
-        for (let i = 0; i < filteredSubtitleItems.length; i += 1) {
-            const rowHeight = rowHeights[filteredSubtitleItems[i].subtitle.id] ?? ESTIMATED_SUBTITLE_ROW_HEIGHT;
-            if (offsets[i] + rowHeight >= visibleTop) {
-                startIndex = i;
-                break;
-            }
-        }
-
-        for (let i = startIndex; i < filteredSubtitleItems.length; i += 1) {
-            if (offsets[i] > visibleBottom) {
-                endIndex = i + 1;
-                break;
-            }
-        }
-
-        return {
-            totalHeight,
-            visibleItems: filteredSubtitleItems.slice(startIndex, endIndex).map((item, visibleIndex) => ({
-                ...item,
-                offsetTop: offsets[startIndex + visibleIndex] ?? 0,
-            })),
-        };
-    }, [filteredSubtitleItems, rowHeights, viewport]);
-
-    useEffect(() => {
-        const scrollElement = containerRef.current?.parentElement;
-        if (!scrollElement) return;
-
-        const updateViewport = () => {
-            setViewport({
-                scrollTop: scrollElement.scrollTop,
-                height: scrollElement.clientHeight,
-            });
-        };
-
-        updateViewport();
-        scrollElement.addEventListener("scroll", updateViewport, { passive: true });
-
-        const resizeObserver = new ResizeObserver(updateViewport);
-        resizeObserver.observe(scrollElement);
-
-        return () => {
-            scrollElement.removeEventListener("scroll", updateViewport);
-            resizeObserver.disconnect();
-        };
-    }, []);
-
-    const measureRow = useCallback((subtitleId: number, node: HTMLDivElement | null) => {
-        if (!node) return;
-        const height = node.getBoundingClientRect().height;
-        setRowHeights((current) => {
-            if (Math.abs((current[subtitleId] ?? 0) - height) < 1) return current;
-            return { ...current, [subtitleId]: height };
-        });
-    }, []);
+    const rowVirtualizer = useVirtualizer({
+        count: filteredSubtitleItems.length,
+        getScrollElement: () => containerRef.current?.parentElement ?? null,
+        estimateSize: () => ESTIMATED_SUBTITLE_ROW_HEIGHT,
+        getItemKey: (index) => filteredSubtitleItems[index]?.subtitle.id ?? index,
+        overscan: SUBTITLE_ROW_OVERSCAN,
+    });
 
     // Handle click outside to deselect subtitle
     useEffect(() => {
@@ -365,16 +301,20 @@ const SubtitleList = ({
         <div
             ref={containerRef}
             className={`relative ${className}`}
-            style={{ height: virtualLayout.totalHeight }}
+            style={{ height: rowVirtualizer.getTotalSize() }}
         >
-            {virtualLayout.visibleItems.map(({ subtitle, index, offsetTop }: { subtitle: Subtitle; index: number; offsetTop: number }) => {
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const item = filteredSubtitleItems[virtualRow.index];
+                if (!item) return null;
+                const { subtitle, index } = item;
                 const isSelected = selectedIndex === index;
 
                 return (
                     <div
                         key={subtitle.id}
-                        ref={(node) => measureRow(subtitle.id, node)}
-                        style={{ transform: `translateY(${offsetTop}px)` }}
+                        data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
+                        style={{ transform: `translateY(${virtualRow.start}px)` }}
                         className={`group absolute left-0 right-0 top-0 flex flex-col items-start gap-2 border-b border-l-2 border-l-transparent p-4 text-sm leading-tight transition-colors duration-150 hover:bg-muted/50 dark:hover:bg-muted/20 ${isSelected ? "bg-muted/50 dark:bg-muted/20 border-l-primary" : ""} ${itemClassName}`}
                         onClick={() => selectSubtitle(index)}
                     >

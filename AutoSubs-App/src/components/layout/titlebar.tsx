@@ -42,8 +42,8 @@ import { usePremiere } from "@/contexts/PremiereContext";
 
 function IntegrationStatus() {
   const { t } = useTranslation();
-  const { timelineInfo: resolveTimeline } = useResolve();
-  const { timelineInfo: premiereTimeline, isConnected: isPremiereConnected } = usePremiere();
+  const { timelineInfo: resolveTimeline, refresh: refreshResolve } = useResolve();
+  const { timelineInfo: premiereTimeline, isConnected: isPremiereConnected, refresh: refreshPremiere } = usePremiere();
 
   const isResolveConnected = resolveTimeline && resolveTimeline.timelineId;
 
@@ -54,6 +54,9 @@ function IntegrationStatus() {
         <HoverCardTrigger asChild>
           <Button
             variant="ghost"
+            onClick={() => {
+              void refreshResolve();
+            }}
             className={`flex items-center gap-2 h-7 text-xs rounded px-2 ${isResolveConnected
               ? "hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900 dark:hover:text-green-300"
               : "hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-300"
@@ -112,6 +115,9 @@ function IntegrationStatus() {
         <HoverCardTrigger asChild>
           <Button
             variant="ghost"
+            onClick={() => {
+              if (isPremiereConnected) void refreshPremiere();
+            }}
             className={`flex items-center gap-2 h-7 text-xs rounded px-2 ${isPremiereConnected
               ? "hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900 dark:hover:text-green-300"
               : "hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-300"
