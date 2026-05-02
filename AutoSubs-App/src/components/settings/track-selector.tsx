@@ -6,6 +6,7 @@ import { Track } from "@/types"
 import { useSettings } from "@/contexts/SettingsContext"
 import { useTranslation } from "react-i18next"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useIntegration } from "@/contexts/IntegrationContext"
 
 interface TrackSelectorProps {
     inputTracks: Track[]
@@ -15,6 +16,17 @@ interface TrackSelectorProps {
 export function TrackSelector({ inputTracks, isPremiereActive }: TrackSelectorProps) {
     const { t } = useTranslation()
     const { settings, updateSetting } = useSettings()
+    const { selectedIntegration } = useIntegration()
+
+    // Get selected tracks for the active application
+    const selectedTracks = settings.selectedInputTracksByApp[selectedIntegration] || []
+
+    const updateTracks = (newTracks: string[]) => {
+        updateSetting("selectedInputTracksByApp", {
+            ...settings.selectedInputTracksByApp,
+            [selectedIntegration]: newTracks
+        });
+    };
 
     return (
         <>
@@ -22,12 +34,12 @@ export function TrackSelector({ inputTracks, isPremiereActive }: TrackSelectorPr
                 <div className="px-4 py-2 bg-muted/30 border-b">
                     <div className="flex items-center justify-between min-h-[28px]">
                         <span className="text-sm text-muted-foreground">
-                            {settings.selectedInputTracks.length > 0
-                                ? (settings.selectedInputTracks.length === 1
+                            {selectedTracks.length > 0
+                                ? (selectedTracks.length === 1
                                     ? t("actionBar.tracks.selectedLabel", {
-                                        label: inputTracks.find(track => track.value === settings.selectedInputTracks[0])?.label || t("actionBar.tracks.trackN", { n: settings.selectedInputTracks[0] })
+                                        label: inputTracks.find(track => track.value === selectedTracks[0])?.label || t("actionBar.tracks.trackN", { n: selectedTracks[0] })
                                     })
-                                    : t("actionBar.tracks.countSelected", { count: settings.selectedInputTracks.length }))
+                                    : t("actionBar.tracks.countSelected", { count: selectedTracks.length }))
                                 : t("actionBar.tracks.noneSelected")}
                         </span>
                         <Button
@@ -35,14 +47,14 @@ export function TrackSelector({ inputTracks, isPremiereActive }: TrackSelectorPr
                             variant="ghost"
                             className="text-xs h-7 px-2 hover:bg-white/80 dark:hover:bg-zinc-800/80"
                             onClick={() => {
-                                if (settings.selectedInputTracks.length === inputTracks.length) {
-                                    updateSetting("selectedInputTracks", []);
+                                if (selectedTracks.length === inputTracks.length) {
+                                    updateTracks([]);
                                 } else {
-                                    updateSetting("selectedInputTracks", inputTracks.map(track => track.value));
+                                    updateTracks(inputTracks.map(track => track.value));
                                 }
                             }}
                         >
-                            {settings.selectedInputTracks.length === inputTracks.length ? t("actionBar.tracks.clearAll") : t("actionBar.tracks.selectAll")}
+                            {selectedTracks.length === inputTracks.length ? t("actionBar.tracks.clearAll") : t("actionBar.tracks.selectAll")}
                         </Button>
                     </div>
                 </div>
@@ -78,7 +90,7 @@ export function TrackSelector({ inputTracks, isPremiereActive }: TrackSelectorPr
                     <div className="flex flex-col gap-1 p-2">
                         {inputTracks.map((track) => {
                             const trackId = track.value;
-                            const isChecked = settings.selectedInputTracks.includes(trackId);
+                            const isChecked = selectedTracks.includes(trackId);
                             return (
                                 <div
                                     key={trackId}
@@ -88,9 +100,9 @@ export function TrackSelector({ inputTracks, isPremiereActive }: TrackSelectorPr
                                             : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 border-zinc-100 dark:border-zinc-800'}`}
                                     onClick={() => {
                                         if (isChecked) {
-                                            updateSetting("selectedInputTracks", settings.selectedInputTracks.filter(id => id !== trackId));
+                                            updateTracks(selectedTracks.filter(id => id !== trackId));
                                         } else {
-                                            updateSetting("selectedInputTracks", [...settings.selectedInputTracks, trackId]);
+                                            updateTracks([...selectedTracks, trackId]);
                                         }
                                     }}
                                 >
@@ -111,9 +123,9 @@ export function TrackSelector({ inputTracks, isPremiereActive }: TrackSelectorPr
                                         className="transition-transform duration-150"
                                         onCheckedChange={(checked: boolean) => {
                                             if (checked) {
-                                                updateSetting("selectedInputTracks", [...settings.selectedInputTracks, trackId]);
+                                                updateTracks([...selectedTracks, trackId]);
                                             } else {
-                                                updateSetting("selectedInputTracks", settings.selectedInputTracks.filter((id: string) => id !== trackId));
+                                                updateTracks(selectedTracks.filter((id: string) => id !== trackId));
                                             }
                                         }}
                                     />

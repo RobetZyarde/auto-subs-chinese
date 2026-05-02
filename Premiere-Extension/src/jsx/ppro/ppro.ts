@@ -1,18 +1,18 @@
+import { logMessage as _log } from "../lib/log";
+
 // ==============================================================================
 // UTILS & POLYFILLS
 // ==============================================================================
 
 /**
- * Log message to ExtendScript console and potentially to a file
+ * Log a message to the ExtendScript console with the PPRO prefix.
  */
 export function logMessage(message: string): void {
-  const now = new Date();
-  const timeStr = now.getHours() + ":" + now.getMinutes() + ":" + now.getSeconds();
-  $.writeln("[AutoSubs " + timeStr + "] " + message);
+  _log("PPRO", message);
 }
 
 /**
- * String.indexOf polyfill for older ExtendScript engines
+ * Array.indexOf polyfill for older ExtendScript engines (ES3).
  */
 function AK_indexOf(arr: any[], item: any): number {
   for (var i = 0; i < arr.length; i++) {
@@ -26,29 +26,32 @@ function AK_indexOf(arr: any[], item: any): number {
 // ==============================================================================
 
 /**
- * Helper to get the path to the included audio preset
+ * Resolves the path to the bundled WAV audio preset.
+ * Search order:
+ *   1. <extension-root>/presets/
+ *   2. <script-dir>/presets/
+ *   3. Same directory as the script
  */
 function getPresetFilePath(outputFolder: string) {
   var separator = outputFolder.indexOf("/") !== -1 ? "/" : "\\";
   var presetName = "WAV_48_kHz_16_bits.epr";
-
-  // Strategy 1: Check in the extension's presets folder
   var scriptFile = new File($.fileName);
 
-  // Strategy 1b: Check in the extension's root presets folder (dist/cep/presets)
+  // Strategy 1: Check in the extension root presets folder (dist/cep/presets)
   var rootPresetsFolder = new Folder(scriptFile.parent.parent.fsName + separator + "presets");
   var rootPresetFile = new File(rootPresetsFolder.fsName + separator + presetName);
   if (rootPresetFile.exists) {
     return { success: true, path: rootPresetFile.fsName };
   }
+
+  // Strategy 2: Check in the script directory's presets sub-folder
   var presetsFolder = new Folder(scriptFile.parent.fsName + separator + "presets");
   var presetFile = new File(presetsFolder.fsName + separator + presetName);
-
   if (presetFile.exists) {
     return { success: true, path: presetFile.fsName };
   }
 
-  // Strategy 2: Check in the same folder as the script
+  // Strategy 3: Check in the same directory as the script
   presetFile = new File(scriptFile.parent.fsName + separator + presetName);
   if (presetFile.exists) {
     return { success: true, path: presetFile.fsName };
@@ -62,7 +65,7 @@ function getPresetFilePath(outputFolder: string) {
 // ==============================================================================
 
 /**
- * Gets detailed information about the active sequence
+ * Gets detailed information about the active sequence.
  */
 export function getActiveSequenceInfo(): string {
   try {
@@ -79,7 +82,7 @@ export function getActiveSequenceInfo(): string {
     let frameWidth = sequence.frameWidth;
     let frameHeight = sequence.frameHeight;
 
-    // Fallback for resolution
+    // Fallback for resolution via getSettings()
     if (!frameWidth || !frameHeight) {
       try {
         const settings = (sequence as any).getSettings();
@@ -87,14 +90,25 @@ export function getActiveSequenceInfo(): string {
           frameWidth = settings.videoFrameWidth;
           frameHeight = settings.videoFrameHeight;
         }
-      } catch (e) { }
+      } catch (e) {
+        logMessage("getSettings() failed: " + e);
+      }
     }
 
+    // Prefer the Time object's .seconds accessor when available; fall back to
+    // dividing raw ticks by the well-known Premiere tick rate (254 016 000 000).
     let durationSeconds = 0;
     try {
-      const durationTicks = parseFloat(sequence.end);
-      durationSeconds = durationTicks / 254016000000;
-    } catch (e) { }
+      const endObj = sequence.end as any;
+      if (endObj && typeof endObj.seconds !== "undefined") {
+        durationSeconds = parseFloat(endObj.seconds);
+      } else {
+        const TICKS_PER_SECOND = 254016000000;
+        durationSeconds = parseFloat(String(endObj)) / TICKS_PER_SECOND;
+      }
+    } catch (e) {
+      logMessage("Error reading sequence duration: " + e);
+    }
 
     const audioTrackInfo: any[] = [];
     if (sequence.audioTracks) {
@@ -131,13 +145,17 @@ export function getActiveSequenceInfo(): string {
 }
 
 /**
- * Gets the time range of selected clips across all tracks
+ * Gets the combined time range of all selected clips across video and audio tracks.
+ * Returns start/end in seconds relative to the sequence start.
  */
 export function getSelectedClipsTimeRange(sequence: any) {
   try {
-    var earliestStart = 999999999;
+    var earliestStart = Infinity;
     var latestEnd = 0;
     var selectedClipsFound = 0;
+    // Use a set-like object (keyed by clip start+end) to deduplicate linked clips
+    // that appear on both a video and audio track.
+    var seenKeys: any = {};
     var selectedItems: any[] = [];
 
     logMessage("Analyzing selected clips...");
@@ -155,7 +173,7 @@ export function getSelectedClipsTimeRange(sequence: any) {
       logMessage("getSelection() failed: " + selErr.toString());
     }
 
-    // Method 2: Fallback - iterate tracks and check isSelected()
+    // Method 2: Fallback — iterate tracks and check isSelected()
     if (selectedItems.length === 0) {
       logMessage("Falling back to per-clip isSelected() check...");
       // Video tracks
@@ -168,7 +186,9 @@ export function getSelectedClipsTimeRange(sequence: any) {
               if (typeof vClip.isSelected === "function" && vClip.isSelected()) {
                 selectedItems.push(vClip);
               }
-            } catch (e2) { }
+            } catch (e2) {
+              logMessage("Error checking video clip selection: " + e2);
+            }
           }
         }
       }
@@ -182,7 +202,9 @@ export function getSelectedClipsTimeRange(sequence: any) {
               if (typeof aClip.isSelected === "function" && aClip.isSelected()) {
                 selectedItems.push(aClip);
               }
-            } catch (e3) { }
+            } catch (e3) {
+              logMessage("Error checking audio clip selection: " + e3);
+            }
           }
         }
       }
@@ -200,10 +222,15 @@ export function getSelectedClipsTimeRange(sequence: any) {
       var clip = selectedItems[i];
       if (clip) {
         try {
-          selectedClipsFound++;
           var startTime = parseFloat(clip.start.seconds);
           var endTime = parseFloat(clip.end.seconds);
 
+          // Deduplicate linked clips (same start+end appear on both video and audio track)
+          var key = startTime + "_" + endTime;
+          if (seenKeys[key]) continue;
+          seenKeys[key] = true;
+
+          selectedClipsFound++;
           if (startTime < earliestStart) earliestStart = startTime;
           if (endTime > latestEnd) latestEnd = endTime;
 
@@ -218,7 +245,7 @@ export function getSelectedClipsTimeRange(sequence: any) {
       return { success: false, error: "No valid clips in selection" };
     }
 
-    logMessage("Found " + selectedClipsFound + " selected clips total");
+    logMessage("Found " + selectedClipsFound + " unique selected clips");
     logMessage("Combined range: " + earliestStart + "s to " + latestEnd + "s");
 
     return {
@@ -237,7 +264,11 @@ export function getSelectedClipsTimeRange(sequence: any) {
 // ==============================================================================
 
 /**
- * Exports sequence audio
+ * Exports the active sequence's audio as a WAV file.
+ * @param outputFolder       - Folder path where the WAV will be written
+ * @param selectedTracksJson - JSON string encoding an array of 1-based track indices to export
+ * @param selectedRange      - "entire" | "inout" | "selected"
+ * @param externalPresetPath - Optional path to a custom .epr preset file
  */
 export function exportSequenceAudio(
   outputFolder: string,
@@ -259,34 +290,25 @@ export function exportSequenceAudio(
     }
 
     var sequence = app.project.activeSequence;
-    var selectedTracks: number[] = [];
 
-    // Parse selected tracks
+    // Parse selected tracks — the parameter is always a JSON string but guard defensively
+    var selectedTracks: number[] = [];
     if (selectedTracksJson && selectedTracksJson.length > 0) {
       try {
-        if (typeof selectedTracksJson === "string") {
-          selectedTracks = JSON.parse(selectedTracksJson);
-        } else if ((selectedTracksJson as any) instanceof Array || typeof (selectedTracksJson as any).length === 'number') {
-          var asArray: any = selectedTracksJson;
-          for (var k = 0; k < asArray.length; k++) {
-            selectedTracks.push(asArray[k]);
-          }
-        } else {
-          selectedTracks = JSON.parse(String(selectedTracksJson));
-        }
+        selectedTracks = JSON.parse(String(selectedTracksJson));
       } catch (e: any) {
         logMessage("Error parsing selectedTracksJson: " + e.toString());
       }
     }
 
-    // Ensure all numeric
+    // Ensure every element is numeric
     for (var v = 0; v < selectedTracks.length; v++) {
-      if (typeof selectedTracks[v] !== 'number') {
+      if (typeof selectedTracks[v] !== "number") {
         selectedTracks[v] = Number(selectedTracks[v]);
       }
     }
 
-    // Filename generation
+    // Build output path
     var timestamp = new Date().getTime();
     var sequenceName = sequence.name.replace(/[^a-zA-Z0-9]/g, "_");
     var filename = sequenceName + "_audio_" + timestamp + ".wav";
@@ -295,42 +317,44 @@ export function exportSequenceAudio(
     var outputPath = outputFolder + (lastChar === separator ? "" : separator) + filename;
     debugInfo.outputPath = outputPath;
 
-    // Preset selection
+    // Resolve preset
     var audioPresetPath = "";
     if (externalPresetPath) {
       var eprFile = new File(externalPresetPath);
-      if (eprFile.exists) audioPresetPath = eprFile.fsName;
-      else logMessage("External preset not found: " + externalPresetPath);
+      if (eprFile.exists) {
+        audioPresetPath = eprFile.fsName;
+      } else {
+        logMessage("External preset not found: " + externalPresetPath);
+      }
     }
     if (!audioPresetPath) {
       var presetResult = getPresetFilePath(outputFolder);
       audioPresetPath = presetResult.path || "";
     }
-
     if (!audioPresetPath) {
       return JSON.stringify({ success: false, error: "Audio preset not found", debug: debugInfo });
     }
     debugInfo.presetPath = audioPresetPath;
 
-    // Verify preset file exists right before calling export
+    // Verify preset still exists immediately before export
     var preExportCheck = new File(audioPresetPath);
     if (!preExportCheck.exists) {
-      logMessage('CRITICAL: Preset file missing at export time: ' + audioPresetPath);
+      logMessage("CRITICAL: Preset file missing at export time: " + audioPresetPath);
       return JSON.stringify({
         success: false,
-        error: 'Preset file missing at export time: ' + audioPresetPath,
-        debug: debugInfo
+        error: "Preset file missing at export time: " + audioPresetPath,
+        debug: debugInfo,
       });
     }
 
-    // QE DOM for track control
+    // Access QE DOM for per-track mute/solo control
     app.enableQE();
     var qeSequence = (qe.project as any).getActiveSequence();
     if (!qeSequence) {
       return JSON.stringify({ success: false, error: "QE sequence not available", debug: debugInfo });
     }
 
-    // Store original states
+    // Snapshot original track states so we can restore them unconditionally
     var originalStates: any[] = [];
     for (var i = 0; i < qeSequence.numAudioTracks; i++) {
       var qeTrack = qeSequence.getAudioTrackAt(i);
@@ -342,30 +366,36 @@ export function exportSequenceAudio(
       }
     }
 
+    // Track state changes and range changes are restored in the finally block
+    var tempInOutSet = false;
+    var originalInPoint: any = null;
+    var originalOutPoint: any = null;
+
     try {
-      // Selective track control
+      // Apply selective track control when a subset is requested
       if (selectedTracks.length > 0) {
+        // Determine which API is available by checking the first track
+        var firstQeTrack = qeSequence.getAudioTrackAt(0);
+        var hasSolo = firstQeTrack && typeof firstQeTrack.setSolo === "function";
+        var hasMute = firstQeTrack && typeof firstQeTrack.setMute === "function";
+
         for (var j = 0; j < qeSequence.numAudioTracks; j++) {
           var qeTrack2 = qeSequence.getAudioTrackAt(j);
-          if (qeTrack2) {
-            var shouldExport = AK_indexOf(selectedTracks, j + 1) !== -1;
-            if (typeof qeTrack2.setSolo === "function") {
-              qeTrack2.setSolo(shouldExport);
-            } else if (typeof qeTrack2.setMute === "function") {
-              qeTrack2.setMute(!shouldExport);
-            }
+          if (!qeTrack2) continue;
+          var shouldExport = AK_indexOf(selectedTracks, j + 1) !== -1;
+          if (hasSolo) {
+            qeTrack2.setSolo(shouldExport);
+          } else if (hasMute) {
+            qeTrack2.setMute(!shouldExport);
           }
         }
       }
 
-      // Range handling
-      var workAreaType = 0; // Entire sequence
-      var tempInOutSet = false;
-      var originalInPoint: any = null;
-      var originalOutPoint: any = null;
+      // Determine export range
+      var workAreaType = 0; // 0 = entire sequence
       var timeOffsetSeconds = 0;
-
       var rangeType = (selectedRange || "entire").toLowerCase();
+
       if (rangeType === "inout") {
         workAreaType = 1;
         logMessage("Using In/Out range for export");
@@ -379,35 +409,29 @@ export function exportSequenceAudio(
         var selectionRange = getSelectedClipsTimeRange(sequence);
         if (selectionRange.success) {
           timeOffsetSeconds = selectionRange.startTime || 0;
-          logMessage("Set temporary In/Out for selection export. Offset: " + timeOffsetSeconds);
-
-          if (typeof selectionRange.startTime === 'number' && typeof selectionRange.endTime === 'number') {
-            var ticksPerSecond = 254016000000;
-            sequence.setInPoint(Math.round(selectionRange.startTime * ticksPerSecond).toString());
-            sequence.setOutPoint(Math.round(selectionRange.endTime * ticksPerSecond).toString());
+          if (
+            typeof selectionRange.startTime === "number" &&
+            typeof selectionRange.endTime === "number"
+          ) {
+            var TICKS_PER_SECOND = 254016000000;
+            sequence.setInPoint(
+              Math.round(selectionRange.startTime * TICKS_PER_SECOND).toString()
+            );
+            sequence.setOutPoint(
+              Math.round(selectionRange.endTime * TICKS_PER_SECOND).toString()
+            );
           }
-
           tempInOutSet = true;
           workAreaType = 1;
+          logMessage("Temporary In/Out set for selection export. Offset: " + timeOffsetSeconds);
         } else {
-          logMessage("No valid selected clips found, falling back to entire timeline");
+          logMessage("No valid selection — falling back to entire timeline");
           workAreaType = 0;
           timeOffsetSeconds = 0;
         }
-      } else {
-        workAreaType = 0;
-        timeOffsetSeconds = 0;
       }
 
-      // Export attempt
       var exportResult = sequence.exportAsMediaDirect(outputPath, audioPresetPath, workAreaType);
-
-      // Cleanup In/Out range if it was modified temporarily
-      if (tempInOutSet && rangeType === "selected") {
-        logMessage("Restoring original sequence In/Out points");
-        if (originalInPoint !== null) sequence.setInPoint(originalInPoint);
-        if (originalOutPoint !== null) sequence.setOutPoint(originalOutPoint);
-      }
 
       if (exportResult === "No Error" || exportResult === true || exportResult === 0) {
         logMessage("Audio exported successfully: " + outputPath);
@@ -416,25 +440,42 @@ export function exportSequenceAudio(
           outputPath: outputPath,
           filename: filename,
           timeOffsetSeconds: timeOffsetSeconds,
-          debug: debugInfo
+          debug: debugInfo,
         });
       } else {
         logMessage("Export failed with result: " + exportResult);
-        return JSON.stringify({ success: false, error: "Export failed: " + exportResult, debug: debugInfo });
+        return JSON.stringify({
+          success: false,
+          error: "Export failed: " + exportResult,
+          debug: debugInfo,
+        });
+      }
+    } finally {
+      // Always restore In/Out points if we temporarily changed them
+      if (tempInOutSet) {
+        logMessage("Restoring original sequence In/Out points");
+        try {
+          if (originalInPoint !== null) sequence.setInPoint(originalInPoint);
+          if (originalOutPoint !== null) sequence.setOutPoint(originalOutPoint);
+        } catch (e) {
+          logMessage("Error restoring In/Out points: " + e);
+        }
       }
 
-    } finally {
-      // Restore track states
+      // Always restore track mute/solo states
       for (var k = 0; k < originalStates.length; k++) {
         var state = originalStates[k];
         var qeTrackRestore = qeSequence.getAudioTrackAt(state.index);
         if (qeTrackRestore) {
-          if (typeof qeTrackRestore.setSolo === "function") qeTrackRestore.setSolo(state.solo);
-          if (typeof qeTrackRestore.setMute === "function") qeTrackRestore.setMute(state.muted);
+          try {
+            if (typeof qeTrackRestore.setSolo === "function") qeTrackRestore.setSolo(state.solo);
+            if (typeof qeTrackRestore.setMute === "function") qeTrackRestore.setMute(state.muted);
+          } catch (e) {
+            logMessage("Error restoring track state at index " + state.index + ": " + e);
+          }
         }
       }
     }
-
   } catch (e: any) {
     return JSON.stringify({ success: false, error: e.toString(), debug: debugInfo });
   }
@@ -445,30 +486,30 @@ export function exportSequenceAudio(
 // ==============================================================================
 
 /**
- * Imports an SRT file into the project and creates a caption track on the active sequence
+ * Imports an SRT file into the project and creates a caption track on the active sequence.
  */
 export function importSRTFile(filePath: string): string {
   try {
     if (!app.project) return JSON.stringify({ success: false, error: "No project open" });
-    if (!app.project.activeSequence) return JSON.stringify({ success: false, error: "No active sequence" });
+    if (!app.project.activeSequence)
+      return JSON.stringify({ success: false, error: "No active sequence" });
 
     var sequence = app.project.activeSequence;
     var rootItem = app.project.rootItem;
     var childCountBefore = rootItem.children.numItems;
 
     // 1. Import the SRT file into the project bin
-    var filePaths = [filePath];
-    app.project.importFiles(filePaths, true, rootItem, false);
+    app.project.importFiles([filePath], true, rootItem, false);
 
     // 2. Find the newly imported project item
     var srtItem = null;
     var childCountAfter = rootItem.children.numItems;
 
-    // Check if a new item was added
     if (childCountAfter > childCountBefore) {
+      // A new item was added — it is the last child
       srtItem = rootItem.children[childCountAfter - 1];
     } else {
-      // The file may have already existed in the project; search by name
+      // File may already have been in the project — search by name
       var srtFile = new File(filePath);
       var srtName = srtFile.name.replace(/\.[^.]+$/, ""); // strip extension
       for (var i = rootItem.children.numItems - 1; i >= 0; i--) {
@@ -481,7 +522,10 @@ export function importSRTFile(filePath: string): string {
     }
 
     if (!srtItem) {
-      return JSON.stringify({ success: false, error: "Could not find imported SRT in project bin" });
+      return JSON.stringify({
+        success: false,
+        error: "Could not find imported SRT in project bin",
+      });
     }
 
     // 3. Create a caption track on the active sequence
@@ -491,15 +535,16 @@ export function importSRTFile(filePath: string): string {
         success: true,
         method: "createCaptionTrack",
         captionResult: captionResult !== undefined ? String(captionResult) : "ok",
-        itemName: srtItem.name
+        itemName: srtItem.name,
       });
     } catch (captionErr: any) {
-      // Fallback: if createCaptionTrack is not available, just report the import
+      // createCaptionTrack is not available in all Premiere versions; fall back to import-only
+      logMessage("createCaptionTrack failed: " + captionErr.toString());
       return JSON.stringify({
         success: true,
         method: "importOnly",
         warning: "createCaptionTrack failed: " + captionErr.toString(),
-        itemName: srtItem.name
+        itemName: srtItem.name,
       });
     }
   } catch (e: any) {

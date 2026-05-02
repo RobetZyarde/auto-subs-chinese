@@ -122,7 +122,7 @@ export interface Settings {
     customMaxCharsPerLine: number,
 
     // Davinci Resolve settings
-    selectedInputTracks: string[];
+    selectedInputTracksByApp: Record<string, string[]>;
     selectedOutputTrack: string;
     selectedTemplate: Template;
 

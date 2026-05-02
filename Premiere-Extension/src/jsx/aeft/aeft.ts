@@ -1,11 +1,14 @@
+import { logMessage as _log } from "../lib/log";
+
 // ==============================================================================
-// UTILS & POLYFILLS
+// UTILS
 // ==============================================================================
 
+/**
+ * Log a message to the ExtendScript console with the AEFT prefix.
+ */
 export function logMessage(message: string): void {
-  const now = new Date();
-  const timeStr = now.getHours() + ":" + now.getMinutes() + ":" + now.getSeconds();
-  $.writeln("[AutoSubs AE " + timeStr + "] " + message);
+  _log("AEFT", message);
 }
 
 // ==============================================================================
@@ -19,6 +22,10 @@ function getActiveComp() {
   return null;
 }
 
+/**
+ * Returns composition metadata in the same shape as ppro's getActiveSequenceInfo,
+ * so the Tauri frontend can treat both hosts uniformly.
+ */
 export function getActiveSequenceInfo(): string {
   try {
     const comp = getActiveComp();
@@ -33,7 +40,7 @@ export function getActiveSequenceInfo(): string {
     const audioTrackInfo: any[] = [];
     let audioTrackCount = 0;
 
-    // In AE, layers act as tracks. We'll just count layers that have audio
+    // In AE, layers act as tracks — count layers that have audio enabled
     for (var i = 1; i <= comp.numLayers; i++) {
       var layer = comp.layers[i];
       if (layer.hasAudio && layer.audioEnabled) {
@@ -68,14 +75,19 @@ export function getActiveSequenceInfo(): string {
   }
 }
 
-export function getSelectedClipsTimeRange(sequence: any) {
+/**
+ * Gets the combined time range of all selected layers in the active composition.
+ * The `_sequence` parameter is accepted but intentionally ignored — AE always
+ * uses the global active composition rather than a sequence reference.
+ */
+export function getSelectedClipsTimeRange(_sequence: any) {
   try {
     const comp = getActiveComp();
     if (!comp) {
       return { success: false, error: "No active composition" };
     }
 
-    var earliestStart = 999999999;
+    var earliestStart = Infinity;
     var latestEnd = 0;
     var selectedClipsFound = 0;
 
@@ -109,6 +121,13 @@ export function getSelectedClipsTimeRange(sequence: any) {
 // AUDIO EXPORT MODULE
 // ==============================================================================
 
+/**
+ * Exports the active composition's audio as a WAV file via the Render Queue.
+ *
+ * Note: The user must have a render queue output-module template named "WAV"
+ * configured in After Effects. If that template is missing, the render will
+ * use the current default module settings.
+ */
 export function exportSequenceAudio(
   outputFolder: string,
   selectedTracksJson: string,
@@ -122,16 +141,48 @@ export function exportSequenceAudio(
       return JSON.stringify({ success: false, error: "No active comp" });
     }
 
-    // Check if there are audio layers
-    var hasAudio = false;
+    // Verify there is at least one enabled audio layer
+    var audioLayers: any[] = [];
     for (var i = 1; i <= activeComp.numLayers; i++) {
-      if (activeComp.layers[i].hasAudio && activeComp.layers[i].audioEnabled) {
-        hasAudio = true;
-        break;
+      var layer = activeComp.layers[i];
+      if (layer.hasAudio) {
+        audioLayers.push({
+          layer: layer,
+          originalAudioState: layer.audioEnabled
+        });
       }
     }
-    if (!hasAudio) {
+
+    if (audioLayers.length === 0) {
       return JSON.stringify({ success: false, error: "No audio layers in comp" });
+    }
+
+    // Parse selected tracks (layer indices)
+    var selectedIndices: any[] = [];
+    try {
+      var parsed = JSON.parse(selectedTracksJson || "[]");
+      for (var j = 0; j < parsed.length; j++) {
+        selectedIndices.push(Number(parsed[j]));
+      }
+    } catch (e) {
+      logMessage("Error parsing selected tracks: " + e);
+    }
+
+    // Temporarily mute layers that are NOT selected
+    // If no tracks are selected in UI, we default to all audio layers
+    var hasSelection = selectedIndices.length > 0;
+    if (hasSelection) {
+      for (var k = 0; k < audioLayers.length; k++) {
+        var item = audioLayers[k];
+        var isSelected = false;
+        for (var s = 0; s < selectedIndices.length; s++) {
+          if (item.layer.index === selectedIndices[s]) {
+            isSelected = true;
+            break;
+          }
+        }
+        item.layer.audioEnabled = isSelected;
+      }
     }
 
     var timestamp = new Date().getTime();
@@ -143,6 +194,7 @@ export function exportSequenceAudio(
       outputFolderObj.create();
     }
 
+    // Use "/" universally inside AE — the ExtendScript File object normalises on all platforms
     var outputPath = outputFolderObj.fsName + "/" + filename;
 
     var renderQueue = app.project.renderQueue;
@@ -150,23 +202,21 @@ export function exportSequenceAudio(
     var lastIndex = renderQueue.numItems;
     var rqItem = renderQueue.item(lastIndex);
 
-    // Apply WAV template
-    // Note: The user must have a "WAV" template in their AE Render Queue templates.
-    // If not, this might fail or render the default.
     rqItem.outputModule(1).applyTemplate("WAV");
     rqItem.outputModule(1).file = new File(outputPath);
 
-    // Range handling
-    var rangeType = (selectedRange || "entire").toLowerCase();
-    var timeOffsetSeconds = 0;
-
+    // Snapshot work area before potentially changing it
     var originalStart = activeComp.workAreaStart;
     var originalDuration = activeComp.workAreaDuration;
+
+    var rangeType = (selectedRange || "entire").toLowerCase();
+    var timeOffsetSeconds = 0;
 
     if (rangeType === "entire") {
       activeComp.workAreaStart = 0;
       activeComp.workAreaDuration = activeComp.duration;
     } else if (rangeType === "inout") {
+      // Keep the existing work area, just capture its start as the time offset
       timeOffsetSeconds = activeComp.workAreaStart;
     } else if (rangeType === "selected" || rangeType === "selection") {
       var selectionRange = getSelectedClipsTimeRange(null);
@@ -175,23 +225,29 @@ export function exportSequenceAudio(
         activeComp.workAreaStart = timeOffsetSeconds;
         activeComp.workAreaDuration = (selectionRange.endTime || 0) - timeOffsetSeconds;
       } else {
+        logMessage("No valid selection — exporting entire composition");
         activeComp.workAreaStart = 0;
         activeComp.workAreaDuration = activeComp.duration;
       }
     }
 
-    logMessage("Exporting wave to " + outputPath);
-    renderQueue.render();
-
-    var status = rqItem.status;
-
-    // Cleanup the render queue item
+    var status: any;
     try {
-      rqItem.remove();
-    } catch (_) { }
+      logMessage("Exporting WAV to " + outputPath);
+      renderQueue.render();
+      status = rqItem.status;
+    } finally {
+      // 1. RESTORE ORIGINAL AUDIO STATES
+      for (var m = 0; m < audioLayers.length; m++) {
+        audioLayers[m].layer.audioEnabled = audioLayers[m].originalAudioState;
+      }
 
-    // Restore work area if we changed it for export
-    if (rangeType === "entire" || rangeType === "selected" || rangeType === "selection") {
+      // 2. Remove the temporary render queue item
+      try {
+        rqItem.remove();
+      } catch (_) { }
+
+      // 3. Restore work area to its pre-export state
       activeComp.workAreaStart = originalStart;
       activeComp.workAreaDuration = originalDuration;
     }
@@ -202,7 +258,7 @@ export function exportSequenceAudio(
         success: true,
         outputPath: outputPath,
         filename: filename,
-        timeOffsetSeconds: timeOffsetSeconds
+        timeOffsetSeconds: timeOffsetSeconds,
       });
     } else {
       return JSON.stringify({ success: false, error: "Export failed or was cancelled" });
@@ -216,12 +272,18 @@ export function exportSequenceAudio(
 // SUBTITLES / CAPTIONS MODULE
 // ==============================================================================
 
+/**
+ * Parses a single SRT timecode string ("HH:MM:SS,mmm") into milliseconds.
+ * Returns null if the format is unrecognised.
+ */
 function parseTimecode(timecodeString: string, separator: string): number | null {
   try {
     var timeComponents = timecodeString.split(separator);
     if (timeComponents.length < 2) return null;
 
     var hhmmss = timeComponents[0].split(":");
+    if (hhmmss.length < 3) return null;
+
     var hours = parseInt(hhmmss[0], 10);
     var minutes = parseInt(hhmmss[1], 10);
     var seconds = parseInt(hhmmss[2], 10);
@@ -229,6 +291,7 @@ function parseTimecode(timecodeString: string, separator: string): number | null
     var millisecondsStr = timeComponents[1] || "0";
     var milliseconds = parseInt(millisecondsStr, 10);
 
+    // Normalise sub-second precision to milliseconds
     if (millisecondsStr.length === 2) {
       milliseconds *= 10;
     } else if (millisecondsStr.length === 1) {
@@ -241,27 +304,37 @@ function parseTimecode(timecodeString: string, separator: string): number | null
   }
 }
 
+/**
+ * Parses raw SRT file content into an array of subtitle objects.
+ * Handles both LF and CRLF line endings. Strips HTML tags from text lines.
+ */
 function parseSrtContent(contentStr: string) {
-  var lines = contentStr.split(/\r?\n/);
-  var subtitles = [];
+  // Normalise CRLF → LF before splitting so the $ anchor and blank-line detection work correctly
+  var lines = contentStr.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  var subtitles: any[] = [];
   var totalLines = lines.length;
 
+  // SRT timecode format: HH:MM:SS,mmm --> HH:MM:SS,mmm
+  // Hours, minutes, and seconds are always exactly 2 digits; milliseconds are 1–3 digits.
+  var timecodePattern = /^\d{2}:\d{2}:\d{2},\d{1,3}\s+-->\s+\d{2}:\d{2}:\d{2},\d{1,3}$/;
+
   for (var i = 0; i < totalLines; i++) {
-    var line = lines[i].replace(/^\s+|\s+$/g, "");
-    if (!/^\d{2}:\d{2}:\d{1,2},\d{1,3} --> \d{2}:\d{2}:\d{1,2},\d{1,3}$/.test(line)) {
+    var line = lines[i].replace(/^\s+|\s+$/g, ""); // trim
+    if (!timecodePattern.test(line)) {
       continue;
     }
 
-    var timecodes = line.split(" --> ");
+    // Split on " --> " allowing variable whitespace around the arrow
+    var timecodes = line.split(/\s+-->\s+/);
     var startTime = parseTimecode(timecodes[0], ",");
     var endTime = parseTimecode(timecodes[1], ",");
 
     if (startTime !== null && endTime !== null) {
-      var textLines = [];
+      var textLines: string[] = [];
       var lineIndex = i + 1;
 
-      while (lineIndex < totalLines && lines[lineIndex] !== "") {
-        // Strip HTML tags if any
+      while (lineIndex < totalLines && lines[lineIndex].replace(/^\s+|\s+$/g, "") !== "") {
+        // Strip HTML tags (e.g. <i>, <b>, <font color=...>)
         var cleanLine = lines[lineIndex].replace(/<\/?[^>]+(>|$)/g, "");
         textLines.push(cleanLine);
         lineIndex++;
@@ -270,14 +343,18 @@ function parseSrtContent(contentStr: string) {
       subtitles.push({
         startTime: startTime,
         endTime: endTime,
-        text: textLines.join("\n")
+        text: textLines.join("\n"),
       });
-      i = lineIndex;
+      i = lineIndex; // advance past the text block
     }
   }
   return subtitles;
 }
 
+/**
+ * Reads an SRT file and creates one BoxText layer per subtitle entry in the
+ * active After Effects composition.
+ */
 export function importSRTFile(filePath: string): string {
   try {
     const comp = getActiveComp();
@@ -290,68 +367,83 @@ export function importSRTFile(filePath: string): string {
       return JSON.stringify({ success: false, error: "SRT file not found" });
     }
 
-    srtFile.open("r");
+    // encoding MUST be set before open() in ExtendScript
     srtFile.encoding = "UTF-8";
-    var content = srtFile.read();
-    srtFile.close();
+    if (!srtFile.open("r")) {
+      return JSON.stringify({ success: false, error: "Could not open SRT file for reading" });
+    }
+
+    var content: string;
+    try {
+      content = srtFile.read();
+    } finally {
+      srtFile.close();
+    }
 
     var subtitles = parseSrtContent(content);
     if (subtitles.length === 0) {
-      return JSON.stringify({ success: false, error: "No subtitles found or invalid SRT format" });
+      return JSON.stringify({
+        success: false,
+        error: "No subtitles found or invalid SRT format",
+      });
     }
 
     app.beginUndoGroup("Import SRT Subtitles");
 
     var boxWidth = comp.width * 0.8;
-    var boxHeight = comp.height * 0.2; // roughly lower third
-
+    var boxHeight = comp.height * 0.2; // roughly lower-third height
     var layersCreated = 0;
 
-    for (var i = 0; i < subtitles.length; i++) {
-      var sub = subtitles[i];
-      var inSeconds = sub.startTime / 1000;
-      var outSeconds = sub.endTime / 1000;
+    try {
+      for (var i = 0; i < subtitles.length; i++) {
+        var sub = subtitles[i];
+        var inSeconds = sub.startTime / 1000;
+        var outSeconds = sub.endTime / 1000;
 
-      // Create a BoxText layer
-      var textLayer = comp.layers.addBoxText([boxWidth, boxHeight]);
-      var textProp = textLayer.property("Source Text") as Property;
-      var textDoc = textProp.value as TextDocument;
+        // Create a Point Text layer (more reliable for absolute centering)
+        var textLayer = comp.layers.addText(sub.text);
+        var textProp = textLayer.property("Source Text") as Property;
+        var textDoc = textProp.value as TextDocument;
 
-      textDoc.text = sub.text;
-      textDoc.justification = ParagraphJustification.CENTER_JUSTIFY;
-      textDoc.fontSize = Math.floor(comp.height * 0.05); // Responsive font size
-      textDoc.fillColor = [1, 1, 1]; // White
-      textDoc.applyStroke = true;
-      textDoc.strokeColor = [0, 0, 0]; // Black
-      textDoc.strokeWidth = 2;
-      textProp.setValue(textDoc);
+        textDoc.justification = ParagraphJustification.CENTER_JUSTIFY;
+        textDoc.fontSize = Math.floor(comp.height * 0.05); // responsive font size
+        textDoc.fillColor = [1, 1, 1]; // white
+        textDoc.applyStroke = true;
+        textDoc.strokeColor = [0, 0, 0]; // black outline
+        textDoc.strokeWidth = 2;
+        textProp.setValue(textDoc);
 
-      textLayer.name = sub.text.replace(/\n/g, " ").substring(0, 30);
+        // Truncate long text for the layer name
+        textLayer.name = sub.text.replace(/\n/g, " ").substring(0, 30);
 
-      textLayer.startTime = inSeconds;
-      textLayer.inPoint = inSeconds;
-      textLayer.outPoint = outSeconds;
+        // Set visibility range
+        textLayer.inPoint = inSeconds;
+        textLayer.outPoint = outSeconds;
 
-      // Center the anchor point in the box
-      textLayer.property("Anchor Point").setValue([boxWidth / 2, boxHeight / 2]);
+        // --- CALCULA CENTRALIZAÇÃO REAL ---
+        // sourceRectAtTime retorna os limites exatos do texto desenhado
+        var rect = textLayer.sourceRectAtTime(0, false);
 
-      // Position in the lower center
-      var transform = textLayer.property("Transform") as PropertyGroup;
-      var position = transform.property("Position") as Property;
-      position.setValue([comp.width / 2, comp.height * 0.85]);
+        // Centraliza o Anchor Point com base no retângulo do texto
+        var centerX = rect.left + rect.width / 2;
+        var centerY = rect.top + rect.height / 2;
+        textLayer.property("Anchor Point").setValue([centerX, centerY]);
 
-      layersCreated++;
+        // Posiciona a layer exatamente no centro da composição
+        textLayer.property("Position").setValue([comp.width / 2, comp.height / 2]);
+
+        layersCreated++;
+      }
+    } finally {
+      app.endUndoGroup();
     }
-
-    app.endUndoGroup();
 
     return JSON.stringify({
       success: true,
       method: "addTextLayers",
       itemName: "Created " + layersCreated + " Text Layers",
-      layersCreated: layersCreated
+      layersCreated: layersCreated,
     });
-
   } catch (e: any) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

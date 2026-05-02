@@ -5,76 +5,6 @@ import { ns } from "../shared/shared";
 import * as ppro from "./ppro/ppro";
 import * as aeft from "./aeft/aeft";
 
-//@ts-ignore
-const host = typeof $ !== "undefined" ? $ : window;
-
-// A safe way to get the app name since some versions of Adobe Apps broken BridgeTalk in various places (e.g. After Effects 24-25)
-// in that case we have to do various checks per app to deterimine the app name
-
-const getAppNameSafely = (): ApplicationName | "unknown" => {
-  const compare = (a: string, b: string) => {
-    return a.toLowerCase().indexOf(b.toLowerCase()) > -1;
-  };
-  const exists = (a: any) => typeof a !== "undefined";
-
-  try {
-    // 1. Direct check via app.name (common in AE)
-    if (typeof app !== "undefined" && app.name) {
-      const name = app.name.toLowerCase();
-      if (compare(name, "after effects")) return "aftereffects";
-      if (compare(name, "premiere")) return "premierepro";
-    }
-
-    // 2. BridgeTalk (standard but can be broken)
-    if (typeof BridgeTalk !== "undefined" && BridgeTalk.appName) {
-      return BridgeTalk.appName as ApplicationName;
-    }
-
-    // 3. Fallback checks
-    if (typeof app !== "undefined") {
-      if (exists(app.appName)) {
-        const appName = app.appName.toLowerCase();
-        if (compare(appName, "after effects")) return "aftereffects";
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
-  return "unknown";
-};
-
-const detectedApp = getAppNameSafely();
-$.writeln("[AutoSubs] Detected host app: " + detectedApp);
-
-switch (detectedApp) {
-  case "aftereffects":
-  case "aftereffectsbeta":
-    $.writeln("[AutoSubs] Mapping AEFT functions...");
-    host[ns] = aeft;
-    break;
-  case "premierepro":
-  case "premiereprobeta":
-    $.writeln("[AutoSubs] Mapping PPRO functions...");
-    host[ns] = ppro;
-    break;
-  default:
-    // If we can't detect, but app object looks like AE, assume AE
-    if (typeof app !== "undefined" && typeof CompItem !== "undefined") {
-      $.writeln("[AutoSubs] Fallback to After Effects detection");
-      host[ns] = aeft;
-    } else {
-      $.writeln("[AutoSubs] Could not determine app, functions might not be available");
-    }
-    break;
-}
-
-const empty = {};
-// prettier-ignore
-export type Scripts = typeof empty
-  & typeof ppro
-  & typeof aeft
-  ;
-
 // https://extendscript.docsforadobe.dev/interapplication-communication/bridgetalk-class.html?highlight=bridgetalk#appname
 type ApplicationName =
   | "aftereffects"
@@ -97,3 +27,78 @@ type ApplicationName =
   | "photoshopbeta"
   | "premierepro"
   | "premiereprobeta";
+
+//@ts-ignore
+const host = typeof $ !== "undefined" ? $ : window;
+
+// A safe way to get the app name since some versions of Adobe Apps break BridgeTalk in various
+// places (e.g. After Effects 24-25). In that case we have to do various checks per app to
+// determine the app name.
+const getAppNameSafely = (): ApplicationName | "unknown" => {
+  const compare = (a: string, b: string) => {
+    return a.toLowerCase().indexOf(b.toLowerCase()) > -1;
+  };
+  const exists = (a: any) => typeof a !== "undefined";
+
+  try {
+    // 1. Direct check via app.name (common in AE)
+    if (typeof app !== "undefined" && app.name) {
+      const name = app.name.toLowerCase();
+      if (compare(name, "after effects")) return "aftereffects";
+      if (compare(name, "premiere")) return "premierepro";
+    }
+
+    // 2. BridgeTalk (standard but can be broken in some AE versions)
+    if (typeof BridgeTalk !== "undefined" && BridgeTalk.appName) {
+      return BridgeTalk.appName as ApplicationName;
+    }
+
+    // 3. Fallback: app.appName property (legacy AE)
+    if (typeof app !== "undefined") {
+      if (exists(app.appName)) {
+        const appName = app.appName.toLowerCase();
+        if (compare(appName, "after effects")) return "aftereffects";
+      }
+    }
+  } catch (e) {
+    $.writeln("[AutoSubs] getAppNameSafely error: " + e);
+  }
+  return "unknown";
+};
+
+const detectedApp = getAppNameSafely();
+$.writeln("[AutoSubs] Detected host app: " + detectedApp);
+
+switch (detectedApp) {
+  case "aftereffects":
+  case "aftereffectsbeta":
+    $.writeln("[AutoSubs] Mapping AEFT functions...");
+    host[ns] = aeft;
+    break;
+  case "premierepro":
+  case "premiereprobeta":
+    $.writeln("[AutoSubs] Mapping PPRO functions...");
+    host[ns] = ppro;
+    break;
+  default:
+    // CompItem is an AE-native class — its presence in the global scope is a reliable
+    // indicator that we are running inside After Effects.  We intentionally avoid checking
+    // app.project.activeItem because there may be no open project yet.
+    try {
+      // `new CompItem()` would throw in Premiere, but `CompItem` itself should be defined in AE.
+      if (typeof app !== "undefined" && String(typeof CompItem) === "function") {
+        $.writeln("[AutoSubs] Fallback: CompItem class present — assuming After Effects");
+        host[ns] = aeft;
+      } else {
+        $.writeln("[AutoSubs] Could not determine host app — functions may not be available");
+      }
+    } catch (e) {
+      $.writeln("[AutoSubs] Fallback detection error: " + e);
+    }
+    break;
+}
+
+// Scripts represents the intersection of all exported functions.
+// At runtime only one host module is ever active; consumers should guard with
+// their own app-detection logic before calling host-specific APIs.
+export type Scripts = typeof ppro & typeof aeft;

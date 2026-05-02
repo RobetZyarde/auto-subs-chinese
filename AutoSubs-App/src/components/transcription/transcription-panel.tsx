@@ -174,7 +174,7 @@ function TranscriptionPanelView({
   onAddToTimeline,
   onViewSubtitles,
   livePreviewSegments,
-  settings,
+  settings: currentSettings, // Use settings from props
   timelineInfo,
   selectedFile: selectedFileProp,
   onSelectedFileChange,
@@ -185,7 +185,7 @@ function TranscriptionPanelView({
   onSelectedIntegrationChange,
 }: TranscriptionPanelViewProps) {
   const { t, i18n } = useTranslation()
-  const { settings: currentSettings, updateSetting } = useSettings()
+  const { updateSetting } = useSettings() // Keep only updateSetting if needed, or better, pass from parent
   const isPremiereActive = selectedIntegration === "premiere" || selectedIntegration === "aftereffects" || selectedIntegration === "premierepro";
   const isTourActive = !currentSettings.tourCompleted
   const uploadIconRef = React.useRef<UploadIconHandle>(null)
@@ -529,11 +529,11 @@ function TranscriptionPanelView({
                     <div className="flex flex-col items-center gap-2">
                       <AudioLines className="h-6 w-6" />
                       <div className="text-sm font-medium">
-                        {currentSettings.selectedInputTracks.length === 0
+                        {currentSettings.selectedInputTracksByApp[selectedIntegration]?.length === 0
                           ? t("actionBar.tracks.selectTracks")
-                          : currentSettings.selectedInputTracks.length === 1
-                            ? t("actionBar.tracks.trackN", { n: currentSettings.selectedInputTracks[0] })
-                            : t("actionBar.tracks.countSelected", { count: currentSettings.selectedInputTracks.length })}
+                          : currentSettings.selectedInputTracksByApp[selectedIntegration]?.length === 1
+                            ? t("actionBar.tracks.trackN", { n: currentSettings.selectedInputTracksByApp[selectedIntegration][0] })
+                            : t("actionBar.tracks.countSelected", { count: currentSettings.selectedInputTracksByApp[selectedIntegration]?.length })}
                       </div>
                       <span className="text-xs text-muted-foreground">{t("actionBar.tracks.selectMultiple")}</span>
                     </div>
@@ -659,7 +659,6 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
 
   React.useEffect(() => {
     if (!hasInitializedIntegration && isPremiereConnected) {
-      // Only auto-select Premiere if we haven't already selected an Adobe app
       if (selectedIntegration !== "aftereffects") {
         setSelectedIntegration("premiere");
       }
@@ -676,6 +675,9 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
   const cancelRequestedRef = resolveCancelRequestedRef;
   const isExporting = isPremiereActive ? premiereIsExporting : resolveIsExporting;
   const exportProgress = isPremiereActive ? premiereExportProgress : resolveExportProgress;
+
+  // Senior Pattern: derive active tracks from the app-aware map instead of a global list
+  const activeSelectedTracks = settings.selectedInputTracksByApp[selectedIntegration] || [];
   const cancelExport = resolveCancelExport; // Fallback for cancel
   const setIsExporting = resolveSetIsExporting; // Fallback
   const setExportProgress = resolveSetExportProgress; // Fallback
@@ -810,7 +812,7 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
       const audioInfo = await getSourceAudio(
         settings.isStandaloneMode,
         fileInput,
-        settings.selectedInputTracks,
+        activeSelectedTracks,
       )
 
       if (!audioInfo) {
@@ -936,7 +938,6 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
           }}
           downloadingModel={null}
           downloadProgress={0}
-          openModelSelector={openModelSelector}
           onOpenModelSelectorChange={setOpenModelSelector}
           isSmallScreen={isSmallScreen}
           isStandaloneMode={settings.isStandaloneMode}
@@ -956,6 +957,7 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
           isProcessing={isProcessing}
           selectedIntegration={selectedIntegration}
           onSelectedIntegrationChange={setSelectedIntegration}
+          openModelSelector={openModelSelector}
         />
       </div>
     </div>
