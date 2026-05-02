@@ -83,7 +83,7 @@
       "clearAll": "すべてクリア",
       "clickToSelect": "クリックして音声トラックを選択",
       "countSelected": "{{count}} トラック選択済み",
-      "createTrack": "現在のタイムラインに音声トラックを作成して文字起こしを開始してください。",
+      "createTrack": "タイムラインが見つかりません",
       "noneFound": "音声トラックが見つかりません。",
       "noneSelected": "トラックが選択されていません",
       "selectAll": "すべて選択",
@@ -133,8 +133,14 @@
     "supportsSrt": ".srt ファイルに対応",
     "fileDialog": { "subtitleFiles": "字幕ファイル" },
     "exportFormats": {
-      "srt": { "title": "字幕 (.srt)", "description": "YouTube や VLC などで使える標準的な字幕形式です。タイムスタンプを含みます。" },
-      "txt": { "title": "文字起こし (.txt)", "description": "利用可能な場合は話者ラベルを含む、LLM 向けのプレーンテキスト書き出しです。" }
+      "srt": {
+        "title": "字幕 (.srt)",
+        "description": "YouTube や VLC などで使える標準的な字幕形式です。タイムスタンプを含みます。"
+      },
+      "txt": {
+        "title": "文字起こし (.txt)",
+        "description": "利用可能な場合は話者ラベルを含む、LLM 向けのプレーンテキスト書き出しです。"
+      }
     }
   },
   "gettingStarted": {
@@ -199,7 +205,7 @@
     },
     "filters": {
       "weight": "軽量",
-      "accuracy": "精度", 
+      "accuracy": "精度",
       "recommended": "おすすめ",
       "search": "検索",
       "clear": "フィルターをクリア"
@@ -240,7 +246,12 @@
       "empty": "ダウンロード済みのモデルが見つかりません",
       "title": "モデル"
     },
-    "diarize": { "label": "話者ダイアリゼーションモデル", "description": "話者ラベリング用バンドル", "details": "話者のダイアリゼーションとラベリングに使用されます。", "badge": "話者ラベル" },
+    "diarize": {
+      "label": "話者ダイアリゼーションモデル",
+      "description": "話者ラベリング用バンドル",
+      "details": "話者のダイアリゼーションとラベリングに使用されます。",
+      "badge": "話者ラベル"
+    },
     "moonshine_base": {
       "badge": "英語専用",
       "description": "高速・高精度",
@@ -421,7 +432,12 @@
     "jumpToTimeline": "タイムライン上の地点にジャンプ",
     "loading": "字幕を読み込み中...",
     "waitingForSubtitles": "字幕を待機中...",
-    "search": { "caseMatch": "大文字/小文字を区別", "wholeWord": "完全一致", "replaceAll": "すべて置換", "replaceWithPlaceholder": "次に置換..." },
+    "search": {
+      "caseMatch": "大文字/小文字を区別",
+      "wholeWord": "完全一致",
+      "replaceAll": "すべて置換",
+      "replaceWithPlaceholder": "次に置換..."
+    },
     "searchAria": "字幕を検索",
     "searchPlaceholder": "字幕を検索...",
     "speakers": "話者",
@@ -432,7 +448,11 @@
     "toggle": "テーマを切り替え"
   },
   "titlebar": {
-    "transcripts": { "searchPlaceholder": "文字起こしを検索...", "loading": "読み込み中...", "empty": "文字起こしが見つかりません。" },
+    "transcripts": {
+      "searchPlaceholder": "文字起こしを検索...",
+      "loading": "読み込み中...",
+      "empty": "文字起こしが見つかりません。"
+    },
     "resolve": {
       "productName": "DaVinci Resolve",
       "status": {
@@ -494,9 +514,15 @@
     "adding": "追加中...",
     "success": "タイムラインに追加されました",
     "steps": {
-      "template": { "title": "テンプレート", "description": "スタイルテンプレートを選択" },
+      "template": {
+        "title": "テンプレート",
+        "description": "スタイルテンプレートを選択"
+      },
       "speakers": { "title": "話者", "description": "話者トラックと色を設定" },
-      "outputTrack": { "title": "出力トラック", "description": "字幕トラックを選択" }
+      "outputTrack": {
+        "title": "出力トラック",
+        "description": "字幕トラックを選択"
+      }
     },
     "mode": {
       "regular": "通常",

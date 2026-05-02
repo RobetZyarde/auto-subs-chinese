@@ -85,7 +85,7 @@
       "clearAll": "모두 지우기",
       "clickToSelect": "클릭하여 오디오 트랙 선택",
       "countSelected": "{{count}}개 트랙 선택됨",
-      "createTrack": "현재 타임라인에 오디오 트랙을 만들어 자막 생성을 시작하세요.",
+      "createTrack": "타임라인을 찾을 수 없습니다",
       "noneFound": "오디오 트랙을 찾을 수 없습니다.",
       "noneSelected": "선택된 트랙 없음",
       "selectAll": "모두 선택",

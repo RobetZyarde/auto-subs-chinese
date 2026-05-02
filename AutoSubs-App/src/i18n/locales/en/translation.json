@@ -156,7 +156,7 @@
       "selectAll": "Select All",
       "clearAll": "Clear All",
       "noneFound": "No audio tracks found.",
-      "createTrack": "Create an audio track in your current timeline to start transcribing.",
+      "createTrack": "No timeline found",
       "selectMultiple": "Click to select multiple tracks"
     },
     "fileDrop": {
@@ -224,7 +224,7 @@
     },
     "filters": {
       "weight": "Lightweight",
-      "accuracy": "Accuracy", 
+      "accuracy": "Accuracy",
       "recommended": "Recommended",
       "search": "Search",
       "clear": "Clear filter"

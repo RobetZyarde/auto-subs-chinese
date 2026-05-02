@@ -1,5 +1,6 @@
 import * as React from "react"
-import { Loader2, Repeat2, Type, Upload, Users, X } from "lucide-react"
+import { useVirtualizer } from "@tanstack/react-virtual"
+import { FileText, Loader2, Repeat2, Search, Type, Upload, Users, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { Input } from "@/components/ui/input"
@@ -11,10 +12,10 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Skeleton } from "@/components/ui/skeleton"
 import { SubtitleList } from "@/components/subtitles/subtitle-list"
 import { SpeakerSettings } from "@/components/common/speaker-settings"
 import { ImportExportPopover } from "@/components/common/import-export-popover"
-import { TranscriptSearchPopover } from "@/components/common/transcript-search-popover"
 import { AddToTimelineDialog } from "@/components/dialogs/add-to-timeline-dialog"
 import { TextFormattingPanel } from "@/components/settings/text-formatting-panel"
 import { useTranscript } from "@/contexts/TranscriptContext"
@@ -23,12 +24,15 @@ import { usePremiere } from "@/contexts/PremiereContext"
 import { useIntegration } from "@/contexts/IntegrationContext"
 import { useSettings } from "@/contexts/SettingsContext"
 import { Speaker, Template, Track } from "@/types"
+import { listTranscriptIndexFiles, readTranscript, type TranscriptListItem } from "@/utils/file-utils"
 import { useTranslation } from "react-i18next"
 import { PlusIcon, type PlusIconHandle } from "../ui/plus"
-import { ArchiveIcon } from "../ui/archive"
-import type { HistoryIconHandle } from "@/components/ui/history"
 
 type SubtitleViewerVariant = "desktop" | "compact"
+
+const ESTIMATED_TRANSCRIPT_ROW_HEIGHT = 60
+const TRANSCRIPT_ROW_OVERSCAN = 8
+const TRANSCRIPT_SKELETON_ROWS = 10
 
 interface SubtitleViewerPanelProps {
   variant: SubtitleViewerVariant
@@ -436,7 +440,6 @@ function SubtitleToolbar({
 }
 
 interface SubtitleContentProps {
-  variant: SubtitleViewerVariant
   subtitlesLength: number
   searchQuery: string
   searchCaseSensitive: boolean
@@ -444,10 +447,176 @@ interface SubtitleContentProps {
   selectedIndex: number | null
   onSelectedIndexChange: (index: number | null) => void
   t: (key: string) => string
+  transcriptDateLocale?: string
+  onTranscriptOpen: () => void
+}
+
+interface PreviousTranscriptsListProps {
+  searchQuery: string
+  transcriptDateLocale?: string
+  onTranscriptOpen: () => void
+  t: (key: string) => string
+}
+
+function PreviousTranscriptsList({
+  searchQuery,
+  transcriptDateLocale,
+  onTranscriptOpen,
+  t,
+}: PreviousTranscriptsListProps) {
+  const [transcripts, setTranscripts] = React.useState<TranscriptListItem[]>([])
+  const [hasLoaded, setHasLoaded] = React.useState(false)
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null)
+  const { setSubtitles, setSpeakers, setCurrentTranscriptFilename } = useTranscript()
+
+  const loadTranscripts = React.useCallback(async () => {
+    try {
+      setTranscripts(await listTranscriptIndexFiles())
+    } catch (error) {
+      console.error("Failed to load transcripts:", error)
+    } finally {
+      setHasLoaded(true)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    void loadTranscripts()
+  }, [loadTranscripts])
+
+  const formatTranscriptDate = React.useCallback((createdAt: Date) => (
+    createdAt.toLocaleDateString(transcriptDateLocale, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    })
+  ), [transcriptDateLocale])
+
+  const filteredTranscripts = React.useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase()
+    if (!query) return transcripts
+
+    return transcripts.filter((transcript) => {
+      const createdAt = transcript.createdAt
+      const month = String(createdAt.getMonth() + 1).padStart(2, "0")
+      const day = String(createdAt.getDate()).padStart(2, "0")
+      const year = String(createdAt.getFullYear())
+      const hours = String(createdAt.getHours()).padStart(2, "0")
+      const minutes = String(createdAt.getMinutes()).padStart(2, "0")
+      const searchableText = [
+        transcript.displayName,
+        transcript.filename,
+        transcript.timelineName,
+        formatTranscriptDate(createdAt),
+        createdAt.toLocaleString(transcriptDateLocale),
+        createdAt.toLocaleDateString(transcriptDateLocale),
+        createdAt.toLocaleTimeString(transcriptDateLocale, {
+          hour: "numeric",
+          minute: "2-digit",
+        }),
+        `${year}-${month}-${day}`,
+        `${month}/${day}/${year}`,
+        `${day}/${month}/${year}`,
+        `${hours}:${minutes}`,
+      ].filter(Boolean).join(" ").toLocaleLowerCase()
+
+      return searchableText.includes(query)
+    })
+  }, [formatTranscriptDate, searchQuery, transcriptDateLocale, transcripts])
+
+  const rowVirtualizer = useVirtualizer({
+    count: filteredTranscripts.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => ESTIMATED_TRANSCRIPT_ROW_HEIGHT,
+    getItemKey: (index) => filteredTranscripts[index]?.filename ?? index,
+    overscan: TRANSCRIPT_ROW_OVERSCAN,
+  })
+
+  const openTranscript = async (filename: string) => {
+    try {
+      const transcriptData = await readTranscript(filename)
+      if (transcriptData) {
+        setSubtitles(transcriptData.segments || [])
+        setSpeakers(transcriptData.speakers || [])
+        setCurrentTranscriptFilename(filename)
+        onTranscriptOpen()
+      }
+    } catch (error) {
+      console.error("Failed to load transcript:", error)
+    }
+  }
+
+  if (!hasLoaded) {
+    return (
+      <div className="h-full overflow-hidden px-2 py-2">
+        <div className="space-y-1">
+          {Array.from({ length: TRANSCRIPT_SKELETON_ROWS }).map((_, index) => (
+            <div
+              key={index}
+              className="flex items-start gap-3 rounded-md px-3 py-2.5"
+            >
+              <Skeleton className="mt-0.5 h-4 w-4 shrink-0 rounded-sm" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <Skeleton className="h-4 w-[72%]" />
+                <Skeleton className="h-3 w-[48%]" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (filteredTranscripts.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center px-8 py-8 text-center text-sm text-muted-foreground">
+        {t("titlebar.transcripts.empty")}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={scrollContainerRef}
+      className="h-full overflow-y-auto pt-2"
+    >
+      <div
+        className="relative"
+        style={{ height: rowVirtualizer.getTotalSize() }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const transcript = filteredTranscripts[virtualRow.index]
+          if (!transcript) return null
+
+          return (
+            <button
+              key={transcript.filename}
+              data-index={virtualRow.index}
+              ref={rowVirtualizer.measureElement}
+              type="button"
+              style={{ transform: `translateY(${virtualRow.start}px)` }}
+              className="absolute left-2 right-2 top-0 flex items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => void openTranscript(transcript.filename)}
+            >
+              <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-foreground">
+                  {transcript.displayName}
+                </span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {formatTranscriptDate(transcript.createdAt)}
+                </span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function SubtitleContent({
-  variant,
   subtitlesLength,
   searchQuery,
   searchCaseSensitive,
@@ -455,11 +624,12 @@ function SubtitleContent({
   selectedIndex,
   onSelectedIndexChange,
   t,
+  transcriptDateLocale,
+  onTranscriptOpen,
 }: SubtitleContentProps) {
-  const archiveIconRef = React.useRef<HistoryIconHandle>(null)
-  const contentClassName = variant === "desktop"
+  const contentClassName = subtitlesLength > 0
     ? "flex-1 overflow-y-auto min-h-0 px-0 relative z-0"
-    : "flex-1 overflow-y-auto min-h-0 px-0 relative z-0"
+    : "flex-1 overflow-hidden min-h-0 px-0 relative z-0"
 
   return (
     <div className={contentClassName}>
@@ -473,29 +643,13 @@ function SubtitleContent({
           itemClassName="hover:bg-sidebar-accent transition-colors"
         />
       ) : (
-        <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-center p-8">
-          <p className="text-lg font-medium mb-2">{t("subtitles.empty.noSubtitlesFound")}</p>
-          <p className="text-sm mb-4">
-            {searchQuery
-              ? t("subtitles.empty.tryDifferentSearch")
-              : t("subtitles.empty.noSubtitlesAvailable")}
-          </p>
-          {!searchQuery && (
-            <TranscriptSearchPopover
-              trigger={
-                <Button
-                  variant="outline"
-                  size="default"
-                  className="gap-2"
-                  onMouseEnter={() => archiveIconRef.current?.startAnimation()}
-                  onMouseLeave={() => archiveIconRef.current?.stopAnimation()}
-                >
-                  <ArchiveIcon ref={archiveIconRef} size={16} />
-                  {t("subtitles.previousTranscripts")}
-                </Button>
-              }
-            />
-          )}
+        <div className="h-full min-h-0">
+          <PreviousTranscriptsList
+            searchQuery={searchQuery}
+            transcriptDateLocale={transcriptDateLocale}
+            onTranscriptOpen={onTranscriptOpen}
+            t={t}
+          />
         </div>
       )}
     </div>
@@ -599,7 +753,9 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
     ? (filename?: string, _selectedTemplate?: string, _selectedOutputTrack?: string, _presetSettings?: Record<string, unknown>) => premierePush(filename) 
     : resolvePush;
   const { settings } = useSettings()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const hasSubtitles = subtitles.length > 0
+  const transcriptDateLocale = i18n.resolvedLanguage || i18n.language || undefined
 
 
   React.useEffect(() => {
@@ -680,28 +836,65 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
 
   return (
     <div className={shellClassName}>
-      <SearchSection
-        variant={variant}
-        headerClassName={headerClassName}
-        t={t}
-        searchQuery={searchQuery}
-        replaceValue={replaceValue}
-        searchCaseSensitive={searchCaseSensitive}
-        searchWholeWord={searchWholeWord}
-        showReplace={showReplace}
-        canReplace={canReplace}
-        searchInputRef={searchInputRef}
-        onSearchQueryChange={setSearchQuery}
-        onReplaceValueChange={setReplaceValue}
-        onToggleCaseSensitive={() => setSearchCaseSensitive((value) => !value)}
-        onToggleWholeWord={() => setSearchWholeWord((value) => !value)}
-        onToggleReplace={() => setShowReplace((value) => !value)}
-        onReplaceAll={handleReplaceAll}
-        searchPlaceholder={t("subtitles.searchPlaceholder")}
-        searchAriaLabel={t("subtitles.searchAria")}
-      />
+      {hasSubtitles ? (
+        <SearchSection
+          variant={variant}
+          headerClassName={headerClassName}
+          t={t}
+          searchQuery={searchQuery}
+          replaceValue={replaceValue}
+          searchCaseSensitive={searchCaseSensitive}
+          searchWholeWord={searchWholeWord}
+          showReplace={showReplace}
+          canReplace={canReplace}
+          searchInputRef={searchInputRef}
+          onSearchQueryChange={setSearchQuery}
+          onReplaceValueChange={setReplaceValue}
+          onToggleCaseSensitive={() => setSearchCaseSensitive((value) => !value)}
+          onToggleWholeWord={() => setSearchWholeWord((value) => !value)}
+          onToggleReplace={() => setShowReplace((value) => !value)}
+          onReplaceAll={handleReplaceAll}
+          searchPlaceholder={t("subtitles.searchPlaceholder")}
+          searchAriaLabel={t("subtitles.searchAria")}
+        />
+      ) : (
+        <div className={headerClassName}>
+          <InputGroup>
+            <InputGroupInput
+              ref={searchInputRef}
+              placeholder={t("titlebar.transcripts.searchPlaceholder")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label={t("titlebar.transcripts.searchPlaceholder")}
+              className="text-sm"
+            />
+            {searchQuery ? (
+              <InputGroupAddon align="inline-end">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setSearchQuery("")}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">{t("subtitles.clearSearch")}</TooltipContent>
+                </Tooltip>
+              </InputGroupAddon>
+            ) : (
+              <InputGroupAddon align="inline-end">
+                <Search className="h-4 w-4 text-muted-foreground" />
+              </InputGroupAddon>
+            )}
+          </InputGroup>
+        </div>
+      )}
 
-      {subtitles.length > 0 && (
+      {hasSubtitles && (
         <SubtitleToolbar
           variant={variant}
           onClose={onClose}
@@ -723,7 +916,6 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
       )}
 
       <SubtitleContent
-        variant={variant}
         subtitlesLength={subtitles.length}
         searchQuery={searchQuery}
         searchCaseSensitive={searchCaseSensitive}
@@ -731,6 +923,11 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
         selectedIndex={selectedIndex}
         onSelectedIndexChange={setSelectedIndex}
         t={t}
+        transcriptDateLocale={transcriptDateLocale}
+        onTranscriptOpen={() => {
+          setSelectedIndex(null)
+          setSearchQuery("")
+        }}
       />
 
       {isIntegrationConnected && subtitles.length > 0 && (

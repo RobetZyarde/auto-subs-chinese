@@ -504,6 +504,37 @@ export async function listTranscriptFiles(): Promise<TranscriptListItem[]> {
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
+export async function listTranscriptIndexFiles(): Promise<TranscriptListItem[]> {
+  const items = await readTranscriptIndex();
+
+  return items
+    .map((item) => {
+      if (!item.filename || item.filename === TRANSCRIPT_INDEX_FILENAME) {
+        return null;
+      }
+
+      const metadata = item.metadata
+        ? buildMetadata(item, item.filename, item.metadata)
+        : undefined;
+      const createdAt = parseValidDate(metadata?.createdAt)
+        || parseValidDate(item.createdAt)
+        || new Date(0);
+
+      return {
+        filename: item.filename,
+        displayName: metadata?.displayName?.trim() || stripExtension(item.filename),
+        createdAt,
+        transcriptId: metadata?.transcriptId,
+        timelineId: metadata?.timelineId,
+        timelineName: metadata?.timelineName,
+        markIn: metadata?.markIn,
+        markOut: metadata?.markOut,
+      } satisfies TranscriptListItem;
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
 export async function resolveTranscriptFilename(
   isStandaloneMode: boolean,
   selectedFile: string | null,

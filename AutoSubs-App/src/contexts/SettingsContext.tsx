@@ -1,11 +1,15 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { load, Store } from '@tauri-apps/plugin-store';
-import { platform } from '@tauri-apps/plugin-os';
-import { Settings } from '@/types';
-import { getPreferredUiLanguage, initI18n, normalizeUiLanguage } from '@/i18n';
-import { models, modelSupportsLanguage, getFirstRecommendedModelForLanguage } from '@/lib/models';
-import { DEFAULT_PRESET_ID } from '@/presets/built-in-presets';
-import { loadFontForLanguage } from '@/lib/font-loader';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { load, Store } from "@tauri-apps/plugin-store";
+import { platform } from "@tauri-apps/plugin-os";
+import { Settings } from "@/types";
+import { getPreferredUiLanguage, initI18n, normalizeUiLanguage } from "@/i18n";
+import {
+  models,
+  modelSupportsLanguage,
+  getFirstRecommendedModelForLanguage,
+} from "@/lib/models";
+import { DEFAULT_PRESET_ID } from "@/presets/built-in-presets";
+import { loadFontForLanguage } from "@/lib/font-loader";
 
 export const DEFAULT_SETTINGS: Settings = {
   // Mode
@@ -69,7 +73,7 @@ interface SettingsContextType {
   updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   resetSettings: () => void;
   isHydrated: boolean;
-};
+}
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
 
@@ -81,15 +85,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   async function initializeStore() {
     try {
-      const loadedStore = await load('autosubs-store.json', { autoSave: false });
+      const loadedStore = await load("autosubs-store.json", {
+        autoSave: false,
+      });
       setStore(loadedStore);
 
       const currentPlatform = await platform();
-      const isWindows = currentPlatform === 'windows';
+      const isWindows = currentPlatform === "windows";
 
       // If you store settings as a single object, you can get it all at once
       // Alternatively, if they are stored individually, you can reconstruct the object here.
-      const storedSettings = await loadedStore.get<any>('settings');
+      const storedSettings = await loadedStore.get<any>("settings");
       const hydratedSettings = storedSettings
         ? ({
             ...DEFAULT_SETTINGS,
@@ -98,7 +104,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
               ? normalizeUiLanguage(storedSettings.uiLanguage)
               : getPreferredUiLanguage(),
             // Migration: convert old isStandaloneMode boolean to audioInputMode enum
-            audioInputMode: storedSettings.audioInputMode ?? (storedSettings.isStandaloneMode ? "file" : "timeline"),
+            audioInputMode:
+              storedSettings.audioInputMode ??
+              (storedSettings.isStandaloneMode ? "file" : "timeline"),
           } as Settings)
         : ({
             ...DEFAULT_SETTINGS,
@@ -109,7 +117,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       initI18n(hydratedSettings.uiLanguage);
       setSettings(hydratedSettings);
     } catch (error) {
-      console.error('Error initializing store:', error);
+      console.error("Error initializing store:", error);
     } finally {
       setIsHydrated(true);
     }
@@ -151,10 +159,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     async function saveState() {
       if (!store) return;
       try {
-        await store.set('settings', settings);
+        await store.set("settings", settings);
         await store.save();
       } catch (error) {
-        console.error('Error saving state:', error);
+        console.error("Error saving state:", error);
       }
     }
 
@@ -167,26 +175,37 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       ...DEFAULT_SETTINGS,
       uiLanguage: getPreferredUiLanguage(),
       onboardingCompleted: true,
+      // Preserve milestone tracking and usage data
+      transcriptionsCompleted: settings.transcriptionsCompleted,
+      subSlateMilestoneShown: settings.subSlateMilestoneShown,
+      timesDismissedSurvey: settings.timesDismissedSurvey,
+      lastSurveyDate: settings.lastSurveyDate,
+      lastSeenVersion: settings.lastSeenVersion,
     });
   }
 
   // Update a setting
   // This enforces that key is a valid Settings property, and value must match its type
   function updateSetting<K extends keyof Settings>(key: K, value: Settings[K]) {
-    setSettings(prev => {
+    setSettings((prev) => {
       const newSettings = {
         ...prev,
-        [key]: key === 'uiLanguage' ? normalizeUiLanguage(value as string) : value
+        [key]:
+          key === "uiLanguage" ? normalizeUiLanguage(value as string) : value,
       };
 
       // Check if language changed and current model supports the new language
-      if (key === 'language' && value !== prev.language) {
+      if (key === "language" && value !== prev.language) {
         const currentModel = models[prev.model];
         if (!modelSupportsLanguage(currentModel, value as string)) {
           // Find first recommended model that supports the new language
-          const recommendedModel = getFirstRecommendedModelForLanguage(value as string);
+          const recommendedModel = getFirstRecommendedModelForLanguage(
+            value as string,
+          );
           if (recommendedModel) {
-            const modelIndex = models.findIndex(m => m.value === recommendedModel.value);
+            const modelIndex = models.findIndex(
+              (m) => m.value === recommendedModel.value,
+            );
             if (modelIndex !== -1) {
               newSettings.model = modelIndex;
             }
@@ -199,12 +218,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SettingsContext.Provider value={{
-      settings,
-      updateSetting,
-      resetSettings,
-      isHydrated,
-    }}>
+    <SettingsContext.Provider
+      value={{
+        settings,
+        updateSetting,
+        resetSettings,
+        isHydrated,
+      }}
+    >
       {!isHydrated ? (
         <div className="h-screen w-screen bg-background" />
       ) : (
@@ -222,7 +243,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 export const useSettings = () => {
   const context = useContext(SettingsContext);
   if (!context) {
-    throw new Error('useSettings must be used within a SettingsProvider');
+    throw new Error("useSettings must be used within a SettingsProvider");
   }
   return context;
 };

@@ -156,7 +156,7 @@
       "selectAll": "Seleccionar todo",
       "clearAll": "Limpiar",
       "noneFound": "No se encontraron pistas de audio.",
-      "createTrack": "Crea una pista de audio en tu línea de tiempo para empezar a transcribir.",
+      "createTrack": "No se encontró línea de tiempo",
       "selectMultiple": "Haz clic para seleccionar múltiples pistas"
     },
     "fileDrop": {
@@ -222,7 +222,7 @@
     },
     "filters": {
       "weight": "Ligero",
-      "accuracy": "Precisión", 
+      "accuracy": "Precisión",
       "recommended": "Recomendado",
       "search": "Buscar",
       "clear": "Limpiar filtro"

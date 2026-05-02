@@ -67,8 +67,14 @@
     "downloadFormat": "Télécharger {{format}}",
     "fileDialog": { "subtitleFiles": "Fichiers de sous-titres" },
     "exportFormats": {
-      "srt": { "title": "Sous-titres (.srt)", "description": "Format de sous-titres standard pour YouTube, VLC et autres. Inclut les horodatages." },
-      "txt": { "title": "Transcription (.txt)", "description": "Export texte brut pour les LLMs incluant les labels de speaker lorsqu’ils sont disponibles." }
+      "srt": {
+        "title": "Sous-titres (.srt)",
+        "description": "Format de sous-titres standard pour YouTube, VLC et autres. Inclut les horodatages."
+      },
+      "txt": {
+        "title": "Transcription (.txt)",
+        "description": "Export texte brut pour les LLMs incluant les labels de speaker lorsqu’ils sont disponibles."
+      }
     }
   },
   "actionBar": {
@@ -148,7 +154,7 @@
       "selectAll": "Tout sélectionner",
       "clearAll": "Tout effacer",
       "noneFound": "Aucune piste audio trouvée.",
-      "createTrack": "Créez une piste audio dans votre timeline pour commencer la transcription.",
+      "createTrack": "Aucune timeline trouvée",
       "selectMultiple": "Cliquez pour sélectionner plusieurs pistes"
     },
     "fileDrop": {
@@ -156,7 +162,9 @@
       "prompt": "Déposez ou cliquez",
       "supports": "La plupart des formats"
     },
-    "fileDialog": { "mediaFiles": "Fichiers multimédias (pris en charge par ffmpeg)" },
+    "fileDialog": {
+      "mediaFiles": "Fichiers multimédias (pris en charge par ffmpeg)"
+    },
     "language": {
       "source": "Source",
       "translate": "Traduire",
@@ -206,8 +214,17 @@
     "searchPlaceholder": "Rechercher des modèles...",
     "noResults": "Aucun modèle trouvé.",
     "filteredByLanguage": "Modèles filtrés par langue",
-    "groups": { "specialized": "Spécialisés pour la langue sélectionnée", "general": "Modèles généraux" },
-    "filters": { "weight": "Léger", "accuracy": "Précision", "recommended": "Recommandé", "search": "Recherche", "clear": "Effacer le filtre" },
+    "groups": {
+      "specialized": "Spécialisés pour la langue sélectionnée",
+      "general": "Modèles généraux"
+    },
+    "filters": {
+      "weight": "Léger",
+      "accuracy": "Précision",
+      "recommended": "Recommandé",
+      "search": "Recherche",
+      "clear": "Effacer le filtre"
+    },
     "englishOnly": {
       "title": "Modèles uniquement anglais",
       "description": "Afficher des modèles anglais spécialisés avec une meilleure précision."
@@ -220,7 +237,12 @@
       "confirmTitle": "Êtes-vous sûr ?",
       "confirmBody": "Cela supprimera le modèle {{model}} de votre appareil. Si vous l’utilisez plus tard, il devra être retéléchargé."
     },
-    "diarize": { "label": "Modèle de diarisation des intervenants", "description": "Pack de labels de speaker", "details": "Utilisé pour la diarisation et l’étiquetage des intervenants.", "badge": "Labels de speaker" },
+    "diarize": {
+      "label": "Modèle de diarisation des intervenants",
+      "description": "Pack de labels de speaker",
+      "details": "Utilisé pour la diarisation et l’étiquetage des intervenants.",
+      "badge": "Labels de speaker"
+    },
     "tiny": {
       "label": "Whisper Tiny",
       "description": "Ultra-rapide",
@@ -433,7 +455,11 @@
     "finish": "Commencer"
   },
   "titlebar": {
-    "transcripts": { "searchPlaceholder": "Rechercher des transcriptions...", "loading": "Chargement...", "empty": "Aucune transcription trouvée." },
+    "transcripts": {
+      "searchPlaceholder": "Rechercher des transcriptions...",
+      "loading": "Chargement...",
+      "empty": "Aucune transcription trouvée."
+    },
     "windowControls": {
       "minimize": "Réduire",
       "maximize": "Agrandir",
@@ -486,9 +512,18 @@
     "adding": "Ajout en cours...",
     "success": "Ajouté à la timeline",
     "steps": {
-      "template": { "title": "Modèle", "description": "Choisissez un modèle de style" },
-      "speakers": { "title": "Intervenants", "description": "Configurer les pistes et couleurs des intervenants" },
-      "outputTrack": { "title": "Piste de sortie", "description": "Sélectionnez la piste de sous-titres" }
+      "template": {
+        "title": "Modèle",
+        "description": "Choisissez un modèle de style"
+      },
+      "speakers": {
+        "title": "Intervenants",
+        "description": "Configurer les pistes et couleurs des intervenants"
+      },
+      "outputTrack": {
+        "title": "Piste de sortie",
+        "description": "Sélectionnez la piste de sous-titres"
+      }
     },
     "mode": {
       "regular": "Normal",
