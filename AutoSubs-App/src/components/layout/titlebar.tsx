@@ -36,7 +36,7 @@ import { diarizeModel } from "@/lib/models";
 import { TranscriptSearchPopover } from "@/components/common/transcript-search-popover";
 
 import { useResolve } from "@/contexts/ResolveContext";
-import { usePremiere } from "@/contexts/PremiereContext";
+import { useAdobe } from "@/contexts/AdobeContext";
 import { useIntegration } from "@/contexts/IntegrationContext";
 
 
@@ -49,7 +49,7 @@ function IntegrationStatus() {
     afterEffectsTimeline,
     isPremiereConnected,
     isAfterEffectsConnected
-  } = usePremiere();
+  } = useAdobe();
   const { selectedIntegration, setSelectedIntegration } = useIntegration();
 
   const isResolveConnected = resolveTimeline && resolveTimeline.timelineId;

@@ -7,9 +7,9 @@ import { logMessage as _log } from "../lib/log";
 /**
  * Log a message to the ExtendScript console with the PPRO prefix.
  */
-export function logMessage(message: string): void {
+const log = (message: string): void => {
   _log("PPRO", message);
-}
+};
 
 /**
  * Array.indexOf polyfill for older ExtendScript engines (ES3).
@@ -91,7 +91,7 @@ export function getActiveSequenceInfo(): string {
           frameHeight = settings.videoFrameHeight;
         }
       } catch (e) {
-        logMessage("getSettings() failed: " + e);
+        log("getSettings() failed: " + e);
       }
     }
 
@@ -107,7 +107,7 @@ export function getActiveSequenceInfo(): string {
         durationSeconds = parseFloat(String(endObj)) / TICKS_PER_SECOND;
       }
     } catch (e) {
-      logMessage("Error reading sequence duration: " + e);
+      log("Error reading sequence duration: " + e);
     }
 
     const audioTrackInfo: any[] = [];
@@ -158,7 +158,7 @@ export function getSelectedClipsTimeRange(sequence: any) {
     var seenKeys: any = {};
     var selectedItems: any[] = [];
 
-    logMessage("Analyzing selected clips...");
+    log("Analyzing selected clips...");
 
     // Method 1: sequence.getSelection()
     try {
@@ -167,15 +167,15 @@ export function getSelectedClipsTimeRange(sequence: any) {
         for (var si = 0; si < sel.length; si++) {
           selectedItems.push(sel[si]);
         }
-        logMessage("Got " + selectedItems.length + " clips via getSelection()");
+        log("Got " + selectedItems.length + " clips via getSelection()");
       }
     } catch (selErr: any) {
-      logMessage("getSelection() failed: " + selErr.toString());
+      log("getSelection() failed: " + selErr.toString());
     }
 
     // Method 2: Fallback — iterate tracks and check isSelected()
     if (selectedItems.length === 0) {
-      logMessage("Falling back to per-clip isSelected() check...");
+      log("Falling back to per-clip isSelected() check...");
       // Video tracks
       for (var vi = 0; vi < sequence.videoTracks.numTracks; vi++) {
         var vTrack = sequence.videoTracks[vi];
@@ -187,7 +187,7 @@ export function getSelectedClipsTimeRange(sequence: any) {
                 selectedItems.push(vClip);
               }
             } catch (e2) {
-              logMessage("Error checking video clip selection: " + e2);
+              log("Error checking video clip selection: " + e2);
             }
           }
         }
@@ -203,18 +203,18 @@ export function getSelectedClipsTimeRange(sequence: any) {
                 selectedItems.push(aClip);
               }
             } catch (e3) {
-              logMessage("Error checking audio clip selection: " + e3);
+              log("Error checking audio clip selection: " + e3);
             }
           }
         }
       }
       if (selectedItems.length > 0) {
-        logMessage("Found " + selectedItems.length + " clips via isSelected() fallback");
+        log("Found " + selectedItems.length + " clips via isSelected() fallback");
       }
     }
 
     if (selectedItems.length === 0) {
-      logMessage("No clips selected by any method");
+      log("No clips selected by any method");
       return { success: false, error: "No clips are currently selected" };
     }
 
@@ -234,9 +234,9 @@ export function getSelectedClipsTimeRange(sequence: any) {
           if (startTime < earliestStart) earliestStart = startTime;
           if (endTime > latestEnd) latestEnd = endTime;
 
-          logMessage("Selected clip: " + clip.name + " (" + startTime + "s to " + endTime + "s)");
+          log("Selected clip: " + clip.name + " (" + startTime + "s to " + endTime + "s)");
         } catch (clipErr: any) {
-          logMessage("Error reading clip time: " + clipErr.toString());
+          log("Error reading clip time: " + clipErr.toString());
         }
       }
     }
@@ -245,8 +245,8 @@ export function getSelectedClipsTimeRange(sequence: any) {
       return { success: false, error: "No valid clips in selection" };
     }
 
-    logMessage("Found " + selectedClipsFound + " unique selected clips");
-    logMessage("Combined range: " + earliestStart + "s to " + latestEnd + "s");
+    log("Found " + selectedClipsFound + " unique selected clips");
+    log("Combined range: " + earliestStart + "s to " + latestEnd + "s");
 
     return {
       success: true,
@@ -284,7 +284,7 @@ export function exportSequenceAudio(
   };
 
   try {
-    logMessage("=== EXPORT SEQUENCE AUDIO VIA QE DOM ===");
+    log("=== EXPORT SEQUENCE AUDIO VIA QE DOM ===");
     if (!app.project || !app.project.activeSequence) {
       return JSON.stringify({ success: false, error: "No active sequence", debug: debugInfo });
     }
@@ -297,7 +297,7 @@ export function exportSequenceAudio(
       try {
         selectedTracks = JSON.parse(String(selectedTracksJson));
       } catch (e: any) {
-        logMessage("Error parsing selectedTracksJson: " + e.toString());
+        log("Error parsing selectedTracksJson: " + e.toString());
       }
     }
 
@@ -324,7 +324,7 @@ export function exportSequenceAudio(
       if (eprFile.exists) {
         audioPresetPath = eprFile.fsName;
       } else {
-        logMessage("External preset not found: " + externalPresetPath);
+        log("External preset not found: " + externalPresetPath);
       }
     }
     if (!audioPresetPath) {
@@ -339,7 +339,7 @@ export function exportSequenceAudio(
     // Verify preset still exists immediately before export
     var preExportCheck = new File(audioPresetPath);
     if (!preExportCheck.exists) {
-      logMessage("CRITICAL: Preset file missing at export time: " + audioPresetPath);
+      log("CRITICAL: Preset file missing at export time: " + audioPresetPath);
       return JSON.stringify({
         success: false,
         error: "Preset file missing at export time: " + audioPresetPath,
@@ -398,11 +398,11 @@ export function exportSequenceAudio(
 
       if (rangeType === "inout") {
         workAreaType = 1;
-        logMessage("Using In/Out range for export");
+        log("Using In/Out range for export");
         var inPointSeconds = parseFloat(sequence.getInPoint()) || 0;
         timeOffsetSeconds = inPointSeconds;
       } else if (rangeType === "selected" || rangeType === "selection") {
-        logMessage("Getting selected clips range...");
+        log("Getting selected clips range...");
         originalInPoint = sequence.getInPoint();
         originalOutPoint = sequence.getOutPoint();
 
@@ -423,9 +423,9 @@ export function exportSequenceAudio(
           }
           tempInOutSet = true;
           workAreaType = 1;
-          logMessage("Temporary In/Out set for selection export. Offset: " + timeOffsetSeconds);
+          log("Temporary In/Out set for selection export. Offset: " + timeOffsetSeconds);
         } else {
-          logMessage("No valid selection — falling back to entire timeline");
+          log("No valid selection — falling back to entire timeline");
           workAreaType = 0;
           timeOffsetSeconds = 0;
         }
@@ -434,7 +434,7 @@ export function exportSequenceAudio(
       var exportResult = sequence.exportAsMediaDirect(outputPath, audioPresetPath, workAreaType);
 
       if (exportResult === "No Error" || exportResult === true || exportResult === 0) {
-        logMessage("Audio exported successfully: " + outputPath);
+        log("Audio exported successfully: " + outputPath);
         return JSON.stringify({
           success: true,
           outputPath: outputPath,
@@ -443,7 +443,7 @@ export function exportSequenceAudio(
           debug: debugInfo,
         });
       } else {
-        logMessage("Export failed with result: " + exportResult);
+        log("Export failed with result: " + exportResult);
         return JSON.stringify({
           success: false,
           error: "Export failed: " + exportResult,
@@ -453,12 +453,12 @@ export function exportSequenceAudio(
     } finally {
       // Always restore In/Out points if we temporarily changed them
       if (tempInOutSet) {
-        logMessage("Restoring original sequence In/Out points");
+        log("Restoring original sequence In/Out points");
         try {
           if (originalInPoint !== null) sequence.setInPoint(originalInPoint);
           if (originalOutPoint !== null) sequence.setOutPoint(originalOutPoint);
         } catch (e) {
-          logMessage("Error restoring In/Out points: " + e);
+          log("Error restoring In/Out points: " + e);
         }
       }
 
@@ -471,7 +471,7 @@ export function exportSequenceAudio(
             if (typeof qeTrackRestore.setSolo === "function") qeTrackRestore.setSolo(state.solo);
             if (typeof qeTrackRestore.setMute === "function") qeTrackRestore.setMute(state.muted);
           } catch (e) {
-            logMessage("Error restoring track state at index " + state.index + ": " + e);
+            log("Error restoring track state at index " + state.index + ": " + e);
           }
         }
       }
@@ -539,7 +539,7 @@ export function importSRTFile(filePath: string): string {
       });
     } catch (captionErr: any) {
       // createCaptionTrack is not available in all Premiere versions; fall back to import-only
-      logMessage("createCaptionTrack failed: " + captionErr.toString());
+      log("createCaptionTrack failed: " + captionErr.toString());
       return JSON.stringify({
         success: true,
         method: "importOnly",

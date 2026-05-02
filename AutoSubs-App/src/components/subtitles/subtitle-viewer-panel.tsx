@@ -19,7 +19,7 @@ import { AddToTimelineDialog } from "@/components/dialogs/add-to-timeline-dialog
 import { TextFormattingPanel } from "@/components/settings/text-formatting-panel"
 import { useTranscript } from "@/contexts/TranscriptContext"
 import { useResolve } from "@/contexts/ResolveContext"
-import { usePremiere } from "@/contexts/PremiereContext"
+import { useAdobe } from "@/contexts/AdobeContext"
 import { useIntegration } from "@/contexts/IntegrationContext"
 import { useSettings } from "@/contexts/SettingsContext"
 import { Speaker, Track } from "@/types"
@@ -510,7 +510,7 @@ interface AddToTimelineFooterProps {
   onAddToTimeline: (selectedOutputTrack: string, selectedTemplate: string, presetSettings?: Record<string, unknown>) => Promise<void>
   t: (key: string) => string
   isAdding: boolean
-  selectedIntegration?: "davinci" | "premiere"
+  selectedIntegration?: "davinci" | "premiere" | "aftereffects"
 }
 
 function AddToTimelineFooter({
@@ -571,12 +571,12 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
   const layersIconRef = React.useRef<PlusIconHandle>(null)
   const { subtitles, currentTranscriptFilename, updateSubtitles, exportSubtitlesAs, importSubtitles, reformatSubtitles, speakers, updateSpeakers } = useTranscript()
   const { timelineInfo: resolveTimeline, pushToTimeline: resolvePush } = useResolve()
-  const { timelineInfo: premiereTimeline, pushToTimeline: premierePush, isConnected: isPremiereConnected } = usePremiere()
+  const { timelineInfo: premiereTimeline, pushToTimeline: premierePush, isConnected: isPremiereConnected } = useAdobe()
 
   const { selectedIntegration } = useIntegration()
-  const isPremiereActive = selectedIntegration === "premiere" || selectedIntegration === "aftereffects" || selectedIntegration === "premierepro";
-  const timelineInfo = isPremiereActive ? premiereTimeline : resolveTimeline;
-  const pushToTimeline = isPremiereActive 
+  const isAdobeActive = selectedIntegration === "premiere" || selectedIntegration === "aftereffects";
+  const timelineInfo = isAdobeActive ? premiereTimeline : resolveTimeline;
+  const pushToTimeline = isAdobeActive 
     ? (filename?: string, _selectedTemplate?: string, _selectedOutputTrack?: string, _presetSettings?: Record<string, unknown>) => premierePush(filename) 
     : resolvePush;
   const { settings } = useSettings()
@@ -610,7 +610,7 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
   }, [searchCaseSensitive, searchQuery, searchWholeWord])
 
   const canReplace = variant === "desktop" ? Boolean(replaceValue.trim()) : Boolean(searchQuery.trim())
-  const isIntegrationConnected = isPremiereActive ? isPremiereConnected : Boolean(timelineInfo?.timelineId);
+  const isIntegrationConnected = isAdobeActive ? isPremiereConnected : Boolean(timelineInfo?.timelineId);
   const shellClassName = variant === "desktop"
     ? "flex flex-col h-full border-l bg-card/50"
     : "flex flex-col h-full min-h-0 bg-background"

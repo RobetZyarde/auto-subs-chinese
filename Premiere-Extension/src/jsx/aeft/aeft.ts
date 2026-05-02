@@ -7,9 +7,9 @@ import { logMessage as _log } from "../lib/log";
 /**
  * Log a message to the ExtendScript console with the AEFT prefix.
  */
-export function logMessage(message: string): void {
+const log = (message: string): void => {
   _log("AEFT", message);
-}
+};
 
 // ==============================================================================
 // COMPOSITION MODULE
@@ -165,7 +165,7 @@ export function exportSequenceAudio(
         selectedIndices.push(Number(parsed[j]));
       }
     } catch (e) {
-      logMessage("Error parsing selected tracks: " + e);
+      log("Error parsing selected tracks: " + e);
     }
 
     // Temporarily mute layers that are NOT selected
@@ -225,7 +225,7 @@ export function exportSequenceAudio(
         activeComp.workAreaStart = timeOffsetSeconds;
         activeComp.workAreaDuration = (selectionRange.endTime || 0) - timeOffsetSeconds;
       } else {
-        logMessage("No valid selection — exporting entire composition");
+        log("No valid selection — exporting entire composition");
         activeComp.workAreaStart = 0;
         activeComp.workAreaDuration = activeComp.duration;
       }
@@ -233,7 +233,7 @@ export function exportSequenceAudio(
 
     var status: any;
     try {
-      logMessage("Exporting WAV to " + outputPath);
+      log("Exporting WAV to " + outputPath);
       renderQueue.render();
       status = rqItem.status;
     } finally {
@@ -253,7 +253,7 @@ export function exportSequenceAudio(
     }
 
     if (status === RQItemStatus.DONE) {
-      logMessage("Audio exported successfully: " + outputPath);
+      log("Audio exported successfully: " + outputPath);
       return JSON.stringify({
         success: true,
         outputPath: outputPath,
@@ -420,16 +420,16 @@ export function importSRTFile(filePath: string): string {
         textLayer.inPoint = inSeconds;
         textLayer.outPoint = outSeconds;
 
-        // --- CALCULA CENTRALIZAÇÃO REAL ---
-        // sourceRectAtTime retorna os limites exatos do texto desenhado
-        var rect = textLayer.sourceRectAtTime(0, false);
+        // --- CALCULATE REAL CENTERING ---
+        // sourceRectAtTime returns the exact bounds of the drawn text
+        var rect = textLayer.sourceRectAtTime(inSeconds, false);
 
-        // Centraliza o Anchor Point com base no retângulo do texto
+        // Center the Anchor Point based on the text bounding box
         var centerX = rect.left + rect.width / 2;
         var centerY = rect.top + rect.height / 2;
         textLayer.property("Anchor Point").setValue([centerX, centerY]);
 
-        // Posiciona a layer exatamente no centro da composição
+        // Position the layer exactly at the center of the composition
         textLayer.property("Position").setValue([comp.width / 2, comp.height / 2]);
 
         layersCreated++;

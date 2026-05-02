@@ -12,23 +12,23 @@ use tauri::Emitter;
 static CONNECTION_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 const PREMIERE_ENDPOINT: &str = "127.0.0.1:8185";
 
-pub struct PremiereConnection {
+pub struct AdobeConnection {
     pub id: u64,
     pub sender: mpsc::Sender<String>,
     pub app_name: String,
 }
 
-pub struct PremiereState {
-    pub connections: Mutex<HashMap<String, PremiereConnection>>,
+pub struct AdobeState {
+    pub connections: Mutex<HashMap<String, AdobeConnection>>,
 }
 
 #[tauri::command]
-pub async fn send_to_premiere(
-    state: tauri::State<'_, PremiereState>,
+pub async fn send_to_adobe(
+    state: tauri::State<'_, AdobeState>,
     payload: serde_json::Value,
     integration: Option<String>,
 ) -> Result<String, String> {
-    let app_id = integration.unwrap_or_else(|| "premiere".to_string());
+    let app_id = integration.unwrap_or_else(|| "adobe".to_string());
     
     let sender = {
         let conn_guard = state.connections.lock().await;
@@ -46,11 +46,11 @@ pub async fn send_to_premiere(
     }
 }
 
-pub fn init_premiere_server(app_handle: tauri::AppHandle) {
-    let premiere_state = PremiereState {
+pub fn init_adobe_server(app_handle: tauri::AppHandle) {
+    let adobe_state = AdobeState {
         connections: Mutex::new(HashMap::new()),
     };
-    app_handle.manage(premiere_state);
+    app_handle.manage(adobe_state);
 
     tauri::async_runtime::spawn(async move {
         let addr = PREMIERE_ENDPOINT;
@@ -91,28 +91,34 @@ async fn handle_connection(stream: TcpStream, app_handle: tauri::AppHandle) -> R
     let connection_id = CONNECTION_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
     let mut detected_app = String::new();
 
-    // Wait for handshake to identify the app
-    if let Some(Ok(msg)) = ws_receiver.next().await {
+    // Wait for handshake to identify the app with a timeout
+    let handshake_res = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        ws_receiver.next()
+    ).await;
+
+    if let Ok(Some(Ok(msg))) = handshake_res {
         if let Message::Text(text) = msg {
             if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(text.as_str()) {
                 if json_val["type"] == "handshake" {
-                    detected_app = json_val["payload"].as_str().unwrap_or("premiere").to_string();
+                    detected_app = json_val["payload"].as_str().unwrap_or("adobe").to_string();
                 }
             }
         }
     }
 
     if detected_app.is_empty() {
-        detected_app = "premiere".to_string();
+        tracing::warn!("Handshake failed or timed out — defaulting to adobe");
+        detected_app = "adobe".to_string();
     }
 
     tracing::info!("Adobe extension connected: {}", detected_app);
 
     // Store the sender in the state
     {
-        let state = app_handle.state::<PremiereState>();
+        let state = app_handle.state::<AdobeState>();
         let mut conn_guard = state.connections.lock().await;
-        conn_guard.insert(detected_app.clone(), PremiereConnection {
+        conn_guard.insert(detected_app.clone(), AdobeConnection {
             id: connection_id,
             sender: tx,
             app_name: detected_app.clone(),
@@ -120,7 +126,7 @@ async fn handle_connection(stream: TcpStream, app_handle: tauri::AppHandle) -> R
     }
 
     // Emit event to frontend with app info
-    let _ = app_handle.emit("premiere-status", json!({ 
+    let _ = app_handle.emit("adobe-status", json!({ 
         "status": "connected", 
         "app": detected_app 
     }));
@@ -145,7 +151,7 @@ async fn handle_connection(stream: TcpStream, app_handle: tauri::AppHandle) -> R
                     if let Some(obj) = json_val.as_object_mut() {
                         obj.insert("integration".to_string(), json!(app_name_clone));
                     }
-                    let _ = app_handle_clone.emit("premiere-message", json_val);
+                    let _ = app_handle_clone.emit("adobe-message", json_val);
                 }
             }
         }
@@ -159,12 +165,12 @@ async fn handle_connection(stream: TcpStream, app_handle: tauri::AppHandle) -> R
 
     // Cleanup
     {
-        let state = app_handle.state::<PremiereState>();
+        let state = app_handle.state::<AdobeState>();
         let mut conn_guard = state.connections.lock().await;
         if let Some(conn) = conn_guard.get(&detected_app) {
             if conn.id == connection_id {
                 conn_guard.remove(&detected_app);
-                let _ = app_handle.emit("premiere-status", json!({ 
+                let _ = app_handle.emit("adobe-status", json!({ 
                     "status": "disconnected", 
                     "app": detected_app 
                 }));

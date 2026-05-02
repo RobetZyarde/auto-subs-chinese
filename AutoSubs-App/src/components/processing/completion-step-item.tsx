@@ -30,10 +30,16 @@ export function CompletionStepItem({
 }: CompletionStepProps) {
     const { t } = useTranslation()
     const isResolveConnected = Boolean(timelineInfo?.timelineId) && selectedIntegration === "davinci"
-    const isPremiereConnected = Boolean(timelineInfo?.timelineId) && (selectedIntegration === "premiere" || selectedIntegration === "aftereffects")
+    const isAdobeConnected = Boolean(timelineInfo?.timelineId) && (selectedIntegration === "premiere" || selectedIntegration === "aftereffects")
 
     return (
         <div className="flex w-full flex-col gap-2">
+            <div className="flex items-center gap-2">
+                <div className={`h-2 w-2 rounded-full ${isResolveConnected || isAdobeConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className="text-sm font-medium">
+                    {isResolveConnected || isAdobeConnected ? t("processing.timeline.connected") : t("processing.timeline.notConnected")}
+                </span>
+            </div>
             <Item variant="default" className="bg-muted/30 border-muted-foreground/20">
                 <ItemContent className="px-2">
                     <ItemTitle>
@@ -67,7 +73,7 @@ export function CompletionStepItem({
                                 {t("completion.exportToFile")}
                             </Button>
                         )}
-                        {(isResolveConnected || isPremiereConnected) && (
+                        {(isResolveConnected || isAdobeConnected) && (
                             <AddToTimelineDialog
                                 settings={settings}
                                 timelineInfo={timelineInfo}

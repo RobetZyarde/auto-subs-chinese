@@ -24,7 +24,7 @@ import { useProgress } from "@/contexts/ProgressContext"
 import { useTranscript } from "@/contexts/TranscriptContext"
 import { useSettings } from "@/contexts/SettingsContext"
 import { useResolve } from "@/contexts/ResolveContext"
-import { usePremiere } from "@/contexts/PremiereContext"
+import { useAdobe } from "@/contexts/AdobeContext"
 import { useIntegration } from "@/contexts/IntegrationContext"
 import { useErrorDialog } from "@/contexts/ErrorDialogContext"
 import { ResolveApiError } from "@/api/resolve-api"
@@ -652,7 +652,7 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
     isExporting: premiereIsExporting,
     exportProgress: premiereExportProgress,
     getSourceAudio: premiereGetSourceAudio,
-  } = usePremiere()
+  } = useAdobe()
 
   const { selectedIntegration, setSelectedIntegration } = useIntegration();
   const [hasInitializedIntegration, setHasInitializedIntegration] = React.useState(false);

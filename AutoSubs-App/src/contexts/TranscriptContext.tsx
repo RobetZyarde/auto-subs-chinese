@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { Subtitle, Speaker, Settings } from '@/types';
 import { useResolve } from '@/contexts/ResolveContext';
-import { usePremiere } from '@/contexts/PremiereContext';
+import { useAdobe } from '@/contexts/AdobeContext';
 import { useIntegration } from '@/contexts/IntegrationContext';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
@@ -43,7 +43,7 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
   const [markIn, setMarkIn] = useState(0);
   const [currentTranscriptFilename, setCurrentTranscriptFilename] = useState<string | null>(null);
   const { timelineInfo: resolveTimeline } = useResolve();
-  const { timelineInfo: premiereTimeline } = usePremiere();
+  const { timelineInfo: premiereTimeline } = useAdobe();
   const { selectedIntegration } = useIntegration();
   const timelineInfo = selectedIntegration === "premiere" ? premiereTimeline : resolveTimeline;
 

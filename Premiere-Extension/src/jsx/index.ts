@@ -38,7 +38,6 @@ const getAppNameSafely = (): ApplicationName | "unknown" => {
   const compare = (a: string, b: string) => {
     return a.toLowerCase().indexOf(b.toLowerCase()) > -1;
   };
-  const exists = (a: any) => typeof a !== "undefined";
 
   try {
     // 1. Direct check via app.name (common in AE)
@@ -54,11 +53,15 @@ const getAppNameSafely = (): ApplicationName | "unknown" => {
     }
 
     // 3. Fallback: app.appName property (legacy AE)
-    if (typeof app !== "undefined") {
-      if (exists(app.appName)) {
-        const appName = app.appName.toLowerCase();
-        if (compare(appName, "after effects")) return "aftereffects";
-      }
+    if (typeof app !== "undefined" && (app as any).appName) {
+      const appName = (app as any).appName.toLowerCase();
+      if (compare(appName, "after effects")) return "aftereffects";
+    }
+
+    // 4. Fallback: app.path property (Premiere)
+    if (typeof app !== "undefined" && (app as any).path) {
+      const path = (app as any).path.toLowerCase();
+      if (compare(path, "premiere")) return "premierepro";
     }
   } catch (e) {
     $.writeln("[AutoSubs] getAppNameSafely error: " + e);

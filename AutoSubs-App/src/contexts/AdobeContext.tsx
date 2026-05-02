@@ -2,14 +2,14 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { listen } from '@tauri-apps/api/event';
 import { toast } from 'sonner';
 import { TimelineInfo } from '@/types';
-import { requestSequenceInfo, requestAudioExport, requestImportSRT } from '@/api/premiere-api';
+import { requestSequenceInfo, requestAudioExport, requestImportSRT } from '@/api/adobe-api';
 import { getAudioExportDir, getTranscriptPath, loadTranscriptSubtitles } from '@/utils/file-utils';
 import { generateSrt } from '@/utils/srt-utils';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useIntegration } from '@/contexts/IntegrationContext';
 
-interface PremiereContextType {
+interface AdobeContextType {
   timelineInfo: TimelineInfo;
   premiereTimeline: TimelineInfo;
   afterEffectsTimeline: TimelineInfo;
@@ -23,7 +23,7 @@ interface PremiereContextType {
   getSourceAudio: (isStandaloneMode: boolean, fileInput: string | null, inputTracks: string[]) => Promise<{ path: string, offset: number } | null>;
 }
 
-const PremiereContext = createContext<PremiereContextType | null>(null);
+const AdobeContext = createContext<AdobeContextType | null>(null);
 
 const emptyTimeline: TimelineInfo = {
   name: "",
@@ -33,7 +33,7 @@ const emptyTimeline: TimelineInfo = {
   outputTracks: []
 };
 
-export function PremiereProvider({ children }: { children: React.ReactNode }) {
+export function AdobeProvider({ children }: { children: React.ReactNode }) {
   const { settings: currentSettings } = useSettings();
   const { selectedIntegration } = useIntegration();
 
@@ -89,7 +89,7 @@ export function PremiereProvider({ children }: { children: React.ReactNode }) {
   }, [selectedIntegration, isConnected, refreshApp]);
 
   useEffect(() => {
-    const unlistenStatus = listen<{ status: string, app: string }>('premiere-status', (event) => {
+    const unlistenStatus = listen<{ status: string, app: string }>('adobe-status', (event) => {
       const { status, app } = event.payload;
       const isAppConnected = status === 'connected';
       const targetApp = app as 'premiere' | 'aftereffects';
@@ -111,7 +111,7 @@ export function PremiereProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    const unlistenMessage = listen<any>('premiere-message', (event) => {
+    const unlistenMessage = listen<any>('adobe-message', (event) => {
       const msg = event.payload;
       const originApp = msg.integration;
       const sessionId = msg.sessionId || (msg.payload && typeof msg.payload === 'object' ? msg.payload.sessionId : undefined);
@@ -148,12 +148,12 @@ export function PremiereProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refreshApp]);
 
-  // Sync effect for manual or automatic integration switches
+  // Only refresh when the USER actively changes integration, not on every connection event
   useEffect(() => {
     if (isConnected) {
       refreshApp(selectedIntegration as any, isConnected);
     }
-  }, [selectedIntegration, isConnected, refreshApp]);
+  }, [selectedIntegration]); // Removed isConnected to avoid double-firing
 
   const sendRequestAndWait = (fn: (sessionId: string) => Promise<string>): Promise<any> => {
     return new Promise((resolve, reject) => {
@@ -207,10 +207,12 @@ export function PremiereProvider({ children }: { children: React.ReactNode }) {
       const tracks = inputTracks.map(Number).filter(n => !isNaN(n));
       const exportRange = currentSettings.exportRange || 'entire';
       const result = await sendRequestAndWait((sid) => requestAudioExport(exportDir, tracks, exportRange, '', sid, selectedIntegration));
-      setExportProgress(100);
-      setIsExporting(false);
       const data = typeof result === 'string' ? JSON.parse(result) : result;
-      if (data && data.success) return { path: data.outputPath, offset: data.timeOffsetSeconds || 0 };
+      if (data && data.success) {
+        setExportProgress(100);
+        setIsExporting(false);
+        return { path: data.outputPath, offset: data.timeOffsetSeconds || 0 };
+      }
       throw new Error(data?.error || 'Export failed');
     } catch (error: any) {
       setIsExporting(false);
@@ -221,7 +223,7 @@ export function PremiereProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <PremiereContext.Provider value={{
+    <AdobeContext.Provider value={{
       timelineInfo,
       premiereTimeline,
       afterEffectsTimeline: aeTimeline,
@@ -239,8 +241,8 @@ export function PremiereProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export const usePremiere = () => {
-  const context = useContext(PremiereContext);
-  if (!context) throw new Error('usePremiere must be used within a PremiereProvider');
+export const useAdobe = () => {
+  const context = useContext(AdobeContext);
+  if (!context) throw new Error('useAdobe must be used within a AdobeProvider');
   return context;
 };

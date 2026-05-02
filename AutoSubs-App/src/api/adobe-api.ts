@@ -1,8 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 
-export async function sendToPremiere(type: string, payload: any = {}, sessionId?: string, integration?: string) {
+export async function sendToAdobe(type: string, payload: any = {}, sessionId?: string, integration?: string) {
   const finalSessionId = sessionId || `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  await invoke<string>('send_to_premiere', {
+  await invoke<string>('send_to_adobe', {
     payload: {
       type,
       payload,
@@ -14,7 +14,7 @@ export async function sendToPremiere(type: string, payload: any = {}, sessionId?
 }
 
 export async function requestSequenceInfo(sessionId?: string, integration?: string) {
-  return sendToPremiere('request_sequence_info', {}, sessionId, integration);
+  return sendToAdobe('request_sequence_info', {}, sessionId, integration);
 }
 
 export async function requestAudioExport(
@@ -25,7 +25,7 @@ export async function requestAudioExport(
   sessionId?: string,
   integration?: string
 ) {
-  return sendToPremiere(
+  return sendToAdobe(
     'request_audio_export',
     { exportFolder, selectedTracks, selectedRange, presetPath },
     sessionId,
@@ -34,5 +34,5 @@ export async function requestAudioExport(
 }
 
 export async function requestImportSRT(filePath: string, sessionId?: string, integration?: string) {
-  return sendToPremiere('request_import_srt', { filePath }, sessionId, integration);
+  return sendToAdobe('request_import_srt', { filePath }, sessionId, integration);
 }

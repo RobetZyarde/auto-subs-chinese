@@ -39,6 +39,7 @@ export interface Word {
     line_number: number;
     probability?: number;
 }
+export type AdobeIntegration = 'premiere' | 'aftereffects';
 export interface Subtitle {
     id: number;
     start: number;
@@ -121,7 +122,7 @@ export interface Settings {
     customPrompt: string,
     customMaxCharsPerLine: number,
 
-    // Davinci Resolve settings
+    // Adobe integrations
     selectedInputTracksByApp: Record<string, string[]>;
     selectedOutputTrack: string;
     selectedTemplate: Template;
