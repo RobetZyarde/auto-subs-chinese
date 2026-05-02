@@ -520,6 +520,10 @@
   },
   "addToTimeline": {
     "title": "Add to Timeline",
+    "ready": {
+      "title": "Subtitles Ready",
+      "description": "Your subtitles have been generated and are ready to be added to the timeline."
+    },
     "templateTheme": "Template Theme",
     "selectTemplate": "Select template",
     "outputTrack": "Output Track",

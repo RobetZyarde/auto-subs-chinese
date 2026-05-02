@@ -341,7 +341,7 @@
   },
   "completion": {
     "processingComplete": "Traitement terminé",
-    "subtitlesReady": "Vos sous-titres sont prêts à être utilisés !",
+    "subtitlesReady": "Vos sous-titres sont prêts !",
     "viewSubtitles": "Voir les sous-titres",
     "exportToFile": "Exporter vers un fichier",
     "addToTimeline": "Ajouter à la timeline"
@@ -476,7 +476,11 @@
   },
   "addToTimeline": {
     "title": "Ajouter à la timeline",
-    "templateTheme": "Thème du modèle",
+    "ready": {
+      "title": "Sous-titres prêts",
+      "description": "Vos sous-titres ont été générés et sont prêts à être ajoutés à la timeline."
+    },
+    "templateTheme": "Thème de modèle",
     "selectTemplate": "Sélectionner un modèle",
     "outputTrack": "Piste de sortie",
     "selectOutputTrack": "Sélectionner la piste de sortie",

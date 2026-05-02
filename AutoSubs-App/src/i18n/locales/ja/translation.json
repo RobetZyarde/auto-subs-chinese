@@ -110,11 +110,11 @@
     }
   },
   "completion": {
-    "addToTimeline": "タイムラインに追加",
-    "exportToFile": "ファイルに書き出し",
     "processingComplete": "処理完了",
     "subtitlesReady": "字幕の準備ができました！",
-    "viewSubtitles": "字幕を表示"
+    "viewSubtitles": "字幕を表示",
+    "exportToFile": "ファイルに書き出し",
+    "addToTimeline": "タイムラインに追加"
   },
   "importExport": {
     "button": "エクスポート / インポート",
@@ -484,6 +484,10 @@
       "hasConflicts": "このトラックには競合するクリップがあります。字幕が既存のコンテンツと重複する可能性があります。"
     },
     "title": "タイムラインに追加",
+    "ready": {
+      "title": "字幕の準備完了",
+      "description": "字幕が生成されました。タイムラインに追加する準備ができています。"
+    },
     "templateTheme": "テンプレートテーマ",
     "selectTemplate": "テンプレートを選択",
     "outputTrack": "出力トラック",

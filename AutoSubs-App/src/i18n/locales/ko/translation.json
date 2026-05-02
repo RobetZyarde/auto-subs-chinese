@@ -112,11 +112,11 @@
     }
   },
   "completion": {
-    "addToTimeline": "타임라인에 추가",
-    "exportToFile": "파일로 내보내기",
     "processingComplete": "처리 완료",
     "subtitlesReady": "자막이 준비되었습니다!",
-    "viewSubtitles": "자막 보기"
+    "viewSubtitles": "자막 보기",
+    "exportToFile": "파일로 내보내기",
+    "addToTimeline": "타임라인에 추가"
   },
   "importExport": {
     "button": "내보내기 / 가져오기",
@@ -526,8 +526,12 @@
         "title": "템플릿"
       }
     },
-    "templateTheme": "템플릿 테마",
     "title": "타임라인에 추가",
+    "ready": {
+      "title": "자막 준비 완료",
+      "description": "자막이 생성되어 타임라인에 추가할 준비가 되었습니다."
+    },
+    "templateTheme": "템플릿 테마",
     "mode": {
       "regular": "일반",
       "animated": "애니메이션"

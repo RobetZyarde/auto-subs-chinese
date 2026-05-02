@@ -504,6 +504,10 @@
   },
   "addToTimeline": {
     "title": "Zur Timeline hinzufügen",
+    "ready": {
+      "title": "Untertitel bereit",
+      "description": "Deine Untertitel wurden generiert und können nun zur Timeline hinzugefügt werden."
+    },
     "templateTheme": "Vorlagenstil",
     "selectTemplate": "Vorlage auswählen",
     "outputTrack": "Ausgabespur",
