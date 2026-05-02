@@ -45,7 +45,8 @@
     "done": "Terminé",
     "delete": "Supprimer",
     "options": "Options",
-    "generateSubtitles": "Générer les sous-titres"
+    "generateSubtitles": "Générer les sous-titres",
+    "open": "Ouvrir"
   },
   "update": {
     "restartResolveServer": {
@@ -65,7 +66,9 @@
     "exportAsSrt": "Exporter en SRT",
     "exportAsJson": "Exporter en JSON",
     "downloadFormat": "Télécharger {{format}}",
-    "fileDialog": { "subtitleFiles": "Fichiers de sous-titres" },
+    "fileDialog": {
+      "subtitleFiles": "Fichiers de sous-titres"
+    },
     "exportFormats": {
       "srt": {
         "title": "Sous-titres (.srt)",
@@ -456,9 +459,19 @@
   },
   "titlebar": {
     "transcripts": {
-      "searchPlaceholder": "Rechercher des transcriptions...",
-      "loading": "Chargement...",
-      "empty": "Aucune transcription trouvée."
+      "empty": "Aucune transcription trouvée.",
+      "empty_title": "Aucune transcription trouvée",
+      "empty_detail": "Votre historique de transcriptions apparaîtra ici une fois que vous aurez généré des sous-titres.",
+      "no_results": "Aucun résultat trouvé",
+      "no_results_detail": "Essayez d ajuster votre recherche.",
+      "delete_title": "Supprimer la transcription ?",
+      "delete_description": "Ceci supprimera définitivement la transcription de votre historique. Cette action est irréversible.",
+      "sections": {
+        "today": "Aujourd hui",
+        "yesterday": "Hier",
+        "last_week": "7 derniers jours",
+        "older": "Plus ancien"
+      }
     },
     "windowControls": {
       "minimize": "Réduire",
@@ -551,11 +564,11 @@
       "emptyTitle": "Aucun préréglage personnalisé",
       "emptyHint": "Cliquez sur Nouveau préréglage pour concevoir le vôtre, ou importez-en un depuis un fichier.",
       "phase": {
-        "launchingTitle": "Ouverture du sous-titre dans Resolve\u2026",
+        "launchingTitle": "Ouverture du sous-titre dans Resolve…",
         "launchingHint": "Nous allons placer un sous-titre d'aperçu sur une piste temporaire.",
         "editingTitle": "Basculer vers DaVinci Resolve",
         "editingBody": "Un sous-titre a été placé sur une nouvelle piste et ouvert dans la page Fusion. Personnalisez-le à l'aide de l'inspecteur, puis revenez ici.",
-        "capturingTitle": "Lecture des paramètres depuis Resolve\u2026",
+        "capturingTitle": "Lecture des paramètres depuis Resolve…",
         "nameTitle": "Nommez votre préréglage",
         "nameHint": "Donnez-lui un nom court et descriptif."
       },
@@ -574,7 +587,7 @@
       "confirmDelete": "Ce préréglage sera supprimé de votre bibliothèque. Les préréglages intégrés ne sont pas affectés.",
       "confirmDeleteConfirm": "Supprimer",
       "importTitle": "Coller le JSON du préréglage",
-      "importPlaceholder": "Collez le contenu d'un fichier de préréglage ici\u2026",
+      "importPlaceholder": "Collez le contenu d'un fichier de préréglage ici…",
       "importSubmit": "Importer le préréglage",
       "errors": {
         "invalidJson": "Cela ne ressemble pas à un fichier de préréglage valide.",

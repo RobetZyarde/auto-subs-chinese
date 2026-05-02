@@ -88,7 +88,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       const loadedStore = await load("autosubs-store.json", {
         autoSave: false,
       });
-      setStore(loadedStore);
 
       const currentPlatform = await platform();
       const isWindows = currentPlatform === "windows";
@@ -116,6 +115,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
       initI18n(hydratedSettings.uiLanguage);
       setSettings(hydratedSettings);
+      setStore(loadedStore);
     } catch (error) {
       console.error("Error initializing store:", error);
     } finally {
@@ -157,7 +157,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   // Whenever settings change, persist them
   useEffect(() => {
     async function saveState() {
-      if (!store) return;
+      if (!isHydrated || !store) return;
       try {
         await store.set("settings", settings);
         await store.save();
@@ -167,7 +167,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
 
     saveState();
-  }, [settings, store]);
+  }, [settings, store, isHydrated]);
 
   // A handy reset function
   function resetSettings() {

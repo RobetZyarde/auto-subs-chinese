@@ -1,81 +1,133 @@
-import * as React from "react"
-import { useVirtualizer } from "@tanstack/react-virtual"
-import { FileText, Loader2, Repeat2, Search, Type, Upload, Users, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
-import { Input } from "@/components/ui/input"
+import * as React from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+  Calendar,
+  Clock,
+  FileText,
+  History,
+  Loader2,
+  MoreVertical,
+  Repeat2,
+  Search,
+  Trash2,
+  Type,
+  Upload,
+  Users,
+  X,
+} from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-} from "@/components/ui/input-group"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Skeleton } from "@/components/ui/skeleton"
-import { SubtitleList } from "@/components/subtitles/subtitle-list"
-import { SpeakerSettings } from "@/components/common/speaker-settings"
-import { ImportExportPopover } from "@/components/common/import-export-popover"
-import { AddToTimelineDialog } from "@/components/dialogs/add-to-timeline-dialog"
-import { TextFormattingPanel } from "@/components/settings/text-formatting-panel"
-import { useTranscript } from "@/contexts/TranscriptContext"
-import { useResolve } from "@/contexts/ResolveContext"
-import { usePremiere } from "@/contexts/PremiereContext"
-import { useIntegration } from "@/contexts/IntegrationContext"
-import { useSettings } from "@/contexts/SettingsContext"
-import { Speaker, Template, Track } from "@/types"
-import { listTranscriptIndexFiles, readTranscript, type TranscriptListItem } from "@/utils/file-utils"
-import { useTranslation } from "react-i18next"
-import { PlusIcon, type PlusIconHandle } from "../ui/plus"
+} from "@/components/ui/input-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SubtitleList } from "@/components/subtitles/subtitle-list";
+import { SpeakerSettings } from "@/components/common/speaker-settings";
+import { ImportExportPopover } from "@/components/common/import-export-popover";
+import { AddToTimelineDialog } from "@/components/dialogs/add-to-timeline-dialog";
+import { TextFormattingPanel } from "@/components/settings/text-formatting-panel";
+import { useTranscript } from "@/contexts/TranscriptContext";
+import { useResolve } from "@/contexts/ResolveContext";
+import { usePremiere } from "@/contexts/PremiereContext";
+import { useIntegration } from "@/contexts/IntegrationContext";
+import { useSettings } from "@/contexts/SettingsContext";
+import { Speaker, Template, Track } from "@/types";
+import {
+  deleteTranscript,
+  listTranscriptIndexFiles,
+  readTranscript,
+  type TranscriptListItem,
+} from "@/utils/file-utils";
+import { useTranslation } from "react-i18next";
+import { PlusIcon, type PlusIconHandle } from "../ui/plus";
+import { cn } from "@/lib/utils";
 
-type SubtitleViewerVariant = "desktop" | "compact"
+type SubtitleViewerVariant = "desktop" | "compact";
 
-const ESTIMATED_TRANSCRIPT_ROW_HEIGHT = 60
-const TRANSCRIPT_ROW_OVERSCAN = 8
-const TRANSCRIPT_SKELETON_ROWS = 10
+const ESTIMATED_TRANSCRIPT_ROW_HEIGHT = 60;
+const TRANSCRIPT_ROW_OVERSCAN = 8;
+const TRANSCRIPT_SKELETON_ROWS = 10;
 
 interface SubtitleViewerPanelProps {
-  variant: SubtitleViewerVariant
-  isOpen?: boolean
-  onClose?: () => void
+  variant: SubtitleViewerVariant;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 interface SearchActionButtonProps {
-  button: React.ReactNode
-  tooltip: string
-  useAddon?: boolean
+  button: React.ReactNode;
+  tooltip: string;
+  useAddon?: boolean;
 }
 
-function SearchActionButton({ button, tooltip, useAddon = false }: SearchActionButtonProps) {
-  const trigger = useAddon ? <InputGroupAddon align="inline-end">{button}</InputGroupAddon> : button
+function SearchActionButton({
+  button,
+  tooltip,
+  useAddon = false,
+}: SearchActionButtonProps) {
+  const trigger = useAddon ? (
+    <InputGroupAddon align="inline-end">{button}</InputGroupAddon>
+  ) : (
+    button
+  );
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>{trigger}</TooltipTrigger>
       <TooltipContent side="bottom">{tooltip}</TooltipContent>
     </Tooltip>
-  )
+  );
 }
 
 interface SearchSectionProps {
-  variant: SubtitleViewerVariant
-  headerClassName: string
-  t: (key: string) => string
-  searchQuery: string
-  replaceValue: string
-  searchCaseSensitive: boolean
-  searchWholeWord: boolean
-  showReplace: boolean
-  canReplace: boolean
-  searchInputRef: React.RefObject<HTMLInputElement>
-  onSearchQueryChange: (value: string) => void
-  onReplaceValueChange: (value: string) => void
-  onToggleCaseSensitive: () => void
-  onToggleWholeWord: () => void
-  onToggleReplace: () => void
-  onReplaceAll: () => void
-  searchPlaceholder: string
-  searchAriaLabel: string
+  variant: SubtitleViewerVariant;
+  headerClassName: string;
+  t: (key: string) => string;
+  searchQuery: string;
+  replaceValue: string;
+  searchCaseSensitive: boolean;
+  searchWholeWord: boolean;
+  showReplace: boolean;
+  canReplace: boolean;
+  searchInputRef: React.RefObject<HTMLInputElement>;
+  onSearchQueryChange: (value: string) => void;
+  onReplaceValueChange: (value: string) => void;
+  onToggleCaseSensitive: () => void;
+  onToggleWholeWord: () => void;
+  onToggleReplace: () => void;
+  onReplaceAll: () => void;
+  searchPlaceholder: string;
+  searchAriaLabel: string;
 }
 
 function SearchSection({
@@ -98,8 +150,8 @@ function SearchSection({
   searchPlaceholder,
   searchAriaLabel,
 }: SearchSectionProps) {
-  const isDesktop = variant === "desktop"
-  const showClearButton = !isDesktop && Boolean(searchQuery)
+  const isDesktop = variant === "desktop";
+  const showClearButton = !isDesktop && Boolean(searchQuery);
 
   const searchActions = [
     showClearButton ? (
@@ -166,7 +218,7 @@ function SearchSection({
       tooltip={t("subtitles.search.replaceAll")}
       useAddon={isDesktop}
     />,
-  ].filter(Boolean)
+  ].filter(Boolean);
 
   const searchInput = (
     <InputGroup>
@@ -180,7 +232,7 @@ function SearchSection({
       />
       {searchActions}
     </InputGroup>
-  )
+  );
 
   const replaceSection = (
     <ButtonGroup className="w-full mt-2">
@@ -201,24 +253,24 @@ function SearchSection({
         {t("subtitles.search.replaceAll")}
       </Button>
     </ButtonGroup>
-  )
+  );
 
   return (
     <div className={headerClassName}>
       {searchInput}
       {showReplace && replaceSection}
     </div>
-  )
+  );
 }
 
 interface SpeakersPopoverProps {
-  variant: SubtitleViewerVariant
-  open: boolean
-  speakers: Speaker[]
-  onOpenChange: (open: boolean) => void
-  onSpeakerChange: (index: number, speaker: Speaker) => void
-  t: (key: string) => string
-  tracks?: Track[]
+  variant: SubtitleViewerVariant;
+  open: boolean;
+  speakers: Speaker[];
+  onOpenChange: (open: boolean) => void;
+  onSpeakerChange: (index: number, speaker: Speaker) => void;
+  t: (key: string) => string;
+  tracks?: Track[];
 }
 
 function SpeakersPopover({
@@ -230,14 +282,14 @@ function SpeakersPopover({
   t,
   tracks,
 }: SpeakersPopoverProps) {
-  const isDesktop = variant === "desktop"
+  const isDesktop = variant === "desktop";
 
   return (
     <Popover
       open={open}
       onOpenChange={(nextOpen) => {
-        if (nextOpen) onOpenChange(true)
-        else onOpenChange(false)
+        if (nextOpen) onOpenChange(true);
+        else onOpenChange(false);
       }}
     >
       <Tooltip>
@@ -248,24 +300,38 @@ function SpeakersPopover({
               size={isDesktop ? "sm" : "icon"}
               className={isDesktop ? "h-9 px-3" : "h-9 w-9"}
               title={isDesktop ? t("subtitles.speakers") : undefined}
-              aria-label={variant === "compact" ? t("subtitles.editSpeakers") : undefined}
+              aria-label={
+                variant === "compact" ? t("subtitles.editSpeakers") : undefined
+              }
             >
               <Users className={isDesktop ? "h-4 w-4 mr-0.5" : "h-4 w-4"} />
               {isDesktop ? t("subtitles.speakers") : null}
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
-        {variant === "compact" && <TooltipContent side="bottom">{t("subtitles.editSpeakers")}</TooltipContent>}
+        {variant === "compact" && (
+          <TooltipContent side="bottom">
+            {t("subtitles.editSpeakers")}
+          </TooltipContent>
+        )}
       </Tooltip>
-      <PopoverContent align="center" className="w-[340px]" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <PopoverContent
+        align="center"
+        className="w-[340px]"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <div className="pb-3">
           <h4 className="font-medium text-sm">{t("speakerEditor.title")}</h4>
-          <p className="text-xs text-muted-foreground">{t("speakerEditor.description")}</p>
+          <p className="text-xs text-muted-foreground">
+            {t("speakerEditor.description")}
+          </p>
         </div>
         <ScrollArea className="h-[320px] pr-4 -mr-4">
           <div className="space-y-3">
             {speakers.length === 0 && (
-              <p className="text-xs text-muted-foreground py-4 text-center">{t("subtitles.empty.noSubtitlesAvailable")}</p>
+              <p className="text-xs text-muted-foreground py-4 text-center">
+                {t("subtitles.empty.noSubtitlesAvailable")}
+              </p>
             )}
             {speakers.map((speaker, index) => (
               <div key={index} className="border rounded-md p-3 bg-card">
@@ -280,20 +346,27 @@ function SpeakersPopover({
         </ScrollArea>
       </PopoverContent>
     </Popover>
-  )
+  );
 }
 
 interface ReformatPopoverProps {
-  variant: SubtitleViewerVariant
-  open: boolean
-  subtitleCount: number
-  onOpenChange: (open: boolean) => void
-  onApply: () => Promise<void>
-  t: (key: string) => string
+  variant: SubtitleViewerVariant;
+  open: boolean;
+  subtitleCount: number;
+  onOpenChange: (open: boolean) => void;
+  onApply: () => Promise<void>;
+  t: (key: string) => string;
 }
 
-function ReformatPopover({ variant, open, subtitleCount, onOpenChange, onApply, t }: ReformatPopoverProps) {
-  const isDesktop = variant === "desktop"
+function ReformatPopover({
+  variant,
+  open,
+  subtitleCount,
+  onOpenChange,
+  onApply,
+  t,
+}: ReformatPopoverProps) {
+  const isDesktop = variant === "desktop";
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -305,16 +378,26 @@ function ReformatPopover({ variant, open, subtitleCount, onOpenChange, onApply, 
               size={isDesktop ? "sm" : "icon"}
               className={isDesktop ? "h-9 px-3" : "h-9 w-9"}
               title={isDesktop ? t("subtitles.reformat") : undefined}
-              aria-label={variant === "compact" ? t("subtitles.reformat") : undefined}
+              aria-label={
+                variant === "compact" ? t("subtitles.reformat") : undefined
+              }
             >
               <Type className={isDesktop ? "h-4 w-4 mr-0.5" : "h-4 w-4"} />
               {isDesktop ? t("subtitles.reformat") : null}
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
-        {variant === "compact" && <TooltipContent side="bottom">{t("subtitles.reformat")}</TooltipContent>}
+        {variant === "compact" && (
+          <TooltipContent side="bottom">
+            {t("subtitles.reformat")}
+          </TooltipContent>
+        )}
       </Tooltip>
-      <PopoverContent align="center" className="w-80 p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <PopoverContent
+        align="center"
+        className="w-80 p-0"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <TextFormattingPanel
           showActions
           onCancel={() => onOpenChange(false)}
@@ -323,26 +406,26 @@ function ReformatPopover({ variant, open, subtitleCount, onOpenChange, onApply, 
         />
       </PopoverContent>
     </Popover>
-  )
+  );
 }
 
 interface SubtitleToolbarProps {
-  variant: SubtitleViewerVariant
-  onClose?: () => void
-  subtitlesLength: number
-  settings: ReturnType<typeof useSettings>["settings"]
-  speakers: Speaker[]
-  showSpeakerEditor: boolean
-  showReformat: boolean
-  importSubtitles: ReturnType<typeof useTranscript>["importSubtitles"]
-  exportSubtitlesAs: ReturnType<typeof useTranscript>["exportSubtitlesAs"]
-  subtitles: ReturnType<typeof useTranscript>["subtitles"]
-  onSpeakerEditorOpenChange: (open: boolean) => void
-  onSpeakerChange: (index: number, speaker: Speaker) => void
-  onReformatOpenChange: (open: boolean) => void
-  onApplyReformat: () => Promise<void>
-  t: (key: string) => string
-  tracks?: Track[]
+  variant: SubtitleViewerVariant;
+  onClose?: () => void;
+  subtitlesLength: number;
+  settings: ReturnType<typeof useSettings>["settings"];
+  speakers: Speaker[];
+  showSpeakerEditor: boolean;
+  showReformat: boolean;
+  importSubtitles: ReturnType<typeof useTranscript>["importSubtitles"];
+  exportSubtitlesAs: ReturnType<typeof useTranscript>["exportSubtitlesAs"];
+  subtitles: ReturnType<typeof useTranscript>["subtitles"];
+  onSpeakerEditorOpenChange: (open: boolean) => void;
+  onSpeakerChange: (index: number, speaker: Speaker) => void;
+  onReformatOpenChange: (open: boolean) => void;
+  onApplyReformat: () => Promise<void>;
+  t: (key: string) => string;
+  tracks?: Track[];
 }
 
 function SubtitleToolbar({
@@ -363,9 +446,10 @@ function SubtitleToolbar({
   t,
   tracks,
 }: SubtitleToolbarProps) {
-  const toolbarClassName = variant === "desktop"
-    ? "shrink-0 px-3 pb-3 pt-2 flex items-center gap-2 relative z-20 border-b overflow-x-auto"
-    : "px-2 py-1.5 border-b shrink-0 relative z-20 bg-background"
+  const toolbarClassName =
+    variant === "desktop"
+      ? "shrink-0 px-3 pb-3 pt-2 flex items-center gap-2 relative z-20 border-b overflow-x-auto"
+      : "px-2 py-1.5 border-b shrink-0 relative z-20 bg-background";
 
   return (
     <div className={toolbarClassName}>
@@ -391,27 +475,40 @@ function SubtitleToolbar({
           <TooltipTrigger asChild>
             <ImportExportPopover
               onImport={() => importSubtitles(settings, null, "")}
-              onExport={(format) => exportSubtitlesAs(format, subtitles, speakers)}
+              onExport={(format) =>
+                exportSubtitlesAs(format, subtitles, speakers)
+              }
               hasSubtitles={subtitlesLength > 0}
-              trigger={variant === "desktop" ? (
-                <Button variant="outline" size="sm" className="h-9 px-3" title={t("importExport.button")}>
-                  <Upload className="h-4 w-4 mr-0.5" />
-                  {t("importExport.button")}
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9"
-                  aria-label={t("importExport.button")}
-                  title={t("importExport.button")}
-                >
-                  <Upload className="h-4 w-4" />
-                </Button>
-              )}
+              trigger={
+                variant === "desktop" ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 px-3"
+                    title={t("importExport.button")}
+                  >
+                    <Upload className="h-4 w-4 mr-0.5" />
+                    {t("importExport.button")}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    aria-label={t("importExport.button")}
+                    title={t("importExport.button")}
+                  >
+                    <Upload className="h-4 w-4" />
+                  </Button>
+                )
+              }
             />
           </TooltipTrigger>
-          {variant === "compact" && <TooltipContent side="bottom">{t("importExport.button")}</TooltipContent>}
+          {variant === "compact" && (
+            <TooltipContent side="bottom">
+              {t("importExport.button")}
+            </TooltipContent>
+          )}
         </Tooltip>
 
         {speakers.length > 0 && (
@@ -436,26 +533,26 @@ function SubtitleToolbar({
         />
       </div>
     </div>
-  )
+  );
 }
 
 interface SubtitleContentProps {
-  subtitlesLength: number
-  searchQuery: string
-  searchCaseSensitive: boolean
-  searchWholeWord: boolean
-  selectedIndex: number | null
-  onSelectedIndexChange: (index: number | null) => void
-  t: (key: string) => string
-  transcriptDateLocale?: string
-  onTranscriptOpen: () => void
+  subtitlesLength: number;
+  searchQuery: string;
+  searchCaseSensitive: boolean;
+  searchWholeWord: boolean;
+  selectedIndex: number | null;
+  onSelectedIndexChange: (index: number | null) => void;
+  t: (key: string) => string;
+  transcriptDateLocale?: string;
+  onTranscriptOpen: () => void;
 }
 
 interface PreviousTranscriptsListProps {
-  searchQuery: string
-  transcriptDateLocale?: string
-  onTranscriptOpen: () => void
-  t: (key: string) => string
+  searchQuery: string;
+  transcriptDateLocale?: string;
+  onTranscriptOpen: () => void;
+  t: (key: string) => string;
 }
 
 function PreviousTranscriptsList({
@@ -464,46 +561,58 @@ function PreviousTranscriptsList({
   onTranscriptOpen,
   t,
 }: PreviousTranscriptsListProps) {
-  const [transcripts, setTranscripts] = React.useState<TranscriptListItem[]>([])
-  const [hasLoaded, setHasLoaded] = React.useState(false)
-  const scrollContainerRef = React.useRef<HTMLDivElement>(null)
-  const { setSubtitles, setSpeakers, setCurrentTranscriptFilename } = useTranscript()
+  const [transcripts, setTranscripts] = React.useState<TranscriptListItem[]>(
+    [],
+  );
+  const [hasLoaded, setHasLoaded] = React.useState(false);
+  const [deletingFilename, setDeletingFilename] = React.useState<string | null>(
+    null,
+  );
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const {
+    setSubtitles,
+    setSpeakers,
+    setCurrentTranscriptFilename,
+    currentTranscriptFilename,
+  } = useTranscript();
 
   const loadTranscripts = React.useCallback(async () => {
     try {
-      setTranscripts(await listTranscriptIndexFiles())
+      setTranscripts(await listTranscriptIndexFiles());
     } catch (error) {
-      console.error("Failed to load transcripts:", error)
+      console.error("Failed to load transcripts:", error);
     } finally {
-      setHasLoaded(true)
+      setHasLoaded(true);
     }
-  }, [])
+  }, []);
 
   React.useEffect(() => {
-    void loadTranscripts()
-  }, [loadTranscripts])
+    void loadTranscripts();
+  }, [loadTranscripts]);
 
-  const formatTranscriptDate = React.useCallback((createdAt: Date) => (
-    createdAt.toLocaleDateString(transcriptDateLocale, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    })
-  ), [transcriptDateLocale])
+  const formatTranscriptDate = React.useCallback(
+    (createdAt: Date) =>
+      createdAt.toLocaleDateString(transcriptDateLocale, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+    [transcriptDateLocale],
+  );
 
   const filteredTranscripts = React.useMemo(() => {
-    const query = searchQuery.trim().toLocaleLowerCase()
-    if (!query) return transcripts
+    const query = searchQuery.trim().toLocaleLowerCase();
+    if (!query) return transcripts;
 
     return transcripts.filter((transcript) => {
-      const createdAt = transcript.createdAt
-      const month = String(createdAt.getMonth() + 1).padStart(2, "0")
-      const day = String(createdAt.getDate()).padStart(2, "0")
-      const year = String(createdAt.getFullYear())
-      const hours = String(createdAt.getHours()).padStart(2, "0")
-      const minutes = String(createdAt.getMinutes()).padStart(2, "0")
+      const createdAt = transcript.createdAt;
+      const month = String(createdAt.getMonth() + 1).padStart(2, "0");
+      const day = String(createdAt.getDate()).padStart(2, "0");
+      const year = String(createdAt.getFullYear());
+      const hours = String(createdAt.getHours()).padStart(2, "0");
+      const minutes = String(createdAt.getMinutes()).padStart(2, "0");
       const searchableText = [
         transcript.displayName,
         transcript.filename,
@@ -519,33 +628,106 @@ function PreviousTranscriptsList({
         `${month}/${day}/${year}`,
         `${day}/${month}/${year}`,
         `${hours}:${minutes}`,
-      ].filter(Boolean).join(" ").toLocaleLowerCase()
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase();
 
-      return searchableText.includes(query)
-    })
-  }, [formatTranscriptDate, searchQuery, transcriptDateLocale, transcripts])
+      return searchableText.includes(query);
+    });
+  }, [formatTranscriptDate, searchQuery, transcriptDateLocale, transcripts]);
+
+  const groupedItems = React.useMemo(() => {
+    const items: (
+      | { type: "header"; label: string }
+      | { type: "transcript"; data: TranscriptListItem }
+    )[] = [];
+
+    if (filteredTranscripts.length === 0) return items;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const lastWeek = new Date(today);
+    lastWeek.setDate(lastWeek.getDate() - 7);
+
+    let currentSection: string | null = null;
+
+    filteredTranscripts.forEach((transcript) => {
+      const date = new Date(transcript.createdAt);
+      const transcriptDate = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+      );
+
+      let section = "";
+      if (transcriptDate.getTime() === today.getTime()) {
+        section = t("titlebar.transcripts.sections.today");
+      } else if (transcriptDate.getTime() === yesterday.getTime()) {
+        section = t("titlebar.transcripts.sections.yesterday");
+      } else if (transcriptDate.getTime() >= lastWeek.getTime()) {
+        section = t("titlebar.transcripts.sections.last_week");
+      } else {
+        section = t("titlebar.transcripts.sections.older");
+      }
+
+      if (section !== currentSection) {
+        items.push({ type: "header", label: section });
+        currentSection = section;
+      }
+
+      items.push({ type: "transcript", data: transcript });
+    });
+
+    return items;
+  }, [filteredTranscripts, t]);
 
   const rowVirtualizer = useVirtualizer({
-    count: filteredTranscripts.length,
+    count: groupedItems.length,
     getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => ESTIMATED_TRANSCRIPT_ROW_HEIGHT,
-    getItemKey: (index) => filteredTranscripts[index]?.filename ?? index,
+    estimateSize: (index) =>
+      groupedItems[index]?.type === "header"
+        ? 32
+        : ESTIMATED_TRANSCRIPT_ROW_HEIGHT,
+    getItemKey: (index) => {
+      const item = groupedItems[index];
+      if (item?.type === "header") return `header-${item.label}`;
+      return item?.data.filename ?? index;
+    },
     overscan: TRANSCRIPT_ROW_OVERSCAN,
-  })
+  });
 
   const openTranscript = async (filename: string) => {
     try {
-      const transcriptData = await readTranscript(filename)
+      const transcriptData = await readTranscript(filename);
       if (transcriptData) {
-        setSubtitles(transcriptData.segments || [])
-        setSpeakers(transcriptData.speakers || [])
-        setCurrentTranscriptFilename(filename)
-        onTranscriptOpen()
+        setSubtitles(transcriptData.segments || []);
+        setSpeakers(transcriptData.speakers || []);
+        setCurrentTranscriptFilename(filename);
+        onTranscriptOpen();
       }
     } catch (error) {
-      console.error("Failed to load transcript:", error)
+      console.error("Failed to load transcript:", error);
     }
-  }
+  };
+
+  const handleDeleteTranscript = async (filename: string) => {
+    try {
+      await deleteTranscript(filename);
+      if (currentTranscriptFilename === filename) {
+        setSubtitles([]);
+        setSpeakers([]);
+        setCurrentTranscriptFilename(null);
+      }
+      void loadTranscripts();
+    } catch (error) {
+      console.error("Failed to delete transcript:", error);
+    } finally {
+      setDeletingFilename(null);
+    }
+  };
 
   if (!hasLoaded) {
     return (
@@ -565,55 +747,176 @@ function PreviousTranscriptsList({
           ))}
         </div>
       </div>
-    )
+    );
   }
 
   if (filteredTranscripts.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center px-8 py-8 text-center text-sm text-muted-foreground">
-        {t("titlebar.transcripts.empty")}
+      <div className="flex h-full flex-col items-center justify-center px-8 py-8 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/50 text-muted-foreground/50">
+          <History className="h-6 w-6" />
+        </div>
+        <h3 className="mt-4 text-sm font-semibold text-foreground">
+          {searchQuery
+            ? t("titlebar.transcripts.no_results")
+            : t("titlebar.transcripts.empty_title")}
+        </h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {searchQuery
+            ? t("titlebar.transcripts.no_results_detail")
+            : t("titlebar.transcripts.empty_detail")}
+        </p>
       </div>
-    )
+    );
   }
 
   return (
-    <div
-      ref={scrollContainerRef}
-      className="h-full overflow-y-auto pt-2"
-    >
-      <div
-        className="relative"
-        style={{ height: rowVirtualizer.getTotalSize() }}
-      >
-        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-          const transcript = filteredTranscripts[virtualRow.index]
-          if (!transcript) return null
+    <>
+      <div ref={scrollContainerRef} className="h-full overflow-y-auto pt-2">
+        <div
+          className="relative"
+          style={{ height: rowVirtualizer.getTotalSize() }}
+        >
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const item = groupedItems[virtualRow.index];
+            if (!item) return null;
 
-          return (
-            <button
-              key={transcript.filename}
-              data-index={virtualRow.index}
-              ref={rowVirtualizer.measureElement}
-              type="button"
-              style={{ transform: `translateY(${virtualRow.start}px)` }}
-              className="absolute left-2 right-2 top-0 flex items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => void openTranscript(transcript.filename)}
-            >
-              <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-foreground">
-                  {transcript.displayName}
-                </span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  {formatTranscriptDate(transcript.createdAt)}
-                </span>
-              </span>
-            </button>
-          )
-        })}
+            if (item.type === "header") {
+              return (
+                <div
+                  key={`header-${item.label}`}
+                  style={{
+                    height: 32,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                  className="absolute left-0 right-0 top-0 flex items-center px-5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70"
+                >
+                  {item.label}
+                </div>
+              );
+            }
+
+            const transcript = item.data;
+            const isActive = currentTranscriptFilename === transcript.filename;
+
+            return (
+              <div
+                key={transcript.filename}
+                data-index={virtualRow.index}
+                ref={rowVirtualizer.measureElement}
+                style={{
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+                className="absolute left-2 right-2 top-0"
+              >
+                <div
+                  className={cn(
+                    "group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-all",
+                    isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground ring-1 ring-inset ring-sidebar-border"
+                      : "hover:bg-sidebar-accent/50 text-foreground",
+                  )}
+                >
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <div
+                      className={cn(
+                        "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground transition-colors group-hover:border-primary/20 group-hover:text-primary",
+                        isActive &&
+                          "border-primary/30 text-primary bg-primary/5",
+                      )}
+                    >
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold tracking-tight">
+                        {transcript.displayName}
+                      </span>
+                      <span className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3 opacity-70" />
+                          {formatTranscriptDate(transcript.createdAt)}
+                        </span>
+                        {transcript.timelineName && (
+                          <>
+                            <span className="h-0.5 w-0.5 rounded-full bg-muted-foreground/30" />
+                            <span className="truncate">
+                              {transcript.timelineName}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-3 text-xs font-medium hover:bg-background text-muted-foreground hover:text-foreground"
+                      onClick={() => void openTranscript(transcript.filename)}
+                    >
+                      {t("common.open")}
+                    </Button>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:bg-background text-muted-foreground hover:text-destructive"
+                          onClick={() =>
+                            setDeletingFilename(transcript.filename)
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">{t("common.delete")}</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        {t("common.delete")}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+
+                  {isActive && (
+                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 h-4 w-1 rounded-full bg-primary" />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
-  )
+
+      <AlertDialog
+        open={!!deletingFilename}
+        onOpenChange={(open) => !open && setDeletingFilename(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("titlebar.transcripts.delete_title")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("titlebar.transcripts.delete_description")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() =>
+                deletingFilename &&
+                void handleDeleteTranscript(deletingFilename)
+              }
+            >
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }
 
 function SubtitleContent({
@@ -627,9 +930,10 @@ function SubtitleContent({
   transcriptDateLocale,
   onTranscriptOpen,
 }: SubtitleContentProps) {
-  const contentClassName = subtitlesLength > 0
-    ? "flex-1 overflow-y-auto min-h-0 px-0 relative z-0"
-    : "flex-1 overflow-hidden min-h-0 px-0 relative z-0"
+  const contentClassName =
+    subtitlesLength > 0
+      ? "flex-1 overflow-y-auto min-h-0 px-0 relative z-0"
+      : "flex-1 overflow-hidden min-h-0 px-0 relative z-0";
 
   return (
     <div className={contentClassName}>
@@ -653,22 +957,26 @@ function SubtitleContent({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 interface AddToTimelineFooterProps {
-  variant: SubtitleViewerVariant
-  settings: ReturnType<typeof useSettings>["settings"]
-  timelineInfo: ReturnType<typeof useResolve>["timelineInfo"]
-  templates: Template[]
-  templatesLoading: boolean
-  templatesLoaded: boolean
-  onLoadTemplates?: () => Promise<Template[]>
-  layersIconRef: React.RefObject<PlusIconHandle>
-  onAddToTimeline: (selectedOutputTrack: string, selectedTemplate: string, presetSettings?: Record<string, unknown>) => Promise<void>
-  t: (key: string) => string
-  isAdding: boolean
-  selectedIntegration?: "davinci" | "premiere"
+  variant: SubtitleViewerVariant;
+  settings: ReturnType<typeof useSettings>["settings"];
+  timelineInfo: ReturnType<typeof useResolve>["timelineInfo"];
+  templates: Template[];
+  templatesLoading: boolean;
+  templatesLoaded: boolean;
+  onLoadTemplates?: () => Promise<Template[]>;
+  layersIconRef: React.RefObject<PlusIconHandle>;
+  onAddToTimeline: (
+    selectedOutputTrack: string,
+    selectedTemplate: string,
+    presetSettings?: Record<string, unknown>,
+  ) => Promise<void>;
+  t: (key: string) => string;
+  isAdding: boolean;
+  selectedIntegration?: "davinci" | "premiere";
 }
 
 function AddToTimelineFooter({
@@ -702,9 +1010,17 @@ function AddToTimelineFooter({
           variant={variant === "desktop" ? "secondary" : "default"}
           size="default"
           disabled={isAdding}
-          className={variant === "desktop" ? "w-full" : "w-full bg-orange-600 hover:bg-orange-500 dark:bg-orange-500 dark:hover:bg-orange-600"}
-          onMouseEnter={() => !isAdding && layersIconRef.current?.startAnimation?.()}
-          onMouseLeave={() => !isAdding && layersIconRef.current?.stopAnimation?.()}
+          className={
+            variant === "desktop"
+              ? "w-full"
+              : "w-full bg-orange-600 hover:bg-orange-500 dark:bg-orange-500 dark:hover:bg-orange-600"
+          }
+          onMouseEnter={() =>
+            !isAdding && layersIconRef.current?.startAnimation?.()
+          }
+          onMouseLeave={() =>
+            !isAdding && layersIconRef.current?.stopAnimation?.()
+          }
         >
           {isAdding ? (
             <>
@@ -720,22 +1036,35 @@ function AddToTimelineFooter({
         </Button>
       </AddToTimelineDialog>
     </div>
-  )
+  );
 }
 
-export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: SubtitleViewerPanelProps) {
-  const [searchQuery, setSearchQuery] = React.useState("")
-  const [searchCaseSensitive, setSearchCaseSensitive] = React.useState(false)
-  const [searchWholeWord, setSearchWholeWord] = React.useState(false)
-  const [showReplace, setShowReplace] = React.useState(false)
-  const [replaceValue, setReplaceValue] = React.useState("")
-  const [selectedIndex, setSelectedIndex] = React.useState<number | null>(null)
-  const [showSpeakerEditor, setShowSpeakerEditor] = React.useState(false)
-  const [showReformat, setShowReformat] = React.useState(false)
-  const [isAddingToTimeline, setIsAddingToTimeline] = React.useState(false)
-  const searchInputRef = React.useRef<HTMLInputElement>(null)
-  const layersIconRef = React.useRef<PlusIconHandle>(null)
-  const { subtitles, currentTranscriptFilename, updateSubtitles, exportSubtitlesAs, importSubtitles, reformatSubtitles, speakers, updateSpeakers } = useTranscript()
+export function SubtitleViewerPanel({
+  variant,
+  isOpen = true,
+  onClose,
+}: SubtitleViewerPanelProps) {
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [searchCaseSensitive, setSearchCaseSensitive] = React.useState(false);
+  const [searchWholeWord, setSearchWholeWord] = React.useState(false);
+  const [showReplace, setShowReplace] = React.useState(false);
+  const [replaceValue, setReplaceValue] = React.useState("");
+  const [selectedIndex, setSelectedIndex] = React.useState<number | null>(null);
+  const [showSpeakerEditor, setShowSpeakerEditor] = React.useState(false);
+  const [showReformat, setShowReformat] = React.useState(false);
+  const [isAddingToTimeline, setIsAddingToTimeline] = React.useState(false);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+  const layersIconRef = React.useRef<PlusIconHandle>(null);
+  const {
+    subtitles,
+    currentTranscriptFilename,
+    updateSubtitles,
+    exportSubtitlesAs,
+    importSubtitles,
+    reformatSubtitles,
+    speakers,
+    updateSpeakers,
+  } = useTranscript();
   const {
     timelineInfo: resolveTimeline,
     templates: resolveTemplates,
@@ -743,96 +1072,121 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
     templatesLoaded: resolveTemplatesLoaded,
     refreshTemplates: refreshResolveTemplates,
     pushToTimeline: resolvePush,
-  } = useResolve()
-  const { timelineInfo: premiereTimeline, pushToTimeline: premierePush, isConnected: isPremiereConnected } = usePremiere()
+  } = useResolve();
+  const {
+    timelineInfo: premiereTimeline,
+    pushToTimeline: premierePush,
+    isConnected: isPremiereConnected,
+  } = usePremiere();
 
-  const { selectedIntegration } = useIntegration()
+  const { selectedIntegration } = useIntegration();
   const isPremiereActive = selectedIntegration === "premiere";
   const timelineInfo = isPremiereActive ? premiereTimeline : resolveTimeline;
-  const pushToTimeline = isPremiereActive 
-    ? (filename?: string, _selectedTemplate?: string, _selectedOutputTrack?: string, _presetSettings?: Record<string, unknown>) => premierePush(filename) 
+  const pushToTimeline = isPremiereActive
+    ? (
+        filename?: string,
+        _selectedTemplate?: string,
+        _selectedOutputTrack?: string,
+        _presetSettings?: Record<string, unknown>,
+      ) => premierePush(filename)
     : resolvePush;
-  const { settings } = useSettings()
-  const { t, i18n } = useTranslation()
-  const hasSubtitles = subtitles.length > 0
-  const transcriptDateLocale = i18n.resolvedLanguage || i18n.language || undefined
-
+  const { settings } = useSettings();
+  const { t, i18n } = useTranslation();
+  const hasSubtitles = subtitles.length > 0;
+  const transcriptDateLocale =
+    i18n.resolvedLanguage || i18n.language || undefined;
 
   React.useEffect(() => {
-    if (variant !== "compact" || !isOpen || !onClose) return
+    if (variant !== "compact" || !isOpen || !onClose) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose()
+        onClose();
       }
-    }
+    };
 
-    document.addEventListener("keydown", handleKeyDown)
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [isOpen, onClose, variant])
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose, variant]);
 
-  const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   const buildFindRegExp = React.useCallback(() => {
-    const q = (searchQuery ?? "").trim()
-    if (!q) return null
-    const escaped = escapeRegExp(q)
-    const pattern = searchWholeWord ? `\\b${escaped}\\b` : escaped
-    const flags = searchCaseSensitive ? "g" : "gi"
-    return new RegExp(pattern, flags)
-  }, [searchCaseSensitive, searchQuery, searchWholeWord])
+    const q = (searchQuery ?? "").trim();
+    if (!q) return null;
+    const escaped = escapeRegExp(q);
+    const pattern = searchWholeWord ? `\\b${escaped}\\b` : escaped;
+    const flags = searchCaseSensitive ? "g" : "gi";
+    return new RegExp(pattern, flags);
+  }, [searchCaseSensitive, searchQuery, searchWholeWord]);
 
-  const canReplace = variant === "desktop" ? Boolean(replaceValue.trim()) : Boolean(searchQuery.trim())
-  const isIntegrationConnected = isPremiereActive ? isPremiereConnected : Boolean(timelineInfo?.timelineId);
-  const shellClassName = variant === "desktop"
-    ? "flex flex-col h-full border-l bg-card/50"
-    : "flex flex-col h-full min-h-0 bg-background"
-  const headerClassName = variant === "desktop"
-    ? "shrink-0 p-3 pb-0"
-    : "p-2 pb-0 shrink-0 sticky top-0 relative z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 space-y-1"
+  const canReplace =
+    variant === "desktop"
+      ? Boolean(replaceValue.trim())
+      : Boolean(searchQuery.trim());
+  const isIntegrationConnected = isPremiereActive
+    ? isPremiereConnected
+    : Boolean(timelineInfo?.timelineId);
+  const shellClassName =
+    variant === "desktop"
+      ? "flex flex-col h-full border-l bg-card/50"
+      : "flex flex-col h-full min-h-0 bg-background";
+  const headerClassName =
+    variant === "desktop"
+      ? "shrink-0 p-3 pb-0"
+      : "p-2 pb-0 shrink-0 sticky top-0 relative z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 space-y-1";
 
   function handleSpeakerChange(index: number, updated: Speaker) {
-    const next = [...speakers]
-    next[index] = updated
-    updateSpeakers(next)
+    const next = [...speakers];
+    next[index] = updated;
+    updateSpeakers(next);
   }
 
   const handleReplaceAll = () => {
-    const re = buildFindRegExp()
-    if (!re) return
+    const re = buildFindRegExp();
+    if (!re) return;
     const next = subtitles.map((s) => ({
       ...s,
       text: (s.text ?? "").replace(re, replaceValue),
-    }))
-    updateSubtitles(next)
-  }
+    }));
+    updateSubtitles(next);
+  };
 
   const handleApplyReformat = async () => {
-    const timelineId = timelineInfo?.timelineId || ""
-    await reformatSubtitles(settings, null, timelineId)
-    setShowReformat(false)
-  }
+    const timelineId = timelineInfo?.timelineId || "";
+    await reformatSubtitles(settings, null, timelineId);
+    setShowReformat(false);
+  };
 
-  const handleAddToTimeline = async (selectedOutputTrack: string, selectedTemplate: string, presetSettings?: Record<string, unknown>) => {
+  const handleAddToTimeline = async (
+    selectedOutputTrack: string,
+    selectedTemplate: string,
+    presetSettings?: Record<string, unknown>,
+  ) => {
     try {
       if (!currentTranscriptFilename) {
-        console.error("No active transcript file to add to timeline")
-        return
+        console.error("No active transcript file to add to timeline");
+        return;
       }
 
-      setIsAddingToTimeline(true)
-      await pushToTimeline(currentTranscriptFilename, selectedTemplate, selectedOutputTrack, presetSettings)
+      setIsAddingToTimeline(true);
+      await pushToTimeline(
+        currentTranscriptFilename,
+        selectedTemplate,
+        selectedOutputTrack,
+        presetSettings,
+      );
     } catch (error) {
-      console.error("Failed to add to timeline:", error)
-      throw error
+      console.error("Failed to add to timeline:", error);
+      throw error;
     } finally {
-      setIsAddingToTimeline(false)
+      setIsAddingToTimeline(false);
     }
-  }
+  };
 
-  if (variant === "compact" && !isOpen) return null
+  if (variant === "compact" && !isOpen) return null;
 
   return (
     <div className={shellClassName}>
@@ -850,7 +1204,9 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
           searchInputRef={searchInputRef}
           onSearchQueryChange={setSearchQuery}
           onReplaceValueChange={setReplaceValue}
-          onToggleCaseSensitive={() => setSearchCaseSensitive((value) => !value)}
+          onToggleCaseSensitive={() =>
+            setSearchCaseSensitive((value) => !value)
+          }
           onToggleWholeWord={() => setSearchWholeWord((value) => !value)}
           onToggleReplace={() => setShowReplace((value) => !value)}
           onReplaceAll={handleReplaceAll}
@@ -882,7 +1238,9 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
                       <X className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">{t("subtitles.clearSearch")}</TooltipContent>
+                  <TooltipContent side="bottom">
+                    {t("subtitles.clearSearch")}
+                  </TooltipContent>
                 </Tooltip>
               </InputGroupAddon>
             ) : (
@@ -925,8 +1283,8 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
         t={t}
         transcriptDateLocale={transcriptDateLocale}
         onTranscriptOpen={() => {
-          setSelectedIndex(null)
-          setSearchQuery("")
+          setSelectedIndex(null);
+          setSearchQuery("");
         }}
       />
 
@@ -938,7 +1296,9 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
           templates={isPremiereActive ? [] : resolveTemplates}
           templatesLoading={!isPremiereActive && resolveTemplatesLoading}
           templatesLoaded={isPremiereActive || resolveTemplatesLoaded}
-          onLoadTemplates={isPremiereActive ? undefined : refreshResolveTemplates}
+          onLoadTemplates={
+            isPremiereActive ? undefined : refreshResolveTemplates
+          }
           layersIconRef={layersIconRef}
           onAddToTimeline={handleAddToTimeline}
           t={t}
@@ -947,5 +1307,5 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
         />
       )}
     </div>
-  )
+  );
 }

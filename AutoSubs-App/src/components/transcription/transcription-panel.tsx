@@ -13,8 +13,6 @@ import {
   RefreshCw,
   SlidersHorizontal,
   ChevronDown,
-  Check,
-  Drum,
   PartyPopper,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";

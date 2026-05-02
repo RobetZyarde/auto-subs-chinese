@@ -45,7 +45,8 @@
     "done": "Fertig",
     "delete": "Löschen",
     "options": "Optionen",
-    "generateSubtitles": "Untertitel generieren"
+    "generateSubtitles": "Untertitel generieren",
+    "open": "Öffnen"
   },
   "update": {
     "restartResolveServer": {
@@ -460,7 +461,19 @@
     "transcripts": {
       "searchPlaceholder": "Transkripte durchsuchen...",
       "loading": "Lädt...",
-      "empty": "Keine Transkripte gefunden."
+      "empty": "Keine Transkripte gefunden.",
+      "empty_title": "Keine Transkripte gefunden",
+      "empty_detail": "Deine Transkriptionshistorie wird hier erscheinen, sobald du Untertitel generiert hast.",
+      "no_results": "Keine Ergebnisse gefunden",
+      "no_results_detail": "Versuche deine Suche anzupassen.",
+      "delete_title": "Transkript löschen?",
+      "delete_description": "Dies wird das Transkript dauerhaft aus deiner Historie entfernen. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "sections": {
+        "today": "Heute",
+        "yesterday": "Gestern",
+        "last_week": "Letzte 7 Tage",
+        "older": "Früher"
+      }
     },
     "windowControls": {
       "minimize": "Minimieren",
@@ -553,11 +566,11 @@
       "emptyTitle": "Noch keine benutzerdefinierten Voreinstellungen",
       "emptyHint": "Klicke auf Neue Voreinstellung, um deine eigene zu entwerfen, oder importiere eine aus einer Datei.",
       "phase": {
-        "launchingTitle": "Untertitel in Resolve öffnen\u2026",
+        "launchingTitle": "Untertitel in Resolve öffnen…",
         "launchingHint": "Wir platzieren einen Vorschau-Untertitel auf einer temporären Spur.",
         "editingTitle": "Zu DaVinci Resolve wechseln",
         "editingBody": "Ein Untertitel wurde auf einer neuen Spur platziert und auf der Fusion-Seite geöffnet. Passe ihn mit dem Inspektor an und komme dann hierher zurück.",
-        "capturingTitle": "Einstellungen aus Resolve lesen\u2026",
+        "capturingTitle": "Einstellungen aus Resolve lesen…",
         "nameTitle": "Voreinstellung benennen",
         "nameHint": "Gib ihr einen kurzen, beschreibenden Namen."
       },
@@ -576,7 +589,7 @@
       "confirmDelete": "Diese Voreinstellung wird aus deiner Bibliothek entfernt. Integrierte Voreinstellungen sind nicht betroffen.",
       "confirmDeleteConfirm": "Löschen",
       "importTitle": "Voreinstellungs-JSON einfügen",
-      "importPlaceholder": "Füge den Inhalt einer Voreinstellungsdatei hier ein\u2026",
+      "importPlaceholder": "Füge den Inhalt einer Voreinstellungsdatei hier ein…",
       "importSubmit": "Voreinstellung importieren",
       "errors": {
         "invalidJson": "Das sieht nicht nach einer gültigen Voreinstellungsdatei aus.",

@@ -45,7 +45,8 @@
     "done": "Listo",
     "delete": "Eliminar",
     "options": "Opciones",
-    "generateSubtitles": "Generar subtítulos"
+    "generateSubtitles": "Generar subtítulos",
+    "open": "Abrir"
   },
   "update": {
     "restartResolveServer": {
@@ -458,9 +459,19 @@
   },
   "titlebar": {
     "transcripts": {
-      "searchPlaceholder": "Buscar transcripciones...",
-      "loading": "Cargando...",
-      "empty": "No se encontraron transcripciones."
+      "empty": "No se encontraron transcripciones.",
+      "empty_title": "No se encontraron transcripciones",
+      "empty_detail": "Tu historial de transcripciones aparecerá aquí una vez que generes subtítulos.",
+      "no_results": "No se encontraron resultados",
+      "no_results_detail": "Intenta ajustar tu búsqueda.",
+      "delete_title": "¿Eliminar transcripción?",
+      "delete_description": "Esto eliminará permanentemente la transcripción de tu historial. Esta acción no se puede deshacer.",
+      "sections": {
+        "today": "Hoy",
+        "yesterday": "Ayer",
+        "last_week": "Últimos 7 días",
+        "older": "Más antiguo"
+      }
     },
     "windowControls": {
       "minimize": "Minimizar",
@@ -553,11 +564,11 @@
       "emptyTitle": "Aún no hay preajustes personalizados",
       "emptyHint": "Haz clic en Nuevo preajuste para diseñar el tuyo, o importa uno desde un archivo.",
       "phase": {
-        "launchingTitle": "Abriendo subtítulo en Resolve\u2026",
+        "launchingTitle": "Abriendo subtítulo en Resolve…",
         "launchingHint": "Colocaremos un subtítulo de vista previa en una pista temporal.",
         "editingTitle": "Cambia a DaVinci Resolve",
         "editingBody": "Se ha colocado un subtítulo en una pista nueva y abierto en la página Fusion. Personalízalo usando el inspector, luego vuelve aquí.",
-        "capturingTitle": "Leyendo ajustes de Resolve\u2026",
+        "capturingTitle": "Leyendo ajustes de Resolve…",
         "nameTitle": "Nombra tu preajuste",
         "nameHint": "Dale un nombre corto y descriptivo."
       },
@@ -576,7 +587,7 @@
       "confirmDelete": "Este preajuste se eliminará de tu biblioteca. Los preajustes integrados no se ven afectados.",
       "confirmDeleteConfirm": "Eliminar",
       "importTitle": "Pegar JSON del preajuste",
-      "importPlaceholder": "Pega el contenido de un archivo de preajuste aquí\u2026",
+      "importPlaceholder": "Pega el contenido de un archivo de preajuste aquí…",
       "importSubmit": "Importar preajuste",
       "errors": {
         "invalidJson": "Eso no parece un archivo de preajuste válido.",
