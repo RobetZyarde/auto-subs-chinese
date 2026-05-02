@@ -33,6 +33,20 @@ const emptyTimeline: TimelineInfo = {
   outputTracks: []
 };
 
+/** Maps raw API data from either Adobe host into a normalised TimelineInfo shape. */
+function toTimelineInfo(data: any): TimelineInfo {
+  return {
+    name: data.name || data.sequenceName || "Sequence",
+    timelineId: data.id || "adobe_seq",
+    templates: [],
+    inputTracks: data.audioTrackInfo?.map((t: any) => ({
+      value: t.index.toString(),
+      label: t.name || `Audio ${t.index}`
+    })) ?? [],
+    outputTracks: []
+  };
+}
+
 export function AdobeProvider({ children }: { children: React.ReactNode }) {
   const { settings: currentSettings } = useSettings();
   const { selectedIntegration } = useIntegration();
@@ -63,24 +77,16 @@ export function AdobeProvider({ children }: { children: React.ReactNode }) {
       const data = typeof result === 'string' ? JSON.parse(result) : result;
 
       if (data && data.success) {
-        const info = {
-          name: data.name || data.sequenceName || "Sequence",
-          timelineId: data.id || "adobe_seq",
-          templates: [],
-          inputTracks: data.audioTrackInfo?.map((t: any) => ({
-            value: t.index.toString(),
-            label: t.name || `Audio ${t.index}`
-          })) || [],
-          outputTracks: []
-        };
-
-        if (app === 'premiere') setPremiereTimeline(info);
-        else if (app === 'aftereffects') setAeTimeline(info);
+        if (app === 'premiere') setPremiereTimeline(toTimelineInfo(data));
+        else if (app === 'aftereffects') setAeTimeline(toTimelineInfo(data));
       }
     } catch (error) {
       console.error(`Failed to refresh info for ${app}:`, error);
     }
-  }, []); // No dependencies - very stable
+    // sendRequestAndWait is a stable function (defined outside useCallback and only reads a ref);
+    // it does not need to be in the dep array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refresh = useCallback(async () => {
     if (selectedIntegration === 'premiere' || selectedIntegration === 'aftereffects') {
@@ -126,18 +132,8 @@ export function AdobeProvider({ children }: { children: React.ReactNode }) {
         const result = msg.payload;
         const data = typeof result === 'string' ? JSON.parse(result) : result;
         if (data && data.success) {
-          const info = {
-            name: data.name || data.sequenceName || "Sequence",
-            timelineId: data.id || "adobe_seq",
-            templates: [],
-            inputTracks: data.audioTrackInfo?.map((t: any) => ({
-              value: t.index.toString(),
-              label: t.name || `Audio ${t.index}`
-            })) || [],
-            outputTracks: []
-          };
-          if (originApp === 'premiere') setPremiereTimeline(info);
-          else if (originApp === 'aftereffects') setAeTimeline(info);
+          if (originApp === 'premiere') setPremiereTimeline(toTimelineInfo(data));
+          else if (originApp === 'aftereffects') setAeTimeline(toTimelineInfo(data));
         }
       }
     });
@@ -148,12 +144,15 @@ export function AdobeProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refreshApp]);
 
-  // Only refresh when the USER actively changes integration, not on every connection event
+  // Refresh when the user actively switches integration. `isConnected` is intentionally
+  // excluded from the dep array: we pass it explicitly as an argument to avoid a stale
+  // closure while still preventing a double-fire on every connection event.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isConnected) {
-      refreshApp(selectedIntegration as any, isConnected);
+      refreshApp(selectedIntegration as 'premiere' | 'aftereffects', isConnected);
     }
-  }, [selectedIntegration]); // Removed isConnected to avoid double-firing
+  }, [selectedIntegration]); // isConnected excluded intentionally — see comment above
 
   const sendRequestAndWait = (fn: (sessionId: string) => Promise<string>): Promise<any> => {
     return new Promise((resolve, reject) => {
@@ -237,12 +236,12 @@ export function AdobeProvider({ children }: { children: React.ReactNode }) {
       getSourceAudio
     }}>
       {children}
-    </PremiereContext.Provider>
+    </AdobeContext.Provider>
   );
 }
 
 export const useAdobe = () => {
   const context = useContext(AdobeContext);
-  if (!context) throw new Error('useAdobe must be used within a AdobeProvider');
+  if (!context) throw new Error('useAdobe must be used within an AdobeProvider');
   return context;
 };

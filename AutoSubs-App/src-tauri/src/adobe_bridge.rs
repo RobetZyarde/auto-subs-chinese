@@ -10,7 +10,7 @@ use tauri::Manager;
 use tauri::Emitter;
 
 static CONNECTION_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
-const PREMIERE_ENDPOINT: &str = "127.0.0.1:8185";
+const ADOBE_BRIDGE_ADDR: &str = "127.0.0.1:8185";
 
 pub struct AdobeConnection {
     pub id: u64,
@@ -53,7 +53,7 @@ pub fn init_adobe_server(app_handle: tauri::AppHandle) {
     app_handle.manage(adobe_state);
 
     tauri::async_runtime::spawn(async move {
-        let addr = PREMIERE_ENDPOINT;
+        let addr = ADOBE_BRIDGE_ADDR;
         let listener = match TcpListener::bind(addr).await {
             Ok(l) => l,
             Err(e) => {
@@ -108,8 +108,8 @@ async fn handle_connection(stream: TcpStream, app_handle: tauri::AppHandle) -> R
     }
 
     if detected_app.is_empty() {
-        tracing::warn!("Handshake failed or timed out — defaulting to adobe");
-        detected_app = "adobe".to_string();
+        tracing::warn!("Handshake failed or timed out — closing unauthenticated connection");
+        return Ok(());
     }
 
     tracing::info!("Adobe extension connected: {}", detected_app);
@@ -157,10 +157,10 @@ async fn handle_connection(stream: TcpStream, app_handle: tauri::AppHandle) -> R
         }
     });
 
-    // Wait for either task to finish (meaning connection lost)
+    // Wait for either task to finish (meaning connection lost); abort the other.
     tokio::select! {
-        _ = &mut send_task => {},
-        _ = &mut recv_task => {},
+        _ = &mut send_task => { recv_task.abort(); },
+        _ = &mut recv_task => { send_task.abort(); },
     }
 
     // Cleanup

@@ -466,7 +466,7 @@ interface StepperProps {
     isAdobe?: boolean
 }
 
-function Stepper({ steps, currentStep, onJump, canAdvanceTo, isAdobe }: StepperProps) {
+function Stepper({ steps, currentStep, onJump, canAdvanceTo }: StepperProps) {
     return (
         <div className="flex items-center gap-1">
             {steps.map((step, index) => {

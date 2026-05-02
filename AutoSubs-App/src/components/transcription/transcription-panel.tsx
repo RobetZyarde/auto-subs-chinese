@@ -186,7 +186,7 @@ function TranscriptionPanelView({
 }: TranscriptionPanelViewProps) {
   const { t, i18n } = useTranslation()
   const { updateSetting } = useSettings() // Keep only updateSetting if needed, or better, pass from parent
-  const isPremiereActive = selectedIntegration === "premiere" || selectedIntegration === "aftereffects" || selectedIntegration === "premierepro";
+  const isPremiereActive = selectedIntegration === "premiere" || selectedIntegration === "aftereffects";
   const isTourActive = !currentSettings.tourCompleted
   const uploadIconRef = React.useRef<UploadIconHandle>(null)
   const dropAreaUploadIconRef = React.useRef<UploadIconHandle>(null)
@@ -366,7 +366,7 @@ function TranscriptionPanelView({
                     onAddToTimeline={onAddToTimeline}
                     onViewSubtitles={onViewSubtitles}
                     livePreviewSegments={livePreviewSegments}
-                    settings={settings}
+                    settings={currentSettings}
                     timelineInfo={timelineInfo}
                     selectedIntegration={selectedIntegration}
                   />
@@ -666,7 +666,7 @@ export function TranscriptionPanel({ onViewSubtitles }: { onViewSubtitles?: () =
     }
   }, [isPremiereConnected, hasInitializedIntegration, selectedIntegration, setSelectedIntegration]);
 
-  const isPremiereActive = selectedIntegration === "premiere" || selectedIntegration === "aftereffects" || selectedIntegration === "premierepro";
+  const isPremiereActive = selectedIntegration === "premiere" || selectedIntegration === "aftereffects";
   const timelineInfo = isPremiereActive ? premiereTimeline : resolveTimeline;
   const getSourceAudio = isPremiereActive ? premiereGetSourceAudio : resolveGetSourceAudio;
   const pushToTimeline = isPremiereActive 

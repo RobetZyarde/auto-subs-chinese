@@ -89,7 +89,7 @@ switch (detectedApp) {
     // app.project.activeItem because there may be no open project yet.
     try {
       // `new CompItem()` would throw in Premiere, but `CompItem` itself should be defined in AE.
-      if (typeof app !== "undefined" && String(typeof CompItem) === "function") {
+      if (typeof app !== "undefined" && typeof CompItem === "function") {
         $.writeln("[AutoSubs] Fallback: CompItem class present — assuming After Effects");
         host[ns] = aeft;
       } else {

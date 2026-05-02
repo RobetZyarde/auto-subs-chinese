@@ -135,7 +135,7 @@ export function exportSequenceAudio(
   externalPresetPath: string
 ): string {
   try {
-    logMessage("=== EXPORT SEQUENCE AUDIO IN AE ===");
+    log("=== EXPORT SEQUENCE AUDIO IN AE ===");
     const activeComp = getActiveComp();
     if (!activeComp) {
       return JSON.stringify({ success: false, error: "No active comp" });
@@ -202,8 +202,27 @@ export function exportSequenceAudio(
     var lastIndex = renderQueue.numItems;
     var rqItem = renderQueue.item(lastIndex);
 
-    rqItem.outputModule(1).applyTemplate("WAV");
+    try {
+      rqItem.outputModule(1).applyTemplate("WAV");
+    } catch (e) {
+      log(
+        "WAV output-module template not found — using default. " +
+        "Create a template named 'WAV' in AE for reliable audio-only exports."
+      );
+    }
     rqItem.outputModule(1).file = new File(outputPath);
+
+    // Verify the resolved output path ends in .wav; abort early if not.
+    var resolvedPath: string = rqItem.outputModule(1).file.fsName;
+    if (!resolvedPath.toLowerCase().match(/\.wav$/)) {
+      try { rqItem.remove(); } catch (_) {}
+      return JSON.stringify({
+        success: false,
+        error:
+          "Output module is not WAV (resolved path: " + resolvedPath + "). " +
+          "Configure an output-module template named 'WAV' in After Effects.",
+      });
+    }
 
     // Snapshot work area before potentially changing it
     var originalStart = activeComp.workAreaStart;
@@ -390,8 +409,7 @@ export function importSRTFile(filePath: string): string {
 
     app.beginUndoGroup("Import SRT Subtitles");
 
-    var boxWidth = comp.width * 0.8;
-    var boxHeight = comp.height * 0.2; // roughly lower-third height
+
     var layersCreated = 0;
 
     try {

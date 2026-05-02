@@ -50,7 +50,7 @@ function IntegrationStatus() {
     isPremiereConnected,
     isAfterEffectsConnected
   } = useAdobe();
-  const { selectedIntegration, setSelectedIntegration } = useIntegration();
+  const { setSelectedIntegration } = useIntegration();
 
   const isResolveConnected = resolveTimeline && resolveTimeline.timelineId;
 

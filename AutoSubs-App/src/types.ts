@@ -1,4 +1,5 @@
 import { SupportedUiLanguage } from '@/i18n';
+import { Integration } from '@/contexts/IntegrationContext';
 
 // Error message interface
 export interface ErrorMsg {
@@ -123,7 +124,7 @@ export interface Settings {
     customMaxCharsPerLine: number,
 
     // Adobe integrations
-    selectedInputTracksByApp: Record<string, string[]>;
+    selectedInputTracksByApp: Record<Integration, string[]>;
     selectedOutputTrack: string;
     selectedTemplate: Template;
 
