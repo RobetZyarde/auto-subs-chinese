@@ -443,6 +443,7 @@ interface SubtitleContentProps {
   searchWholeWord: boolean
   selectedIndex: number | null
   onSelectedIndexChange: (index: number | null) => void
+  onJumpToTime: (seconds: number) => Promise<void>
   t: (key: string) => string
 }
 
@@ -454,6 +455,7 @@ function SubtitleContent({
   searchWholeWord,
   selectedIndex,
   onSelectedIndexChange,
+  onJumpToTime,
   t,
 }: SubtitleContentProps) {
   const archiveIconRef = React.useRef<HistoryIconHandle>(null)
@@ -470,6 +472,7 @@ function SubtitleContent({
           searchWholeWord={searchWholeWord}
           selectedIndex={selectedIndex}
           onSelectedIndexChange={onSelectedIndexChange}
+          onJumpToTime={onJumpToTime}
           itemClassName="hover:bg-sidebar-accent transition-colors"
         />
       ) : (
@@ -576,9 +579,15 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
   const { selectedIntegration } = useIntegration()
   const isAdobeActive = selectedIntegration === "premiere" || selectedIntegration === "aftereffects";
   const timelineInfo = isAdobeActive ? premiereTimeline : resolveTimeline;
+  
   const pushToTimeline = isAdobeActive 
     ? (filename?: string, _selectedTemplate?: string, _selectedOutputTrack?: string, _presetSettings?: Record<string, unknown>) => premierePush(filename) 
     : resolvePush;
+
+  const { jumpToTime: adobeJumpToTime } = useAdobe();
+  const { jumpToTime: resolveJumpToTime } = useResolve();
+  const jumpToTime = isAdobeActive ? adobeJumpToTime : resolveJumpToTime;
+
   const { settings } = useSettings()
   const { t } = useTranslation()
 
@@ -711,6 +720,7 @@ export function SubtitleViewerPanel({ variant, isOpen = true, onClose }: Subtitl
         searchWholeWord={searchWholeWord}
         selectedIndex={selectedIndex}
         onSelectedIndexChange={setSelectedIndex}
+        onJumpToTime={jumpToTime}
         t={t}
       />
 

@@ -466,3 +466,19 @@ export function importSRTFile(filePath: string): string {
     return JSON.stringify({ success: false, error: e.toString() });
   }
 }
+
+/**
+ * Moves the playhead of the active composition to the specified time.
+ */
+export function jumpToTime(seconds: number): string {
+  try {
+    const comp = getActiveComp();
+    if (!comp) {
+      return JSON.stringify({ success: false, error: "No active composition" });
+    }
+    comp.time = seconds;
+    return JSON.stringify({ success: true });
+  } catch (e: any) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}

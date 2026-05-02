@@ -36,3 +36,7 @@ export async function requestAudioExport(
 export async function requestImportSRT(filePath: string, sessionId?: string, integration?: string) {
   return sendToAdobe('request_import_srt', { filePath }, sessionId, integration);
 }
+
+export async function requestJumpToTime(seconds: number, sessionId?: string, integration?: string) {
+  return sendToAdobe('request_jump_to_time', { time: seconds }, sessionId, integration);
+}

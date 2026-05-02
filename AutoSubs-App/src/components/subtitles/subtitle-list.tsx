@@ -23,9 +23,8 @@ interface SubtitleListProps {
     error?: string | null;
     selectedIndex?: number | null;
     onSelectedIndexChange?: (index: number | null) => void;
+    onJumpToTime?: (seconds: number) => Promise<void>;
 }
-
-import { jumpToTime } from "@/api/resolve-api";
 
 const SubtitleList = ({
     searchQuery = "",
@@ -37,6 +36,7 @@ const SubtitleList = ({
     error = null,
     selectedIndex: controlledSelectedIndex,
     onSelectedIndexChange,
+    onJumpToTime,
 }: SubtitleListProps) => {
     const { t } = useTranslation();
     const { subtitles, updateSubtitles, speakers, updateSpeakers } = useTranscript();
@@ -385,7 +385,9 @@ const SubtitleList = ({
                                             className="text-xs text-muted-foreground font-mono cursor-pointer hover:text-primary"
                                             onClick={async (e) => {
                                                 e.stopPropagation();
-                                                await jumpToTime(subtitle.start);
+                                                if (onJumpToTime) {
+                                                    await onJumpToTime(subtitle.start);
+                                                }
                                             }}
                                         >
                                             {formatTimecode(subtitle.start)}

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { listen } from '@tauri-apps/api/event';
 import { toast } from 'sonner';
 import { TimelineInfo } from '@/types';
-import { requestSequenceInfo, requestAudioExport, requestImportSRT } from '@/api/adobe-api';
+import { requestSequenceInfo, requestAudioExport, requestImportSRT, requestJumpToTime } from '@/api/adobe-api';
 import { getAudioExportDir, getTranscriptPath, loadTranscriptSubtitles } from '@/utils/file-utils';
 import { generateSrt } from '@/utils/srt-utils';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
@@ -21,6 +21,7 @@ interface AdobeContextType {
   refresh: () => Promise<void>;
   pushToTimeline: (filename?: string) => Promise<void>;
   getSourceAudio: (isStandaloneMode: boolean, fileInput: string | null, inputTracks: string[]) => Promise<{ path: string, offset: number } | null>;
+  jumpToTime: (seconds: number) => Promise<void>;
 }
 
 const AdobeContext = createContext<AdobeContextType | null>(null);
@@ -221,6 +222,16 @@ export function AdobeProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function jumpToTime(seconds: number) {
+    if (!isConnected || !selectedIntegration) return;
+    try {
+      // Fire and forget pattern. No need to wait for a WebSocket response.
+      await requestJumpToTime(seconds, undefined, selectedIntegration);
+    } catch (error) {
+      console.error('Failed to dispatch jump_to_time command:', error);
+    }
+  }
+
   return (
     <AdobeContext.Provider value={{
       timelineInfo,
@@ -233,7 +244,8 @@ export function AdobeProvider({ children }: { children: React.ReactNode }) {
       exportProgress,
       refresh,
       pushToTimeline,
-      getSourceAudio
+      getSourceAudio,
+      jumpToTime
     }}>
       {children}
     </AdobeContext.Provider>

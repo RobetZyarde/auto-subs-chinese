@@ -190,6 +190,12 @@ export const useWebSocket = (port: number) => {
         sendMessage({ type: "import_srt_response", payload: importData, sessionId: message.sessionId, operationId: opId });
         break;
       }
+      case "request_jump_to_time": {
+        const { time } = message.payload;
+        await executeWithRetry(() => evalTS("jumpToTime", time));
+        // We don't necessarily need to send a response back
+        break;
+      }
       case "pong":
         updateState({ lastHeartbeat: Date.now() });
         break;

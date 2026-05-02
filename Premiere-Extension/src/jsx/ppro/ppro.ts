@@ -551,3 +551,23 @@ export function importSRTFile(filePath: string): string {
     return JSON.stringify({ success: false, error: e.toString() });
   }
 }
+
+/**
+ * Moves the playhead of the active sequence to the specified time.
+ */
+export function jumpToTime(seconds: number): string {
+  try {
+    if (!app.project) return JSON.stringify({ success: false, error: "No project open" });
+    if (!app.project.activeSequence)
+      return JSON.stringify({ success: false, error: "No active sequence" });
+
+    var sequence = app.project.activeSequence;
+    var TICKS_PER_SECOND = 254016000000;
+    var ticks = Math.round(seconds * TICKS_PER_SECOND).toString();
+    sequence.setPlayerPosition(ticks);
+
+    return JSON.stringify({ success: true });
+  } catch (e: any) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
