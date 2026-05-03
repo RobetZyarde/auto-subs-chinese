@@ -48,6 +48,8 @@
       },
       "customCharsTitle": "최대 문자 수",
       "customCharsDescription": "줄당 문자 수",
+      "formatButton": "서식",
+      "customPromptButton": "프롬프트",
       "customPromptTitle": "어휘 및 맥락",
       "customPromptDescription": "Whisper가 이름, 브랜드, 전문 용어, 약어, 선호 표기를 더 잘 인식하도록 돕습니다.",
       "customPromptTermsTitle": "주요 용어",
@@ -83,7 +85,7 @@
       "clearAll": "모두 지우기",
       "clickToSelect": "클릭하여 오디오 트랙 선택",
       "countSelected": "{{count}}개 트랙 선택됨",
-      "createTrack": "현재 타임라인에 오디오 트랙을 만들어 자막 생성을 시작하세요.",
+      "createTrack": "타임라인을 찾을 수 없습니다",
       "noneFound": "오디오 트랙을 찾을 수 없습니다.",
       "noneSelected": "선택된 트랙 없음",
       "selectAll": "모두 선택",
@@ -103,7 +105,9 @@
     "done": "완료",
     "generateSubtitles": "자막 생성",
     "next": "다음",
-    "saveChanges": "변경사항 저장"
+    "options": "옵션",
+    "saveChanges": "변경사항 저장",
+    "open": "열기"
   },
   "update": {
     "restartResolveServer": {
@@ -449,10 +453,20 @@
     "toggle": "테마 전환"
   },
   "titlebar": {
-    "transcripts": {
-      "empty": "전사 기록을 찾을 수 없습니다.",
-      "loading": "불러오는 중...",
-      "searchPlaceholder": "전사 기록 검색..."
+    "subtitleHistory": {
+      "empty": "전사된 내용이 없습니다.",
+      "empty_title": "전사된 내용이 없습니다",
+      "empty_detail": "자막을 생성하면 여기에 전사 기록이 표시됩니다.",
+      "no_results": "결과 없음",
+      "no_results_detail": "검색어를 조정해 보세요.",
+      "delete_title": "전사 내용을 삭제할까요?",
+      "delete_description": "기록에서 전사 내용이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+      "sections": {
+        "today": "오늘",
+        "yesterday": "어제",
+        "last_week": "지난 7일",
+        "older": "이전"
+      }
     },
     "resolve": {
       "productName": "DaVinci Resolve",
@@ -554,11 +568,11 @@
       "emptyTitle": "사용자 정의 프리셋이 없습니다",
       "emptyHint": "새 프리셋을 클릭하여 직접 디자인하거나 파일에서 가져오세요.",
       "phase": {
-        "launchingTitle": "Resolve에서 자막 열기 중\u2026",
+        "launchingTitle": "Resolve에서 자막 열기 중…",
         "launchingHint": "임시 트랙에 미리보기 자막을 배치합니다.",
         "editingTitle": "DaVinci Resolve로 전환",
         "editingBody": "새 트랙에 자막이 배치되고 Fusion 페이지에서 열렸습니다. 검사기를 사용하여 사용자 정의한 후 여기로 돌아오세요.",
-        "capturingTitle": "Resolve에서 설정 읽기 중\u2026",
+        "capturingTitle": "Resolve에서 설정 읽기 중…",
         "nameTitle": "프리셋 이름 지정",
         "nameHint": "짧고 설명적인 이름을 지정하세요."
       },
@@ -577,7 +591,7 @@
       "confirmDelete": "이 프리셋이 라이브러리에서 제거됩니다. 내장 프리셋은 영향을 받지 않습니다.",
       "confirmDeleteConfirm": "삭제",
       "importTitle": "프리셋 JSON 붙여넣기",
-      "importPlaceholder": "프리셋 파일 내용을 여기에 붙여넣으세요\u2026",
+      "importPlaceholder": "프리셋 파일 내용을 여기에 붙여넣으세요…",
       "importSubmit": "프리셋 가져오기",
       "errors": {
         "invalidJson": "유효한 프리셋 파일처럼 보이지 않습니다.",

@@ -84,7 +84,9 @@ export interface Model {
 // Settings Interface
 export interface Settings {
     // Mode
-    isStandaloneMode: boolean,
+    audioInputMode: "file" | "timeline",
+    preferredEditorIntegration: Integration;
+
 
     // UI settings
     uiLanguage: SupportedUiLanguage;

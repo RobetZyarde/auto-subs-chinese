@@ -1,14 +1,9 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Minus, Square, X, Settings, Sun, Moon, Monitor, Heart, Boxes, RotateCcw, GitMerge } from "lucide-react";
+import { Minus, Square, X, Settings, Sun, Moon, Monitor, Heart, Boxes, RotateCcw, GitMerge, ChevronDown, Check } from "lucide-react";
 import type { HistoryIconHandle } from "@/components/ui/history";
 import { platform } from "@tauri-apps/plugin-os";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,207 +28,157 @@ import {
 } from "@/hooks/use-update-status";
 import { invoke } from "@tauri-apps/api/core";
 import { diarizeModel } from "@/lib/models";
-import { TranscriptSearchPopover } from "@/components/common/transcript-search-popover";
+import { SubtitleHistoryPopover } from "@/components/common/subtitle-history-popover";
 
 import { useResolve } from "@/contexts/ResolveContext";
 import { useAdobe } from "@/contexts/AdobeContext";
-import { useIntegration } from "@/contexts/IntegrationContext";
-
-
+import { useIntegration, type Integration } from "@/contexts/IntegrationContext";
 
 function IntegrationStatus() {
   const { t } = useTranslation();
-  const { timelineInfo: resolveTimeline } = useResolve();
+  const { timelineInfo: resolveTimeline, refresh: refreshResolve } = useResolve();
   const {
     premiereTimeline,
     afterEffectsTimeline,
     isPremiereConnected,
-    isAfterEffectsConnected
+    isAfterEffectsConnected,
+    refresh: refreshAdobe
   } = useAdobe();
-  const { setSelectedIntegration } = useIntegration();
+  const { selectedIntegration, setSelectedIntegration } = useIntegration();
 
-  const isResolveConnected = resolveTimeline && resolveTimeline.timelineId;
+  const isResolveConnected = Boolean(resolveTimeline?.timelineId);
+  const integrations = {
+    davinci: {
+      productName: t("titlebar.resolve.productName"),
+      logo: "/davinci-resolve-logo.png",
+      connected: isResolveConnected,
+      timelineName: resolveTimeline?.name,
+      connectedText: t("titlebar.resolve.tooltip.connected"),
+      disconnectedText: t("titlebar.resolve.tooltip.cantConnect"),
+      helperText: isResolveConnected
+        ? t("titlebar.resolve.tooltip.canGetAudio")
+        : t("titlebar.resolve.tooltip.openResolve"),
+      refresh: refreshResolve,
+    },
+    premiere: {
+      productName: t("titlebar.premiere.productName"),
+      logo: "/premiere-logo.png",
+      connected: isPremiereConnected,
+      timelineName: premiereTimeline?.name,
+      connectedText: t("titlebar.premiere.tooltip.connected"),
+      disconnectedText: t("titlebar.premiere.tooltip.disconnected"),
+      helperText: isPremiereConnected
+        ? t("titlebar.premiere.tooltip.canGetAudio")
+        : t("titlebar.premiere.tooltip.openPremiere"),
+      refresh: refreshAdobe,
+    },
+    aftereffects: {
+      productName: t("titlebar.aftereffects.productName"),
+      logo: "/aftereffects-logo.png",
+      connected: isAfterEffectsConnected,
+      timelineName: afterEffectsTimeline?.name,
+      connectedText: t("titlebar.aftereffects.tooltip.connected"),
+      disconnectedText: t("titlebar.aftereffects.tooltip.disconnected"),
+      helperText: isAfterEffectsConnected
+        ? t("titlebar.aftereffects.tooltip.canGetAudio")
+        : t("titlebar.aftereffects.tooltip.openAfterEffects"),
+      refresh: refreshAdobe,
+    },
+  } satisfies Record<Integration, {
+    productName: string;
+    logo: string;
+    connected: boolean;
+    timelineName?: string;
+    connectedText: string;
+    disconnectedText: string;
+    helperText: string;
+    refresh: () => Promise<void>;
+  }>;
+
+  const activeIntegration = integrations[selectedIntegration];
+  const activeLabel = activeIntegration.connected
+    ? (activeIntegration.timelineName || activeIntegration.connectedText)
+    : activeIntegration.productName;
 
   return (
     <div className="flex items-center gap-1 select-none" data-tauri-drag-region="false">
-      {/* DaVinci Resolve */}
-      <HoverCard openDelay={400}>
-        <HoverCardTrigger asChild>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            className={`flex items-center gap-2 h-7 text-xs rounded px-2 ${isResolveConnected
+            className={`flex items-center gap-2 h-7 text-xs px-2 !outline-none !ring-0 focus:!outline-none focus:!ring-0 focus-visible:!outline-none focus-visible:!ring-0 ${activeIntegration.connected
               ? "hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900 dark:hover:text-green-300"
               : "hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-300"
               }`}
           >
             <div
-              className={`w-2 h-2 rounded-full ${isResolveConnected ? 'bg-green-500' : 'bg-red-500'}`}
+              className={`w-2 h-2 rounded-full ${activeIntegration.connected ? 'bg-green-500' : 'bg-red-500'}`}
             />
             <img
-              src="/davinci-resolve-logo.png"
-              alt="DaVinci Resolve"
-              className="h-4 w-4 opacity-80"
-            />
-            <span className="max-w-[120px] truncate">
-              {isResolveConnected
-                ? (resolveTimeline?.name || t("titlebar.resolve.status.connected"))
-                : t("titlebar.resolve.productName")}
-            </span>
-          </Button>
-        </HoverCardTrigger>
-        <HoverCardContent className="w-72 z-50">
-          <div className="flex items-start gap-3">
-            <img
-              src="/davinci-resolve-logo.png"
-              alt="DaVinci Resolve"
-              className="h-8 w-8"
-            />
-            <div className="space-y-1">
-              <h4 className="text-sm font-semibold">{t("titlebar.resolve.productName")}</h4>
-              {isResolveConnected ? (
-                <div className="space-y-1">
-                  <p className="text-sm text-green-600 dark:text-green-400">
-                    {t("titlebar.resolve.tooltip.connected")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t("titlebar.resolve.tooltip.canGetAudio")}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <p className="text-xs text-red-600 dark:text-red-400">
-                    {t("titlebar.resolve.tooltip.cantConnect")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t("titlebar.resolve.tooltip.openResolve")}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </HoverCardContent>
-      </HoverCard>
-
-      {/* Premiere Pro */}
-      <HoverCard openDelay={400}>
-        <HoverCardTrigger asChild>
-          <Button
-            variant="ghost"
-            onClick={() => setSelectedIntegration("premiere")}
-            className={`flex items-center gap-2 h-7 text-xs rounded px-2 ${isPremiereConnected
-              ? "hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900 dark:hover:text-green-300"
-              : "hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-300"
-              }`}
-          >
-            <div
-              className={`w-2 h-2 rounded-full ${isPremiereConnected ? 'bg-green-500' : 'bg-red-500'}`}
-            />
-            <img
-              src="/premiere-logo.png"
-              alt="Premiere Pro"
+              src={activeIntegration.logo}
+              alt={activeIntegration.productName}
               className="h-4 w-4"
             />
             <span className="max-w-[120px] truncate">
-              {isPremiereConnected
-                ? (premiereTimeline?.name || t("titlebar.premiere.status.connected"))
-                : t("titlebar.premiere.productName")}
+              {activeLabel}
             </span>
+            <ChevronDown className="h-3 w-3 opacity-50" />
           </Button>
-        </HoverCardTrigger>
-        <HoverCardContent className="w-72 z-50">
-          <div className="flex items-start gap-3">
-            <img
-              src="/premiere-logo.png"
-              alt="Premiere Pro"
-              className="h-8 w-8"
-            />
-            <div className="space-y-1">
-              <h4 className="text-sm font-semibold">{t("titlebar.premiere.productName")}</h4>
-              {isPremiereConnected ? (
-                <div className="space-y-1">
-                  <p className="text-sm text-green-600 dark:text-green-400">
-                    {t("titlebar.premiere.tooltip.connected")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t("titlebar.premiere.tooltip.canGetAudio")}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                    {t("titlebar.premiere.tooltip.disconnected")}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    {t("titlebar.premiere.tooltip.openPremiere")}
-                  </p>
-                </div>
-              )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="center" className="w-80 z-50">
+          <div className="px-2 py-1.5">
+            <div className="flex items-start gap-3">
+              <img
+                src={activeIntegration.logo}
+                alt={activeIntegration.productName}
+                className="h-8 w-8"
+              />
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold">{activeIntegration.productName}</h4>
+                <p className={`text-sm ${activeIntegration.connected ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  {activeIntegration.connected ? activeIntegration.connectedText : activeIntegration.disconnectedText}
+                </p>
+                <p className="text-xs text-muted-foreground">{activeIntegration.helperText}</p>
+              </div>
             </div>
           </div>
-        </HoverCardContent>
-      </HoverCard>
-
-      {/* After Effects */}
-      <HoverCard openDelay={400}>
-        <HoverCardTrigger asChild>
-          <Button
-            variant="ghost"
-            onClick={() => setSelectedIntegration("aftereffects")}
-            className={`flex items-center gap-2 h-7 text-xs rounded px-2 ${isAfterEffectsConnected
-              ? "hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900 dark:hover:text-green-300"
-              : "hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-300"
-              }`}
+          <DropdownMenuSeparator />
+          {(Object.keys(integrations) as Integration[]).map((integration) => {
+            const item = integrations[integration];
+            return (
+              <DropdownMenuItem
+                key={integration}
+                onClick={() => setSelectedIntegration(integration)}
+                className="cursor-pointer"
+              >
+                <div className={`w-2 h-2 rounded-full ${item.connected ? 'bg-green-500' : 'bg-red-500'}`} />
+                <img src={item.logo} alt={item.productName} className="h-4 w-4" />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span>{item.productName}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {item.connected ? (item.timelineName || item.connectedText) : item.disconnectedText}
+                  </span>
+                </div>
+                {selectedIntegration === integration ? <Check className="h-4 w-4" /> : null}
+              </DropdownMenuItem>
+            );
+          })}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => {
+              void activeIntegration.refresh();
+            }}
+            className="cursor-pointer"
           >
-            <div
-              className={`w-2 h-2 rounded-full ${isAfterEffectsConnected ? 'bg-green-500' : 'bg-red-500'}`}
-            />
-            <img
-              src="/aftereffects-logo.png"
-              alt="After Effects"
-              className="h-4 w-4"
-            />
-            <span className="max-w-[120px] truncate">
-              {isAfterEffectsConnected
-                ? (afterEffectsTimeline?.name || t("titlebar.aftereffects.status.connected"))
-                : t("titlebar.aftereffects.productName")}
-            </span>
-          </Button>
-        </HoverCardTrigger>
-        <HoverCardContent className="w-72 z-50">
-          <div className="flex items-start gap-3">
-            <img
-              src="/aftereffects-logo.png"
-              alt="After Effects"
-              className="h-8 w-8"
-            />
-            <div className="space-y-1">
-              <h4 className="text-sm font-semibold">{t("titlebar.aftereffects.productName")}</h4>
-              {isAfterEffectsConnected ? (
-                <div className="space-y-1">
-                  <p className="text-sm text-green-600 dark:text-green-400">
-                    {t("titlebar.aftereffects.tooltip.connected")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t("titlebar.aftereffects.tooltip.canGetAudio")}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                    {t("titlebar.aftereffects.tooltip.disconnected")}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    {t("titlebar.aftereffects.tooltip.openAfterEffects")}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </HoverCardContent>
-      </HoverCard>
+            <RotateCcw className="h-4 w-4" />
+            <span>{t("common.refresh", "Refresh")}</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
+
 
 function SettingsDropdown() {
   const { t } = useTranslation();
@@ -381,11 +326,11 @@ function SettingsDropdown() {
   );
 }
 
-function TranscriptsButton({ onTranscriptOpen }: { onTranscriptOpen?: () => void }) {
+function SubtitleHistoryButton({ onSubtitleDocumentOpen }: { onSubtitleDocumentOpen?: () => void }) {
   const historyIconRef = useRef<HistoryIconHandle>(null);
 
   return (
-    <TranscriptSearchPopover
+    <SubtitleHistoryPopover
       trigger={
         <Button
           variant="ghost"
@@ -398,7 +343,7 @@ function TranscriptsButton({ onTranscriptOpen }: { onTranscriptOpen?: () => void
           <ArchiveIcon ref={historyIconRef} size={16} />
         </Button>
       }
-      onTranscriptOpen={onTranscriptOpen}
+      onSubtitleDocumentOpen={onSubtitleDocumentOpen}
       align="end"
     />
   );
@@ -520,10 +465,10 @@ export function Titlebar({ onOpenCompactViewer }: { onOpenCompactViewer?: () => 
             {centerContent}
           </div>
 
-          {/* Right side - Transcripts and Settings buttons */}
+          {/* Right side - Subtitle history and settings buttons */}
           <div className="flex items-center w-24 justify-end">
             <div data-tauri-drag-region="false" data-tour="history-button">
-              <TranscriptsButton onTranscriptOpen={onOpenCompactViewer} />
+              <SubtitleHistoryButton onSubtitleDocumentOpen={onOpenCompactViewer} />
             </div>
             <div data-tauri-drag-region="false">
               <SettingsDropdown />
@@ -533,13 +478,13 @@ export function Titlebar({ onOpenCompactViewer }: { onOpenCompactViewer?: () => 
       ) : (
         // Windows/Linux layout: Settings on left, status in center, window buttons on right
         <>
-          {/* Left side - Transcripts and Settings */}
+          {/* Left side - Subtitle history and settings */}
           <div className="flex items-center">
             <div data-tauri-drag-region="false">
               <SettingsDropdown />
             </div>
             <div data-tauri-drag-region="false" data-tour="history-button">
-              <TranscriptsButton onTranscriptOpen={onOpenCompactViewer} />
+              <SubtitleHistoryButton onSubtitleDocumentOpen={onOpenCompactViewer} />
             </div>
           </div>
 

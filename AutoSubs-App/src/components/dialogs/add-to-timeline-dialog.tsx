@@ -19,11 +19,12 @@ import {
     ChevronRight,
     Layers,
     Layout,
+    Loader2,
     Palette,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Settings, Speaker, TimelineInfo } from "@/types"
-import { useTranscript } from "@/contexts/TranscriptContext"
+import { Settings, Speaker, Template, TimelineInfo } from "@/types"
+import { useSubtitleDocument } from "@/contexts/SubtitleDocumentContext"
 import { usePresets, DEFAULT_PRESET_ID } from "@/contexts/PresetsContext"
 import { useSettings } from "@/contexts/SettingsContext"
 import { SpeakerSettings } from "@/components/common/speaker-settings"
@@ -59,6 +60,10 @@ interface AddToTimelineDialogProps {
     children: React.ReactNode
     settings: Settings
     timelineInfo: TimelineInfo
+    templates: Template[]
+    templatesLoading: boolean
+    templatesLoaded: boolean
+    onLoadTemplates?: () => Promise<Template[]>
     onAddToTimeline: (
         selectedOutputTrack: string,
         selectedTemplate: string,
@@ -78,13 +83,17 @@ export function AddToTimelineDialog({
     children,
     settings,
     timelineInfo,
+    templates,
+    templatesLoading,
+    templatesLoaded,
+    onLoadTemplates,
     onAddToTimeline,
     isAdding = false,
     selectedIntegration,
 }: AddToTimelineDialogProps) {
     const isAdobe = selectedIntegration === "premiere" || selectedIntegration === "aftereffects"
     const { t } = useTranslation()
-    const { speakers, updateSpeakers, currentTranscriptFilename } = useTranscript()
+    const { speakers, updateSpeakers, currentSubtitleDocumentFilename } = useSubtitleDocument()
     const { updateSetting } = useSettings()
     const {
         presets,
@@ -106,6 +115,7 @@ export function AddToTimelineDialog({
     }))
     const [localSpeakers, setLocalSpeakers] = React.useState<Speaker[]>(speakers)
     const [isSubmitting, setIsSubmitting] = React.useState(false)
+    const [templateLoadError, setTemplateLoadError] = React.useState<string | null>(null)
     const [createSession, setCreateSession] = React.useState<CreateSession>({ kind: "closed" })
     const [conflictInfo, setConflictInfo] = React.useState<ConflictInfo | null>(null)
 
@@ -157,17 +167,31 @@ export function AddToTimelineDialog({
         setLocalSpeakers(initializedSpeakers)
         setCreateSession({ kind: "closed" })
         setConflictInfo(null)
+        setTemplateLoadError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open])
 
+    React.useEffect(() => {
+        if (!open || isAdobe || templatesLoaded || templatesLoading || !onLoadTemplates) return
+        let cancelled = false
+        setTemplateLoadError(null)
+        onLoadTemplates().catch((err) => {
+            if (cancelled) return
+            const message = err instanceof Error ? err.message : String(err)
+            setTemplateLoadError(message)
+        })
+        return () => { cancelled = true }
+    }, [open, isAdobe, templatesLoaded, templatesLoading, onLoadTemplates])
+
+
     // Check for track conflicts whenever the selected output track changes.
     React.useEffect(() => {
-        if (!open || !currentTranscriptFilename || !selection.outputTrack) {
+        if (!open || !currentSubtitleDocumentFilename || !selection.outputTrack) {
             setConflictInfo(null)
             return
         }
         let cancelled = false
-        checkTrackConflicts(currentTranscriptFilename, selection.outputTrack)
+        checkTrackConflicts(currentSubtitleDocumentFilename, selection.outputTrack)
             .then((info) => {
                 if (!cancelled) setConflictInfo(info)
             })
@@ -176,7 +200,7 @@ export function AddToTimelineDialog({
                 if (!cancelled) setConflictInfo(null)
             })
         return () => { cancelled = true }
-    }, [open, selection.outputTrack, currentTranscriptFilename])
+    }, [open, selection.outputTrack, currentSubtitleDocumentFilename])
 
     // Intercept close while a preset-edit session is active so the temporary
     // track is always torn down. We explicitly cancel here rather than relying
@@ -255,7 +279,7 @@ export function AddToTimelineDialog({
         if (selection.mode === "animated") {
             updateSetting("presetId", selection.presetId)
         } else {
-            const matched = timelineInfo.templates.find(
+            const matched = templates.find(
                 (tpl) => tpl.value === selection.templateValue,
             )
             if (matched) updateSetting("selectedTemplate", matched)
@@ -294,7 +318,7 @@ export function AddToTimelineDialog({
         createSession.kind === "edit" ? getPreset(createSession.presetId) : undefined
 
     // Check if the AutoSubs Caption template is available in Resolve
-    const hasAnimatedTemplate = timelineInfo.templates.some(
+    const hasAnimatedTemplate = templates.some(
         (t) => t.value === ANIMATED_CAPTION_TEMPLATE,
     )
 
@@ -341,7 +365,21 @@ export function AddToTimelineDialog({
                             onTemplateChange={(value) =>
                                 setSelection((s) => ({ ...s, templateValue: value }))
                             }
-                            templates={timelineInfo.templates}
+                            templates={templates}
+                            templatesLoading={templatesLoading}
+                            templatesLoaded={templatesLoaded}
+                            templateLoadError={templateLoadError}
+                            onRetryLoadTemplates={async () => {
+                                if (!onLoadTemplates) return []
+                                setTemplateLoadError(null)
+                                try {
+                                    return await onLoadTemplates()
+                                } catch (err) {
+                                    const message = err instanceof Error ? err.message : String(err)
+                                    setTemplateLoadError(message)
+                                    throw err
+                                }
+                            }}
                             presetId={selection.presetId}
                             onPresetChange={(id) =>
                                 setSelection((s) => ({ ...s, presetId: id, mode: "animated" }))
@@ -518,6 +556,10 @@ interface TemplateStepProps {
     templateValue: string
     onTemplateChange: (value: string) => void
     templates: TimelineInfo["templates"]
+    templatesLoading: boolean
+    templatesLoaded: boolean
+    templateLoadError: string | null
+    onRetryLoadTemplates?: () => Promise<Template[]>
     presetId: string
     onPresetChange: (id: string) => void
     animatedPresets: ReturnType<typeof usePresets>["presets"]
@@ -542,6 +584,10 @@ function TemplateStep({
     templateValue,
     onTemplateChange,
     templates,
+    templatesLoading,
+    templatesLoaded,
+    templateLoadError,
+    onRetryLoadTemplates,
     presetId,
     onPresetChange,
     animatedPresets,
@@ -563,10 +609,10 @@ function TemplateStep({
 
     // If animated mode is selected but the template is not available, switch to regular mode
     React.useEffect(() => {
-        if (mode === "animated" && !hasAnimatedTemplate) {
+        if (templatesLoaded && mode === "animated" && !hasAnimatedTemplate) {
             onModeChange("regular")
         }
-    }, [mode, hasAnimatedTemplate, onModeChange])
+    }, [templatesLoaded, mode, hasAnimatedTemplate, onModeChange])
     if (createSession.kind !== "closed") {
         return (
             <CreatePresetFlow
@@ -594,7 +640,27 @@ function TemplateStep({
             <TabsContent value="regular" className="space-y-3">
                 <ScrollArea className="h-[240px] rounded-md border">
                     <div className="p-2 space-y-1">
-                        {templates.filter(t => t.value !== ANIMATED_CAPTION_TEMPLATE).map((template) => (
+                        {templatesLoading && (
+                            <div className="h-[220px] flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Loading templates...</span>
+                            </div>
+                        )}
+                        {!templatesLoading && templateLoadError && (
+                            <div className="h-[220px] flex flex-col items-center justify-center gap-3 text-center text-sm">
+                                <AlertTriangle className="h-5 w-5 text-destructive" />
+                                <div className="space-y-1">
+                                    <p className="font-medium">Could not load templates</p>
+                                    <p className="text-muted-foreground">{templateLoadError}</p>
+                                </div>
+                                {onRetryLoadTemplates && (
+                                    <Button type="button" variant="outline" size="sm" onClick={() => onRetryLoadTemplates()}>
+                                        Retry
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                        {!templatesLoading && !templateLoadError && templatesLoaded && templates.filter(t => t.value !== ANIMATED_CAPTION_TEMPLATE).map((template) => (
                             <button
                                 key={template.value}
                                 type="button"
@@ -612,6 +678,11 @@ function TemplateStep({
                                 </div>
                             </button>
                         ))}
+                        {!templatesLoading && !templateLoadError && templatesLoaded && templates.filter(t => t.value !== ANIMATED_CAPTION_TEMPLATE).length === 0 && (
+                            <div className="h-[220px] flex items-center justify-center text-sm text-muted-foreground">
+                                No regular templates found.
+                            </div>
+                        )}
                     </div>
                 </ScrollArea>
             </TabsContent>

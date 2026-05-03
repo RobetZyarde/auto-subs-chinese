@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { toast } from 'sonner';
 import { TimelineInfo } from '@/types';
 import { requestSequenceInfo, requestAudioExport, requestImportSRT, requestJumpToTime } from '@/api/adobe-api';
-import { getAudioExportDir, getTranscriptPath, loadTranscriptSubtitles } from '@/utils/file-utils';
+import { getAudioExportDir, getSubtitleDocumentPath, loadSubtitleDocumentSubtitles } from '@/utils/file-utils';
 import { generateSrt } from '@/utils/srt-utils';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -20,7 +20,8 @@ interface AdobeContextType {
   exportProgress: number;
   refresh: () => Promise<void>;
   pushToTimeline: (filename?: string) => Promise<void>;
-  getSourceAudio: (isStandaloneMode: boolean, fileInput: string | null, inputTracks: string[]) => Promise<{ path: string, offset: number } | null>;
+  getSourceAudio: (audioInputMode: "file" | "timeline", fileInput: string | null, inputTracks: string[]) => Promise<{ path: string, offset: number } | null>;
+
   jumpToTime: (seconds: number) => Promise<void>;
 }
 
@@ -177,8 +178,8 @@ export function AdobeProvider({ children }: { children: React.ReactNode }) {
   async function pushToTimeline(filename?: string) {
     if (!filename || !selectedIntegration) return;
     try {
-      const filePath = await getTranscriptPath(filename);
-      const subtitles = await loadTranscriptSubtitles(filename);
+      const filePath = await getSubtitleDocumentPath(filename);
+      const subtitles = await loadSubtitleDocumentSubtitles(filename);
       const srtPath = filePath.replace(/\.json$/, '.srt');
       const srtData = generateSrt(subtitles);
       await writeTextFile(srtPath, srtData);
@@ -198,8 +199,9 @@ export function AdobeProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function getSourceAudio(isStandaloneMode: boolean, fileInput: string | null, inputTracks: string[]): Promise<{ path: string, offset: number } | null> {
-    if (isStandaloneMode || !isConnected || !selectedIntegration) return { path: fileInput || "", offset: 0 };
+  async function getSourceAudio(audioInputMode: "file" | "timeline", fileInput: string | null, inputTracks: string[]): Promise<{ path: string, offset: number } | null> {
+    if (audioInputMode === "file" || !isConnected || !selectedIntegration) return { path: fileInput || "", offset: 0 };
+
     setIsExporting(true);
     setExportProgress(10);
     try {

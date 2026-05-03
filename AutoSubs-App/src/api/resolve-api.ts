@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import { getTranscriptPath, getAudioExportDir } from '@/utils/file-utils';
-import { Speaker } from '@/types';
+import { getSubtitleDocumentPath, getAudioExportDir } from '@/utils/file-utils';
+import { Speaker, Template } from '@/types';
 
 /**
  * Error thrown when the AutoSubs Lua server (inside Resolve) reports a failure
@@ -80,12 +80,13 @@ async function callResolve(
   }
 }
 
-export async function exportAudio(inputTracks: Array<string>) {
+export async function exportAudio(inputTracks: Array<string>, exportRange: 'entire' | 'inout' = 'entire') {
   const outputDir = await getAudioExportDir();
   const data = await callResolve({
     func: 'ExportAudio',
     outputDir,
     inputTracks,
+    exportRange,
   });
 
   // Surface any Resolve-side error with underlying detail so the frontend
@@ -113,7 +114,16 @@ export async function getTimelineInfo() {
   if (!data.timelineId) {
     throw new Error('No timeline detected in Resolve.');
   }
-  return data;
+  return {
+    ...data,
+    templates: [],
+  };
+}
+
+export async function getTemplates(): Promise<Template[]> {
+  const data = await callResolve({ func: 'GetTemplates' });
+  throwIfError(data, 'GetTemplates');
+  return Array.isArray(data) ? data : [];
 }
 
 export interface ConflictInfo {
@@ -158,7 +168,7 @@ export async function checkTrackConflicts(
   filename: string,
   outputTrack: string,
 ): Promise<ConflictInfo> {
-  const filePath = await getTranscriptPath(filename);
+  const filePath = await getSubtitleDocumentPath(filename);
   return callResolve({
     func: 'CheckTrackConflicts',
     filePath,
@@ -173,7 +183,7 @@ export async function addSubtitlesToTimeline(
   conflictMode: ConflictMode = null,
   presetSettings?: Record<string, unknown>,
 ): Promise<AddSubtitlesResult> {
-  const filePath = await getTranscriptPath(filename);
+  const filePath = await getSubtitleDocumentPath(filename);
   const data = await callResolve({
     func: 'AddSubtitles',
     filePath,

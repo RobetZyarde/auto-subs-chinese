@@ -13,9 +13,17 @@
 
 use std::time::Duration;
 
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 
 const RESOLVE_ENDPOINT: &str = "http://127.0.0.1:56002/";
+
+static RESOLVE_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
+    reqwest::Client::builder()
+        .connection_verbose(false)
+        .build()
+        .expect("failed to build Resolve HTTP client")
+});
 
 #[derive(Debug, Deserialize)]
 pub struct ResolveBridgeArgs {
@@ -35,16 +43,9 @@ pub struct ResolveBridgeArgs {
 pub async fn resolve_bridge(args: ResolveBridgeArgs) -> Result<String, String> {
     let timeout = Duration::from_secs(args.timeout_secs.unwrap_or(180));
 
-    // One-shot client so we never hold a connection open between calls (the
-    // Lua server closes the socket after each response anyway).
-    let client = reqwest::Client::builder()
-        .timeout(timeout)
-        .connection_verbose(false)
-        .build()
-        .map_err(|e| format!("failed to build HTTP client: {}", e))?;
-
-    let response = client
+    let response = RESOLVE_CLIENT
         .post(RESOLVE_ENDPOINT)
+        .timeout(timeout)
         .header("Content-Type", "application/json")
         .json(&args.payload)
         .send()

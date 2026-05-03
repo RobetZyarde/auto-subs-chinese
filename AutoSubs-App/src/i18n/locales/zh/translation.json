@@ -44,7 +44,9 @@
     "add": "添加",
     "done": "完成",
     "delete": "删除",
-    "generateSubtitles": "生成字幕"
+    "options": "选项",
+    "generateSubtitles": "生成字幕",
+    "open": "打开"
   },
   "update": {
     "restartResolveServer": {
@@ -115,6 +117,8 @@
       },
       "customCharsTitle": "最大字符数",
       "customCharsDescription": "每行字符数",
+      "formatButton": "格式",
+      "customPromptButton": "提示",
       "customPromptTitle": "词汇和上下文",
       "customPromptDescription": "帮助 Whisper 识别名称、品牌、术语、缩写和首选拼写。",
       "customPromptTermsTitle": "关键术语",
@@ -153,7 +157,7 @@
       "selectAll": "全选",
       "clearAll": "清除全部",
       "noneFound": "未找到音频轨道。",
-      "createTrack": "在当前时间线中创建音频轨道以开始转录。",
+      "createTrack": "未找到时间线",
       "selectMultiple": "点击选择多个轨道"
     },
     "fileDrop": {
@@ -377,7 +381,7 @@
     "translate": "正在翻译为 {{language}}",
     "processing": "正在处理",
     "export": "导出"
- },
+  },
   "subtitles": {
     "title": "字幕",
     "speakers": "说话人",
@@ -454,10 +458,20 @@
     "finish": "开始使用"
   },
   "titlebar": {
-    "transcripts": {
-      "searchPlaceholder": "搜索转录记录...",
-      "loading": "加载中...",
-      "empty": "未找到转录记录。"
+    "subtitleHistory": {
+      "empty": "未找到记录。",
+      "empty_title": "未找到记录",
+      "empty_detail": "生成字幕后，您的转录历史记录将显示在这里。",
+      "no_results": "未找到结果",
+      "no_results_detail": "请尝试调整您的搜索条件。",
+      "delete_title": "删除记录？",
+      "delete_description": "这将永久删除历史记录中的转录内容。此操作无法撤消。",
+      "sections": {
+        "today": "今天",
+        "yesterday": "昨天",
+        "last_week": "过去7天",
+        "older": "更早"
+      }
     },
     "windowControls": {
       "minimize": "最小化",
@@ -554,11 +568,11 @@
       "emptyTitle": "还没有自定义预设",
       "emptyHint": "点击新建预设来设计您自己的预设，或从文件导入。",
       "phase": {
-        "launchingTitle": "正在 Resolve 中打开字幕\u2026",
+        "launchingTitle": "正在 Resolve 中打开字幕…",
         "launchingHint": "我们将在临时轨道上放置一个预览字幕。",
         "editingTitle": "切换到 DaVinci Resolve",
         "editingBody": "字幕已放置在新轨道上并在 Fusion 页面打开。使用检查器进行自定义，然后返回这里。",
-        "capturingTitle": "正在从 Resolve 读取设置\u2026",
+        "capturingTitle": "正在从 Resolve 读取设置…",
         "nameTitle": "为您的预设命名",
         "nameHint": "给它一个简短且描述性的名称。"
       },
@@ -577,7 +591,7 @@
       "confirmDelete": "此预设将从您的库中移除。内置预设不受影响。",
       "confirmDeleteConfirm": "删除",
       "importTitle": "粘贴预设 JSON",
-      "importPlaceholder": "在此处粘贴预设文件的内容\u2026",
+      "importPlaceholder": "在此处粘贴预设文件的内容…",
       "importSubmit": "导入预设",
       "errors": {
         "invalidJson": "这看起来不像是一个有效的预设文件。",

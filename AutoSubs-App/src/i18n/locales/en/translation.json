@@ -44,7 +44,9 @@
     "add": "Add",
     "done": "Done",
     "delete": "Delete",
-    "generateSubtitles": "Generate Subtitles"
+    "options": "Options",
+    "generateSubtitles": "Generate Subtitles",
+    "open": "Open"
   },
   "update": {
     "restartResolveServer": {
@@ -115,6 +117,8 @@
       },
       "customCharsTitle": "Max Characters",
       "customCharsDescription": "Characters per line",
+      "formatButton": "Format",
+      "customPromptButton": "Prompt",
       "customPromptTitle": "Vocabulary & Context",
       "customPromptDescription": "Helps Whisper recognize names, brands, jargon, acronyms, and preferred spellings.",
       "customPromptTermsTitle": "Key Terms",
@@ -153,7 +157,7 @@
       "selectAll": "Select All",
       "clearAll": "Clear All",
       "noneFound": "No audio tracks found.",
-      "createTrack": "Create an audio track in your current timeline to start transcribing.",
+      "createTrack": "No timeline found",
       "selectMultiple": "Click to select multiple tracks"
     },
     "fileDrop": {
@@ -221,7 +225,7 @@
     },
     "filters": {
       "weight": "Lightweight",
-      "accuracy": "Accuracy", 
+      "accuracy": "Accuracy",
       "recommended": "Recommended",
       "search": "Search",
       "clear": "Clear filter"
@@ -399,7 +403,7 @@
     "loading": "Loading subtitles...",
     "jumpToTimeline": "Jump to point on timeline",
     "unknownSpeaker": "Unknown Speaker",
-    "previousTranscripts": "Previous Transcripts",
+    "previousSubtitles": "Subtitle History",
     "empty": {
       "noSubtitlesFound": "No subtitles found",
       "tryDifferentSearch": "Try a different search term",
@@ -449,18 +453,30 @@
       "description": "Configure language, speaker identification, text formatting, then click Generate Subtitles to start."
     },
     "history": {
-      "title": "Previous Transcripts",
-      "description": "Access and search through all your past transcriptions here."
+      "title": "Subtitle History",
+      "description": "Access and search through your saved subtitle documents here."
     },
     "skip": "Skip tour",
     "next": "Next",
     "finish": "Get Started"
   },
   "titlebar": {
-    "transcripts": {
-      "searchPlaceholder": "Search transcripts...",
+    "subtitleHistory": {
+      "searchPlaceholder": "Search subtitle history...",
       "loading": "Loading...",
-      "empty": "No transcripts found."
+      "empty": "No subtitle documents found.",
+      "empty_title": "No subtitle documents found",
+      "empty_detail": "Your subtitle history will appear here once you generate subtitles.",
+      "no_results": "No results found",
+      "no_results_detail": "Try adjusting your search query.",
+      "delete_title": "Delete subtitle document?",
+      "delete_description": "This will permanently remove the subtitle document from your history. This action cannot be undone.",
+      "sections": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "last_week": "Last 7 Days",
+        "older": "Earlier"
+      }
     },
     "windowControls": {
       "minimize": "Minimize",
@@ -570,11 +586,11 @@
       "emptyTitle": "No custom presets yet",
       "emptyHint": "Click New preset to design your own, or import one from a file.",
       "phase": {
-        "launchingTitle": "Opening caption in Resolve\u2026",
-        "launchingHint": "We\u2019ll drop a preview caption on a temporary track.",
+        "launchingTitle": "Opening caption in Resolve…",
+        "launchingHint": "We’ll drop a preview caption on a temporary track.",
         "editingTitle": "Switch to DaVinci Resolve",
         "editingBody": "A caption has been placed on a new track and opened in the Fusion page. Customise it using the inspector, then come back here.",
-        "capturingTitle": "Reading settings from Resolve\u2026",
+        "capturingTitle": "Reading settings from Resolve…",
         "nameTitle": "Name your preset",
         "nameHint": "Give it something short and descriptive."
       },
@@ -593,12 +609,12 @@
       "confirmDelete": "This preset will be removed from your library. Built-in presets are not affected.",
       "confirmDeleteConfirm": "Delete",
       "importTitle": "Paste preset JSON",
-      "importPlaceholder": "Paste the contents of a preset file here\u2026",
+      "importPlaceholder": "Paste the contents of a preset file here…",
       "importSubmit": "Import preset",
       "errors": {
-        "invalidJson": "That doesn\u2019t look like a valid preset file.",
-        "startFailed": "Couldn\u2019t open the preset editor in Resolve.",
-        "captureFailed": "Couldn\u2019t read the caption settings from Resolve.",
+        "invalidJson": "That doesn’t look like a valid preset file.",
+        "startFailed": "Couldn’t open the preset editor in Resolve.",
+        "captureFailed": "Couldn’t read the caption settings from Resolve.",
         "nameRequired": "Please enter a name."
       }
     }

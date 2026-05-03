@@ -1,23 +1,41 @@
 // src/utils/fileUtils.ts
-import { join, documentDir, appLocalDataDir, videoDir } from '@tauri-apps/api/path';
-import { readDir, readTextFile, exists, writeTextFile, mkdir, stat, rename, copyFile, remove } from '@tauri-apps/plugin-fs';
-import { platform } from '@tauri-apps/plugin-os';
-import { Subtitle, Speaker } from '@/types';
+import {
+  join,
+  documentDir,
+  appLocalDataDir,
+  videoDir,
+} from "@tauri-apps/api/path";
+import {
+  readDir,
+  readTextFile,
+  exists,
+  writeTextFile,
+  mkdir,
+  stat,
+  rename,
+  copyFile,
+  remove,
+} from "@tauri-apps/plugin-fs";
+import { platform } from "@tauri-apps/plugin-os";
+import { Subtitle, Speaker } from "@/types";
 
-const TRANSCRIPT_INDEX_FILENAME = 'transcript-index.json';
+const TRANSCRIPT_INDEX_FILENAME = "transcript-index.json";
 
 function normalizeTranscriptText(text: string): string {
-  return text
-    .replace(/\s+/g, ' ')
-    .trim();
+  return text.replace(/\s+/g, " ").trim();
 }
 
-function resolveSpeakerLabel(speakerId: string, speakers: Speaker[], speakerIdBase: number): string {
+function resolveSpeakerLabel(
+  speakerId: string,
+  speakers: Speaker[],
+  speakerIdBase: number,
+): string {
   const numericSpeakerId = Number(speakerId);
   const speakerIndex = Number.isFinite(numericSpeakerId)
     ? numericSpeakerId - speakerIdBase
     : -1;
-  const speakerName = speakerIndex >= 0 ? speakers[speakerIndex]?.name?.trim() : '';
+  const speakerName =
+    speakerIndex >= 0 ? speakers[speakerIndex]?.name?.trim() : "";
 
   if (speakerName) {
     return speakerName;
@@ -30,40 +48,49 @@ function resolveSpeakerLabel(speakerId: string, speakers: Speaker[], speakerIdBa
   return `Speaker ${speakerId}`;
 }
 
-export function generateTranscriptTxt(subtitles: Subtitle[], speakers: Speaker[] = []): string {
+export function generateTranscriptTxt(
+  subtitles: Subtitle[],
+  speakers: Speaker[] = [],
+): string {
   if (!Array.isArray(subtitles) || subtitles.length === 0) {
-    return '';
+    return "";
   }
 
   const normalizedSubtitles = subtitles
     .map((subtitle) => ({
       ...subtitle,
-      text: normalizeTranscriptText(subtitle.text ?? ''),
+      text: normalizeTranscriptText(subtitle.text ?? ""),
       speaker_id: subtitle.speaker_id?.trim() || undefined,
     }))
     .filter((subtitle) => subtitle.text.length > 0);
 
   if (normalizedSubtitles.length === 0) {
-    return '';
+    return "";
   }
 
-  const hasSpeakers = normalizedSubtitles.some((subtitle) => subtitle.speaker_id);
+  const hasSpeakers = normalizedSubtitles.some(
+    (subtitle) => subtitle.speaker_id,
+  );
 
   if (!hasSpeakers) {
     return normalizedSubtitles
       .map((subtitle) => subtitle.text)
-      .join(' ')
-      .replace(/\s+/g, ' ')
+      .join(" ")
+      .replace(/\s+/g, " ")
       .trim();
   }
 
-  const speakerIdBase = normalizedSubtitles.some((subtitle) => subtitle.speaker_id === '0') ? 0 : 1;
+  const speakerIdBase = normalizedSubtitles.some(
+    (subtitle) => subtitle.speaker_id === "0",
+  )
+    ? 0
+    : 1;
   const groupedBlocks: Array<{ speakerLabel: string; text: string }> = [];
 
   for (const subtitle of normalizedSubtitles) {
     const speakerLabel = subtitle.speaker_id
       ? resolveSpeakerLabel(subtitle.speaker_id, speakers, speakerIdBase)
-      : 'Transcript';
+      : "Transcript";
     const previousBlock = groupedBlocks[groupedBlocks.length - 1];
 
     if (previousBlock && previousBlock.speakerLabel === speakerLabel) {
@@ -79,12 +106,12 @@ export function generateTranscriptTxt(subtitles: Subtitle[], speakers: Speaker[]
 
   return groupedBlocks
     .map((block) => `${block.speakerLabel}:\n${block.text}`)
-    .join('\n\n');
+    .join("\n\n");
 }
 
 export interface TranscriptMetadata {
   transcriptId: string;
-  sourceType: 'standalone' | 'resolve' | 'unknown';
+  sourceType: "standalone" | "resolve" | "unknown";
   displayName: string;
   createdAt: string;
   timelineId?: string;
@@ -101,7 +128,7 @@ interface TranscriptIndexItem {
   createdAt?: string;
 }
 
-export interface StoredTranscript {
+export interface StoredSubtitleDocument {
   filename: string;
   createdAt: string;
   processingTime?: number;
@@ -113,14 +140,14 @@ export interface StoredTranscript {
   transcriptId?: string;
   timelineId?: string;
   timelineName?: string;
-  sourceType?: TranscriptMetadata['sourceType'];
+  sourceType?: TranscriptMetadata["sourceType"];
   sourceFilePath?: string;
   sourceFileName?: string;
   mark_in?: number;
   mark_out?: number;
 }
 
-export interface TranscriptListItem {
+export interface SubtitleDocumentListItem {
   filename: string;
   displayName: string;
   createdAt: Date;
@@ -131,48 +158,58 @@ export interface TranscriptListItem {
   markOut?: number;
 }
 
-export interface GenerateTranscriptFilenameOptions {
+export interface GenerateSubtitleDocumentFilenameOptions {
   isStandaloneMode: boolean;
   selectedFile: string | null;
   timelineId?: string;
   timelineName?: string;
 }
 
-export interface SaveTranscriptOptions {
+export interface SaveSubtitleDocumentOptions {
   // Content formatting (case, punctuation, censoring) is applied by the Rust backend
   // during transcription / reformat, so no per-save options are needed.
   metadata?: Partial<TranscriptMetadata>;
 }
 
 function stripExtension(fileName: string): string {
-  return fileName.replace(/\.[^/.\\]+$/, '');
+  return fileName.replace(/\.[^/.\\]+$/, "");
 }
 
 function getFileName(filePath: string | null | undefined): string {
-  if (!filePath) return 'unknown';
-  return filePath.split(/[/\\]/).pop() || 'unknown';
+  if (!filePath) return "unknown";
+  return filePath.split(/[/\\]/).pop() || "unknown";
 }
 
 function sanitizeFilenamePart(value: string): string {
-  return value
-    .normalize('NFKD')
-    .replace(/[^a-zA-Z0-9\s-_]/g, '')
-    .trim()
-    .replace(/[\s_]+/g, '-')
-    .replace(/-+/g, '-')
-    .toLowerCase()
-    .slice(0, 60) || 'transcript';
+  return (
+    value
+      .normalize("NFKD")
+      .replace(/[^a-zA-Z0-9\s-_]/g, "")
+      .trim()
+      .replace(/[\s_]+/g, "-")
+      .replace(/-+/g, "-")
+      .toLowerCase()
+      .slice(0, 60) || "transcript"
+  );
 }
 
 function createTranscriptId(): string {
-  const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-  const randomPart = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID().split('-')[0]
-    : Math.random().toString(36).slice(2, 10);
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:.TZ]/g, "")
+    .slice(0, 14);
+  const randomPart =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID().split("-")[0]
+      : Math.random().toString(36).slice(2, 10);
   return `tr_${timestamp}_${randomPart}`;
 }
 
-function inferDisplayName(isStandaloneMode: boolean, selectedFile: string | null, timelineName?: string): string {
+function inferDisplayName(
+  isStandaloneMode: boolean,
+  selectedFile: string | null,
+  timelineName?: string,
+): string {
   if (isStandaloneMode && selectedFile) {
     return stripExtension(getFileName(selectedFile));
   }
@@ -181,7 +218,7 @@ function inferDisplayName(isStandaloneMode: boolean, selectedFile: string | null
     return timelineName.trim();
   }
 
-  return 'transcript';
+  return "transcript";
 }
 
 function buildMetadata(
@@ -189,32 +226,51 @@ function buildMetadata(
   filename: string,
   overrides: Partial<TranscriptMetadata> | undefined,
 ): TranscriptMetadata {
-  const transcriptId = overrides?.transcriptId || filename.replace(/\.json$/, '').split('__').pop() || createTranscriptId();
-  const createdAt = overrides?.createdAt || transcript.createdAt || new Date().toISOString();
-  const sourceType = overrides?.sourceType || transcript.sourceType || 'unknown';
-  const displayName = overrides?.displayName
-    || transcript.timelineName
-    || transcript.timeline_name
-    || transcript.sourceFileName
-    || transcript.source_file_name
-    || stripExtension(filename.replace(/\.json$/, ''));
+  const transcriptId =
+    overrides?.transcriptId ||
+    filename
+      .replace(/\.json$/, "")
+      .split("__")
+      .pop() ||
+    createTranscriptId();
+  const createdAt =
+    overrides?.createdAt || transcript.createdAt || new Date().toISOString();
+  const sourceType =
+    overrides?.sourceType || transcript.sourceType || "unknown";
+  const displayName =
+    overrides?.displayName ||
+    transcript.timelineName ||
+    transcript.timeline_name ||
+    transcript.sourceFileName ||
+    transcript.source_file_name ||
+    stripExtension(filename.replace(/\.json$/, ""));
 
   return {
     transcriptId,
     sourceType,
     displayName,
     createdAt,
-    timelineId: overrides?.timelineId ?? transcript.timelineId ?? transcript.timeline_id,
-    timelineName: overrides?.timelineName ?? transcript.timelineName ?? transcript.timeline_name,
-    sourceFilePath: overrides?.sourceFilePath ?? transcript.sourceFilePath ?? transcript.source_file_path,
-    sourceFileName: overrides?.sourceFileName ?? transcript.sourceFileName ?? transcript.source_file_name,
+    timelineId:
+      overrides?.timelineId ?? transcript.timelineId ?? transcript.timeline_id,
+    timelineName:
+      overrides?.timelineName ??
+      transcript.timelineName ??
+      transcript.timeline_name,
+    sourceFilePath:
+      overrides?.sourceFilePath ??
+      transcript.sourceFilePath ??
+      transcript.source_file_path,
+    sourceFileName:
+      overrides?.sourceFileName ??
+      transcript.sourceFileName ??
+      transcript.source_file_name,
     markIn: overrides?.markIn ?? transcript.mark_in,
     markOut: overrides?.markOut ?? transcript.mark_out,
   };
 }
 
 function parseValidDate(value: unknown): Date | null {
-  if (typeof value !== 'string' || value.trim().length === 0) {
+  if (typeof value !== "string" || value.trim().length === 0) {
     return null;
   }
 
@@ -222,13 +278,13 @@ function parseValidDate(value: unknown): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-async function getTranscriptIndexPath(): Promise<string> {
-  const dir = await getTranscriptsDir();
+async function getSubtitleDocumentIndexPath(): Promise<string> {
+  const dir = await getSubtitleDocumentsDir();
   return await join(dir, TRANSCRIPT_INDEX_FILENAME);
 }
 
-async function readTranscriptIndex(): Promise<TranscriptIndexItem[]> {
-  const indexPath = await getTranscriptIndexPath();
+async function readSubtitleDocumentIndex(): Promise<TranscriptIndexItem[]> {
+  const indexPath = await getSubtitleDocumentIndexPath();
   if (!(await exists(indexPath))) {
     return [];
   }
@@ -238,18 +294,23 @@ async function readTranscriptIndex(): Promise<TranscriptIndexItem[]> {
     const parsed = JSON.parse(contents);
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
-    console.error('Failed to read transcript index:', error);
+    console.error("Failed to read transcript index:", error);
     return [];
   }
 }
 
-async function writeTranscriptIndex(items: TranscriptIndexItem[]): Promise<void> {
-  const indexPath = await getTranscriptIndexPath();
+async function writeSubtitleDocumentIndex(
+  items: TranscriptIndexItem[],
+): Promise<void> {
+  const indexPath = await getSubtitleDocumentIndexPath();
   await writeTextFile(indexPath, JSON.stringify(items, null, 2));
 }
 
-async function upsertTranscriptIndexItem(filename: string, metadata: TranscriptMetadata): Promise<void> {
-  const items = await readTranscriptIndex();
+async function upsertSubtitleDocumentIndexItem(
+  filename: string,
+  metadata: TranscriptMetadata,
+): Promise<void> {
+  const items = await readSubtitleDocumentIndex();
   const nextItem: TranscriptIndexItem = {
     filename,
     metadata,
@@ -263,17 +324,21 @@ async function upsertTranscriptIndexItem(filename: string, metadata: TranscriptM
     items.push(nextItem);
   }
 
-  await writeTranscriptIndex(items);
+  await writeSubtitleDocumentIndex(items);
 }
 
-async function ensureTranscriptIndexItem(filename: string): Promise<TranscriptIndexItem | null> {
-  const items = await readTranscriptIndex();
+async function ensureSubtitleDocumentIndexItem(
+  filename: string,
+): Promise<TranscriptIndexItem | null> {
+  const items = await readSubtitleDocumentIndex();
   const existingItem = items.find((item) => item.filename === filename);
   if (existingItem) {
     return existingItem;
   }
 
-  const transcript = await readTranscript(filename) as StoredTranscript | null;
+  const transcript = (await readSubtitleDocument(
+    filename,
+  )) as StoredSubtitleDocument | null;
   if (!transcript) {
     return null;
   }
@@ -286,11 +351,22 @@ async function ensureTranscriptIndexItem(filename: string): Promise<TranscriptIn
   };
 
   items.push(nextItem);
-  await writeTranscriptIndex(items);
+  await writeSubtitleDocumentIndex(items);
   return nextItem;
 }
 
-function getLegacyTranscriptFilename(isStandaloneMode: boolean, selectedFile: string | null, timelineId?: string): string | null {
+async function removeSubtitleDocumentIndexItem(filename: string): Promise<void> {
+  const items = await readSubtitleDocumentIndex();
+  await writeSubtitleDocumentIndex(
+    items.filter((item) => item.filename !== filename),
+  );
+}
+
+function getLegacyTranscriptFilename(
+  isStandaloneMode: boolean,
+  selectedFile: string | null,
+  timelineId?: string,
+): string | null {
   if (isStandaloneMode && selectedFile) {
     return `${stripExtension(getFileName(selectedFile))}.json`;
   }
@@ -324,12 +400,12 @@ async function migrateLegacyTranscriptsOnce(newDir: string): Promise<void> {
       try {
         entries = await readDir(legacyDir);
       } catch (err) {
-        console.warn('Could not read legacy transcripts directory:', err);
+        console.warn("Could not read legacy transcripts directory:", err);
         return;
       }
 
       const jsonEntries = entries.filter(
-        (e) => e.isFile && e.name && e.name.toLowerCase().endsWith('.json'),
+        (e) => e.isFile && e.name && e.name.toLowerCase().endsWith(".json"),
       );
       if (jsonEntries.length === 0) return;
 
@@ -368,10 +444,10 @@ async function migrateLegacyTranscriptsOnce(newDir: string): Promise<void> {
         await remove(legacyDir, { recursive: true });
         console.log(`Removed legacy transcripts directory: ${legacyDir}`);
       } catch (err) {
-        console.warn('Failed to remove legacy transcripts directory:', err);
+        console.warn("Failed to remove legacy transcripts directory:", err);
       }
     } catch (err) {
-      console.error('Transcript migration failed:', err);
+      console.error("Transcript migration failed:", err);
     }
   })();
 
@@ -383,17 +459,17 @@ async function migrateLegacyTranscriptsOnce(newDir: string): Promise<void> {
 // ~/Library/Application Support/<bundle-id>/Transcripts). This keeps
 // user-generated data out of Documents and avoids cloud-sync surprises
 // (OneDrive/iCloud), while surviving app updates.
-export async function getTranscriptsDir(): Promise<string> {
+export async function getSubtitleDocumentsDir(): Promise<string> {
   const dir = await join(await appLocalDataDir(), "Transcripts");
 
   // Ensure the directory exists
   try {
     if (!(await exists(dir))) {
       await mkdir(dir, { recursive: true });
-      console.log('Created transcripts directory:', dir);
+      console.log("Created transcripts directory:", dir);
     }
   } catch (error) {
-    console.error('Failed to create transcripts directory:', error);
+    console.error("Failed to create transcripts directory:", error);
     throw new Error(`Failed to create transcripts directory: ${error}`);
   }
 
@@ -408,31 +484,31 @@ export async function getAudioExportDir(): Promise<string> {
   // Storage locations. ~/Videos is registered by default, so use it there.
   // Other platforms keep using appLocalDataDir.
   const dir =
-    platform() === 'linux'
-      ? await join(await videoDir(), 'AutoSubs')
-      : await join(await appLocalDataDir(), 'Audio');
+    platform() === "linux"
+      ? await join(await videoDir(), "AutoSubs")
+      : await join(await appLocalDataDir(), "Audio");
 
   // Ensure the directory exists
   try {
     if (!(await exists(dir))) {
       await mkdir(dir, { recursive: true });
-      console.log('Created audio export directory:', dir);
+      console.log("Created audio export directory:", dir);
     }
   } catch (error) {
-    console.error('Failed to create audio export directory:', error);
+    console.error("Failed to create audio export directory:", error);
     throw new Error(`Failed to create audio export directory: ${error}`);
   }
 
   return dir;
 }
 
-export async function getTranscriptPath(filename: string): Promise<string> {
-  const dir = await getTranscriptsDir();
+export async function getSubtitleDocumentPath(filename: string): Promise<string> {
+  const dir = await getSubtitleDocumentsDir();
   return await join(dir, filename);
 }
 
-export async function readTranscript(filename: string): Promise<any | null> {
-  const filePath = await getTranscriptPath(filename);
+export async function readSubtitleDocument(filename: string): Promise<any | null> {
+  const filePath = await getSubtitleDocumentPath(filename);
   console.log("Reading transcript from:", filePath);
   if (!(await exists(filePath))) {
     console.log("Transcript file not found.");
@@ -442,61 +518,76 @@ export async function readTranscript(filename: string): Promise<any | null> {
   return JSON.parse(contents);
 }
 
-export function generateTranscriptFilename(
-  isStandaloneModeOrOptions: boolean | GenerateTranscriptFilenameOptions,
+export function generateSubtitleDocumentFilename(
+  isStandaloneModeOrOptions: boolean | GenerateSubtitleDocumentFilenameOptions,
   selectedFile?: string | null,
   timelineId?: string,
   timelineName?: string,
 ): string {
-  const options = typeof isStandaloneModeOrOptions === 'object'
-    ? isStandaloneModeOrOptions
-    : {
-        isStandaloneMode: isStandaloneModeOrOptions,
-        selectedFile: selectedFile ?? null,
-        timelineId,
-        timelineName,
-      };
+  const options =
+    typeof isStandaloneModeOrOptions === "object"
+      ? isStandaloneModeOrOptions
+      : {
+          isStandaloneMode: isStandaloneModeOrOptions,
+          selectedFile: selectedFile ?? null,
+          timelineId,
+          timelineName,
+        };
 
-  const displayName = inferDisplayName(options.isStandaloneMode, options.selectedFile, options.timelineName);
+  const displayName = inferDisplayName(
+    options.isStandaloneMode,
+    options.selectedFile,
+    options.timelineName,
+  );
   const safeDisplayName = sanitizeFilenamePart(displayName);
   return `${safeDisplayName}__${createTranscriptId()}.json`;
 }
 
-export async function listTranscriptFiles(): Promise<TranscriptListItem[]> {
-  const transcriptsDir = await getTranscriptsDir();
+export async function listSubtitleDocuments(): Promise<SubtitleDocumentListItem[]> {
+  const transcriptsDir = await getSubtitleDocumentsDir();
   const entries = await readDir(transcriptsDir);
 
-  const transcriptFiles: Array<TranscriptListItem | null> = await Promise.all(
+  const transcriptFiles: Array<SubtitleDocumentListItem | null> = await Promise.all(
     entries
-      .filter((entry) => entry.name.endsWith('.json') && entry.name !== TRANSCRIPT_INDEX_FILENAME)
+      .filter(
+        (entry) =>
+          entry.name.endsWith(".json") &&
+          entry.name !== TRANSCRIPT_INDEX_FILENAME,
+      )
       .map(async (entry) => {
         try {
-          const filePath = await getTranscriptPath(entry.name);
+          const filePath = await getSubtitleDocumentPath(entry.name);
           const fileStats = await stat(filePath);
-          const indexItem = await ensureTranscriptIndexItem(entry.name);
+          const indexItem = await ensureSubtitleDocumentIndexItem(entry.name);
           const metadata = indexItem?.metadata
             ? buildMetadata(indexItem, entry.name, indexItem.metadata)
             : undefined;
-          const createdAt = (fileStats.mtime ? new Date(fileStats.mtime) : null)
-            || parseValidDate(indexItem?.metadata?.createdAt)
-            || parseValidDate(indexItem?.createdAt)
-            || new Date(0);
+          const createdAt =
+            (fileStats.mtime ? new Date(fileStats.mtime) : null) ||
+            parseValidDate(indexItem?.metadata?.createdAt) ||
+            parseValidDate(indexItem?.createdAt) ||
+            new Date(0);
 
           return {
             filename: entry.name,
-            displayName: metadata?.displayName?.trim() || stripExtension(entry.name),
+            displayName:
+              metadata?.displayName?.trim() || stripExtension(entry.name),
             createdAt,
             transcriptId: metadata?.transcriptId,
             timelineId: metadata?.timelineId,
             timelineName: metadata?.timelineName,
             markIn: metadata?.markIn,
             markOut: metadata?.markOut,
-          } satisfies TranscriptListItem;
+          } satisfies SubtitleDocumentListItem;
         } catch (error) {
-          console.error('Failed to parse transcript metadata for:', entry.name, error);
+          console.error(
+            "Failed to parse transcript metadata for:",
+            entry.name,
+            error,
+          );
           return null;
         }
-      })
+      }),
   );
 
   return transcriptFiles
@@ -504,16 +595,53 @@ export async function listTranscriptFiles(): Promise<TranscriptListItem[]> {
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
-export async function resolveTranscriptFilename(
+export async function listSubtitleDocumentIndex(): Promise<
+  SubtitleDocumentListItem[]
+> {
+  const items = await readSubtitleDocumentIndex();
+
+  return items
+    .map((item) => {
+      if (!item.filename || item.filename === TRANSCRIPT_INDEX_FILENAME) {
+        return null;
+      }
+
+      const metadata = item.metadata
+        ? buildMetadata(item, item.filename, item.metadata)
+        : undefined;
+      const createdAt =
+        parseValidDate(metadata?.createdAt) ||
+        parseValidDate(item.createdAt) ||
+        new Date(0);
+
+      return {
+        filename: item.filename,
+        displayName:
+          metadata?.displayName?.trim() || stripExtension(item.filename),
+        createdAt,
+        transcriptId: metadata?.transcriptId,
+        timelineId: metadata?.timelineId,
+        timelineName: metadata?.timelineName,
+        markIn: metadata?.markIn,
+        markOut: metadata?.markOut,
+      } satisfies SubtitleDocumentListItem;
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export async function resolveSubtitleDocumentFilename(
   isStandaloneMode: boolean,
   selectedFile: string | null,
   timelineId?: string,
 ): Promise<string | null> {
-  const transcripts = await listTranscriptFiles();
+  const transcripts = await listSubtitleDocuments();
 
   const matchingTranscript = transcripts.find((transcript) => {
     if (isStandaloneMode && selectedFile) {
-      return transcript.displayName === stripExtension(getFileName(selectedFile));
+      return (
+        transcript.displayName === stripExtension(getFileName(selectedFile))
+      );
     }
 
     if (!isStandaloneMode && timelineId) {
@@ -527,12 +655,16 @@ export async function resolveTranscriptFilename(
     return matchingTranscript.filename;
   }
 
-  const legacyFilename = getLegacyTranscriptFilename(isStandaloneMode, selectedFile, timelineId);
+  const legacyFilename = getLegacyTranscriptFilename(
+    isStandaloneMode,
+    selectedFile,
+    timelineId,
+  );
   if (!legacyFilename) {
     return null;
   }
 
-  const legacyPath = await getTranscriptPath(legacyFilename);
+  const legacyPath = await getSubtitleDocumentPath(legacyFilename);
   return (await exists(legacyPath)) ? legacyFilename : null;
 }
 
@@ -541,42 +673,43 @@ function interpolateWordsFromText(text: string, start: number, end: number) {
   // Use match to preserve whitespace as part of each word
   const wordTexts = text.match(/(\s*\S+)/g) || [];
   const wordCount = wordTexts.length;
-  const segmentStart = typeof start === 'string' ? parseFloat(start) : start;
-  const segmentEnd = typeof end === 'string' ? parseFloat(end) : end;
+  const segmentStart = typeof start === "string" ? parseFloat(start) : start;
+  const segmentEnd = typeof end === "string" ? parseFloat(end) : end;
   const duration = segmentEnd - segmentStart;
   const wordDuration = wordCount > 0 ? duration / wordCount : 0;
   return wordTexts.map((word, idx) => ({
     word,
     start: (segmentStart + idx * wordDuration).toFixed(3),
     end: (segmentStart + (idx + 1) * wordDuration).toFixed(3),
-    line_number: 0
+    line_number: 0,
   }));
 }
 
 // Save a new transcript to JSON file.
 // Segments are assumed to already be structurally split by the Rust backend.
 // This function only applies content formatting (case, punctuation, censoring).
-export async function saveTranscript(
+export async function saveSubtitleDocument(
   transcript: any,
   filename: string,
-  options?: SaveTranscriptOptions
+  options?: SaveSubtitleDocumentOptions,
 ): Promise<{ segments: Subtitle[]; speakers: Speaker[] }> {
   try {
-    const storageDir = await getTranscriptsDir();
+    const storageDir = await getSubtitleDocumentsDir();
     const filePath = await join(storageDir, filename);
 
-    console.log('Saving transcript to:', filePath);
+    console.log("Saving transcript to:", filePath);
 
     // Normalize a single incoming Rust segment into a frontend `Subtitle`,
     // including per-word `line_number` assignment based on newlines in the
     // rendered text (Rust joins multi-line cues with '\n').
     const toSubtitle = (segment: any, index: number) => {
-      let words = segment.words && segment.words.length > 0
-        ? segment.words
-        : interpolateWordsFromText(segment.text, segment.start, segment.end);
+      let words =
+        segment.words && segment.words.length > 0
+          ? segment.words
+          : interpolateWordsFromText(segment.text, segment.start, segment.end);
 
-      const textStr: string = segment.text ?? '';
-      const lines = textStr.split('\n');
+      const textStr: string = segment.text ?? "";
+      const lines = textStr.split("\n");
       if (words && words.length > 0 && lines.length > 1) {
         let wordIdx = 0;
         for (let lineNum = 0; lineNum < lines.length; lineNum++) {
@@ -598,7 +731,7 @@ export async function saveTranscript(
         id: index,
         start: segment.start,
         end: segment.end,
-        text: (segment.text ?? '').trim(),
+        text: (segment.text ?? "").trim(),
         speaker_id: segment.speaker_id || undefined,
         words,
       };
@@ -610,17 +743,18 @@ export async function saveTranscript(
     //                      case/punctuation/censoring can be changed later without
     //                      re-transcribing.
     const segments: Subtitle[] = (transcript.segments ?? []).map(toSubtitle);
-    const rawIncomingOriginals: any[] = transcript.originalSegments
-      ?? transcript.original_segments
-      ?? transcript.segments
-      ?? [];
+    const rawIncomingOriginals: any[] =
+      transcript.originalSegments ??
+      transcript.original_segments ??
+      transcript.segments ??
+      [];
     const originalSegments: Subtitle[] = rawIncomingOriginals.map(toSubtitle);
 
     // Speakers are now aggregated in the Rust backend and included in the transcript
     const speakers: Speaker[] = transcript.speakers || [];
     const metadata = buildMetadata(transcript, filename, options?.metadata);
 
-    const transcriptData: StoredTranscript = {
+    const transcriptData: StoredSubtitleDocument = {
       filename,
       transcriptId: metadata.transcriptId,
       createdAt: metadata.createdAt,
@@ -641,18 +775,20 @@ export async function saveTranscript(
 
     // Save transcript to file
     await writeTextFile(filePath, JSON.stringify(transcriptData, null, 2));
-    await upsertTranscriptIndexItem(filename, metadata);
-    console.log('Successfully saved transcript to:', filePath);
+    await upsertSubtitleDocumentIndexItem(filename, metadata);
+    console.log("Successfully saved transcript to:", filePath);
     return { segments, speakers };
   } catch (error) {
-    console.error('Failed to save transcript:', error);
+    console.error("Failed to save transcript:", error);
     throw new Error(`Failed to save transcript: ${String(error)}`);
   }
 }
 
 // Load transcript and return subtitles
-export async function loadTranscriptSubtitles(filename: string): Promise<Subtitle[]> {
-  const storageDir = await getTranscriptsDir();
+export async function loadSubtitleDocumentSubtitles(
+  filename: string,
+): Promise<Subtitle[]> {
+  const storageDir = await getSubtitleDocumentsDir();
   const filePath = await join(storageDir, filename);
 
   if (!(await exists(filePath))) {
@@ -666,9 +802,9 @@ export async function loadTranscriptSubtitles(filename: string): Promise<Subtitl
 }
 
 // Update the transcript file for the specified timeline with new speakers or subtitles
-export async function updateTranscript(
+export async function updateSubtitleDocument(
   filename: string,
-  opts: { subtitles?: Subtitle[]; speakers?: Speaker[] }
+  opts: { subtitles?: Subtitle[]; speakers?: Speaker[] },
 ) {
   const { speakers, subtitles } = opts;
 
@@ -676,7 +812,7 @@ export async function updateTranscript(
   if (!speakers && !subtitles) return;
 
   // read current file
-  let transcript = await readTranscript(filename);
+  let transcript = await readSubtitleDocument(filename);
   if (!transcript) return;
 
   const metadata = buildMetadata(transcript, filename, transcript.metadata);
@@ -700,7 +836,29 @@ export async function updateTranscript(
   transcript.mark_out = metadata.markOut;
 
   // write to file
-  const filePath = await getTranscriptPath(filename);
+  const filePath = await getSubtitleDocumentPath(filename);
   await writeTextFile(filePath, JSON.stringify(transcript, null, 2));
-  await upsertTranscriptIndexItem(filename, metadata);
+  await upsertSubtitleDocumentIndexItem(filename, metadata);
+}
+
+/**
+ * Delete a transcript file and its entry in the index
+ */
+export async function deleteSubtitleDocument(filename: string): Promise<void> {
+  try {
+    const filePath = await getSubtitleDocumentPath(filename);
+
+    // 1. Remove from index first to ensure it doesn't show up if file deletion fails
+    await removeSubtitleDocumentIndexItem(filename);
+
+    // 2. Remove the actual file
+    if (await exists(filePath)) {
+      await remove(filePath);
+    }
+
+    console.log("Successfully deleted transcript:", filename);
+  } catch (error) {
+    console.error("Failed to delete transcript:", filename, error);
+    throw new Error(`Failed to delete transcript: ${String(error)}`);
+  }
 }

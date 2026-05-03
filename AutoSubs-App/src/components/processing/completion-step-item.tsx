@@ -9,6 +9,7 @@ import {
 import { Download, List, Plus } from "lucide-react"
 import { AddToTimelineDialog } from "@/components/dialogs/add-to-timeline-dialog"
 import { Settings, TimelineInfo } from "@/types"
+import { useResolve } from "@/contexts/ResolveContext"
 import { useTranslation } from "react-i18next"
 
 export interface CompletionStepProps {
@@ -29,8 +30,17 @@ export function CompletionStepItem({
     selectedIntegration
 }: CompletionStepProps) {
     const { t } = useTranslation()
+    const {
+        templates: resolveTemplates,
+        templatesLoading: resolveTemplatesLoading,
+        templatesLoaded: resolveTemplatesLoaded,
+        refreshTemplates: refreshResolveTemplates,
+    } = useResolve()
+
     const isResolveConnected = Boolean(timelineInfo?.timelineId) && selectedIntegration === "davinci"
     const isAdobeConnected = Boolean(timelineInfo?.timelineId) && (selectedIntegration === "premiere" || selectedIntegration === "aftereffects")
+    const isAdobe = selectedIntegration === "premiere" || selectedIntegration === "aftereffects"
+
 
     return (
         <div className="flex w-full flex-col gap-2">
@@ -71,8 +81,13 @@ export function CompletionStepItem({
                             <AddToTimelineDialog
                                 settings={settings}
                                 timelineInfo={timelineInfo}
+                                templates={isAdobe ? [] : resolveTemplates}
+                                templatesLoading={!isAdobe && resolveTemplatesLoading}
+                                templatesLoaded={isAdobe || resolveTemplatesLoaded}
+                                onLoadTemplates={isAdobe ? undefined : refreshResolveTemplates}
                                 onAddToTimeline={onAddToTimeline}
                                 selectedIntegration={selectedIntegration}
+
                             >
                                 <Button
                                     variant="outline"
