@@ -368,8 +368,8 @@
     }
   },
   "completion": {
-    "processingComplete": "Proceso completado",
-    "subtitlesReady": "¡Tus subtítulos están listos para usar!",
+    "processingComplete": "Procesamiento completo",
+    "subtitlesReady": "¡Tus subtítulos están listos!",
     "viewSubtitles": "Ver subtítulos",
     "exportToFile": "Exportar a archivo",
     "addToTimeline": "Añadir a la línea de tiempo"
@@ -507,9 +507,22 @@
       },
       "tooltip": {
         "connected": "Conectado",
-        "canGetAudio": "Puedes obter el audio de la línea de tiempo y añadirle subtítulos.",
+        "canGetAudio": "Puedes obtener el audio de la línea de tiempo y añadirle subtítulos.",
         "disconnected": "Extensión desconectada",
         "openPremiere": "Abre Premiere Pro para conectarte automáticamente."
+      }
+    },
+    "aftereffects": {
+      "productName": "After Effects",
+      "status": {
+        "connected": "Conectado",
+        "disconnected": "Desconectado"
+      },
+      "tooltip": {
+        "connected": "Conectado",
+        "canGetAudio": "Puedes obtener el audio de la composición y añadirle subtítulos.",
+        "disconnected": "Extensión desconectada",
+        "openAfterEffects": "Abre After Effects para conectarte automáticamente."
       }
     }
   },
@@ -518,6 +531,10 @@
   },
   "addToTimeline": {
     "title": "Añadir a la línea de tiempo",
+    "ready": {
+      "title": "Subtítulos listos",
+      "description": "Tus subtítulos han sido generados y están listos para ser añadidos a la línea de tiempo."
+    },
     "templateTheme": "Tema de plantilla",
     "selectTemplate": "Seleccionar plantilla",
     "outputTrack": "Pista de salida",

@@ -70,7 +70,7 @@ interface AddToTimelineDialogProps {
         presetSettings?: Record<string, unknown>,
     ) => Promise<void>
     isAdding?: boolean
-    selectedIntegration?: "davinci" | "premiere"
+    selectedIntegration?: "davinci" | "premiere" | "aftereffects"
 }
 
 const STEPS = [
@@ -91,7 +91,7 @@ export function AddToTimelineDialog({
     isAdding = false,
     selectedIntegration,
 }: AddToTimelineDialogProps) {
-    const isPremiere = selectedIntegration === "premiere"
+    const isAdobe = selectedIntegration === "premiere" || selectedIntegration === "aftereffects"
     const { t } = useTranslation()
     const { speakers, updateSpeakers, currentSubtitleDocumentFilename } = useSubtitleDocument()
     const { updateSetting } = useSettings()
@@ -122,8 +122,15 @@ export function AddToTimelineDialog({
     // Only show the speakers step when we actually have speakers to configure.
     const hasSpeakers = speakers.length > 0
     const activeSteps = React.useMemo<ReadonlyArray<typeof STEPS[number]>>(
-        () => (hasSpeakers ? STEPS : [STEPS[0], STEPS[1]]),
-        [hasSpeakers],
+        () => {
+            if (isAdobe) {
+                // Adobe apps (Premiere/AE) handle tracks and templates automatically or differently.
+                // We only show the speakers step if available, otherwise it goes straight to submit.
+                return hasSpeakers ? [STEPS[2]] : []
+            }
+            return hasSpeakers ? STEPS : [STEPS[0], STEPS[1]]
+        },
+        [hasSpeakers, isAdobe],
     )
     const totalSteps = activeSteps.length
 
@@ -165,7 +172,7 @@ export function AddToTimelineDialog({
     }, [open])
 
     React.useEffect(() => {
-        if (!open || isPremiere || templatesLoaded || templatesLoading || !onLoadTemplates) return
+        if (!open || isAdobe || templatesLoaded || templatesLoading || !onLoadTemplates) return
         let cancelled = false
         setTemplateLoadError(null)
         onLoadTemplates().catch((err) => {
@@ -174,7 +181,8 @@ export function AddToTimelineDialog({
             setTemplateLoadError(message)
         })
         return () => { cancelled = true }
-    }, [open, isPremiere, templatesLoaded, templatesLoading, onLoadTemplates])
+    }, [open, isAdobe, templatesLoaded, templatesLoading, onLoadTemplates])
+
 
     // Check for track conflicts whenever the selected output track changes.
     React.useEffect(() => {
@@ -295,7 +303,7 @@ export function AddToTimelineDialog({
     }
 
     function canProceed(): boolean {
-        if (isPremiere) return true
+        if (isAdobe) return true
         const stepKey = activeSteps[currentStep]?.key
         if (stepKey === "template") {
             if (selection.mode === "regular") return !!selection.templateValue
@@ -331,17 +339,19 @@ export function AddToTimelineDialog({
                         if (target <= currentStep) return true
                         return target === currentStep + 1 && canProceed()
                     }}
-                    isPremiere={isPremiere}
+                    isAdobe={isAdobe}
                 />
 
                 {/* Step body */}
                 <div className="py-1 min-h-[280px] relative">
-                    {isPremiere && (activeSteps[currentStep]?.key === "outputTrack" || activeSteps[currentStep]?.key === "template") && (
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/50 backdrop-blur-[1px] rounded-md border border-dashed">
-                            <div className="text-center px-4 p-4 rounded-xl bg-background/80 shadow-sm border">
-                                <AlertTriangle className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                                <p className="text-sm font-medium">Not applicable for Premiere Pro</p>
-                                <p className="text-xs text-muted-foreground max-w-[200px] mt-1">Premiere handles caption tracks automatically.</p>
+                    {activeSteps.length === 0 && (
+                        <div className="flex flex-col items-center justify-center h-[280px] text-center space-y-4">
+                            <div className="bg-primary/10 p-4 rounded-full">
+                                <Check className="h-8 w-8 text-primary" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-lg font-medium">{t("addToTimeline.ready.title")}</p>
+                                <p className="text-sm text-muted-foreground">{t("addToTimeline.ready.description", { app: selectedIntegration === 'aftereffects' ? 'After Effects' : 'Premiere Pro' })}</p>
                             </div>
                         </div>
                     )}
@@ -491,32 +501,29 @@ interface StepperProps {
     currentStep: number
     onJump: (index: number) => void
     canAdvanceTo: (index: number) => boolean
-    isPremiere?: boolean
+    isAdobe?: boolean
 }
 
-function Stepper({ steps, currentStep, onJump, canAdvanceTo, isPremiere }: StepperProps) {
+function Stepper({ steps, currentStep, onJump, canAdvanceTo }: StepperProps) {
     return (
         <div className="flex items-center gap-1">
             {steps.map((step, index) => {
                 const Icon = step.icon
                 const isCompleted = index < currentStep
                 const isCurrent = index === currentStep
-                const isBlocked = isPremiere && (step.key === "outputTrack" || step.key === "template")
-                const clickable = canAdvanceTo(index) && !isBlocked
+                const clickable = canAdvanceTo(index)
                 return (
                     <React.Fragment key={step.key}>
                         <button
                             type="button"
-                            onClick={() => clickable && !isBlocked && onJump(index)}
-                            disabled={!clickable || isBlocked}
+                            onClick={() => clickable && onJump(index)}
+                            disabled={!clickable}
                             className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                                isBlocked
-                                    ? "opacity-50 bg-muted text-muted-foreground cursor-not-allowed"
-                                    : isCompleted
-                                        ? "bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
-                                        : isCurrent
-                                            ? "bg-primary text-primary-foreground cursor-pointer"
-                                            : (!clickable ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer")
+                                isCompleted
+                                    ? "bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
+                                    : isCurrent
+                                        ? "bg-primary text-primary-foreground cursor-pointer"
+                                        : (!clickable ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer")
                                 }`}
                         >
                             {isCompleted ? (

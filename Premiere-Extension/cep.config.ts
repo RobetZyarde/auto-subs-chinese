@@ -13,6 +13,7 @@ const config: CEP_Config = {
   requiredRuntimeVersion: 9.0,
   hosts: [
     { name: "PPRO", version: "[0.0,99.9]" }, 
+    { name: "AEFT", version: "[0.0,99.9]" },
   ],
 
   type: "Custom",
@@ -48,7 +49,7 @@ const config: CEP_Config = {
     country: "US",
     province: "CA",
     org: "Company",
-    password: process.env.ZXP_PASSWORD || "password",
+    password: (typeof process !== "undefined" && process.env.ZXP_PASSWORD) || "password",
     tsa: [
       "http://timestamp.digicert.com/", // Windows Only
       "http://timestamp.apple.com/ts01", // MacOS Only

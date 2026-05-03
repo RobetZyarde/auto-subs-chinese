@@ -513,6 +513,19 @@
         "disconnected": "Erweiterung getrennt",
         "openPremiere": "Premiere Pro öffnen, um automatisch eine Verbindung herzustellen."
       }
+    },
+    "aftereffects": {
+      "productName": "After Effects",
+      "status": {
+        "connected": "Verbunden",
+        "disconnected": "Getrennt"
+      },
+      "tooltip": {
+        "connected": "Verbunden",
+        "canGetAudio": "Sie können Audio aus der Komposition abrufen und Untertitel hinzufügen.",
+        "disconnected": "Erweiterung getrennt",
+        "openAfterEffects": "Öffnen Sie After Effects, um automatisch zu verbinden."
+      }
     }
   },
   "theme": {
@@ -520,6 +533,10 @@
   },
   "addToTimeline": {
     "title": "Zur Timeline hinzufügen",
+    "ready": {
+      "title": "Untertitel bereit",
+      "description": "Deine Untertitel wurden generiert und können nun zur Timeline hinzugefügt werden."
+    },
     "templateTheme": "Vorlagenstil",
     "selectTemplate": "Vorlage auswählen",
     "outputTrack": "Ausgabespur",

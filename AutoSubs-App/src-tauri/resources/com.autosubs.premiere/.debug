@@ -3,6 +3,7 @@
   <Extension Id="com.autosubs.premiere.main">
     <HostList>
       <Host Name="PPRO" Port="8860"/>
+      <Host Name="AEFT" Port="8861"/>
     </HostList>
   </Extension>
 </ExtensionList>

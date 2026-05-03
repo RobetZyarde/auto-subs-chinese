@@ -54,7 +54,11 @@ export const DEFAULT_SETTINGS: Settings = {
   customMaxCharsPerLine: 38,
 
   // Resolve settings
-  selectedInputTracks: ["1"],
+  selectedInputTracksByApp: {
+    "davinci": ["1"],
+    "premiere": [],
+    "aftereffects": []
+  },
   selectedOutputTrack: "1",
   selectedTemplate: { value: "Default Template", label: "Default Template" },
 
@@ -99,6 +103,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         ? ({
             ...DEFAULT_SETTINGS,
             ...storedSettings,
+            // Migration: if selectedInputTracksByApp doesn't exist but selectedInputTracks does,
+            // use it for both davinci and premiere to preserve user state.
+            selectedInputTracksByApp: storedSettings.selectedInputTracksByApp || {
+              "davinci": storedSettings.selectedInputTracks || ["1"],
+              "premiere": storedSettings.selectedInputTracks || [],
+              "aftereffects": []
+            },
             uiLanguage: storedSettings.onboardingCompleted
               ? normalizeUiLanguage(storedSettings.uiLanguage)
               : getPreferredUiLanguage(),

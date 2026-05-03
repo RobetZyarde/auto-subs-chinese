@@ -1,4 +1,5 @@
 import { SupportedUiLanguage } from '@/i18n';
+import { Integration } from '@/contexts/IntegrationContext';
 
 // Error message interface
 export interface ErrorMsg {
@@ -39,6 +40,7 @@ export interface Word {
     line_number: number;
     probability?: number;
 }
+export type AdobeIntegration = 'premiere' | 'aftereffects';
 export interface Subtitle {
     id: number;
     start: number;
@@ -83,7 +85,8 @@ export interface Model {
 export interface Settings {
     // Mode
     audioInputMode: "file" | "timeline",
-    preferredEditorIntegration: "davinci" | "premiere",
+    preferredEditorIntegration: Integration;
+
 
     // UI settings
     uiLanguage: SupportedUiLanguage;
@@ -122,8 +125,8 @@ export interface Settings {
     customPrompt: string,
     customMaxCharsPerLine: number,
 
-    // Davinci Resolve settings
-    selectedInputTracks: string[];
+    // Adobe integrations
+    selectedInputTracksByApp: Record<Integration, string[]>;
     selectedOutputTrack: string;
     selectedTemplate: Template;
 

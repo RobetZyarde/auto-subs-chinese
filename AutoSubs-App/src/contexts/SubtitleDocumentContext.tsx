@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { Subtitle, Speaker, Settings } from '@/types';
 import { useResolve } from '@/contexts/ResolveContext';
-import { usePremiere } from '@/contexts/PremiereContext';
+import { useAdobe } from '@/contexts/AdobeContext';
 import { useIntegration } from '@/contexts/IntegrationContext';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
@@ -43,9 +43,10 @@ export function SubtitleDocumentProvider({ children }: { children: React.ReactNo
   const [markIn, setMarkIn] = useState(0);
   const [currentSubtitleDocumentFilename, setCurrentSubtitleDocumentFilename] = useState<string | null>(null);
   const { timelineInfo: resolveTimeline } = useResolve();
-  const { timelineInfo: premiereTimeline } = usePremiere();
+  const { timelineInfo: adobeTimeline } = useAdobe();
   const { selectedIntegration } = useIntegration();
-  const timelineInfo = selectedIntegration === "premiere" ? premiereTimeline : resolveTimeline;
+  const isAdobeActive = selectedIntegration === "premiere" || selectedIntegration === "aftereffects";
+  const timelineInfo = isAdobeActive ? adobeTimeline : resolveTimeline;
 
   // Load subtitles when timelineId or fileInput changes
   const loadSubtitles = useCallback(async (audioInputMode: "file" | "timeline", fileInput: string | null, timelineId: string) => {

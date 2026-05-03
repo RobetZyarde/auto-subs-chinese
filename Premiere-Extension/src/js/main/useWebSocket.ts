@@ -190,6 +190,12 @@ export const useWebSocket = (port: number) => {
         sendMessage({ type: "import_srt_response", payload: importData, sessionId: message.sessionId, operationId: opId });
         break;
       }
+      case "request_jump_to_time": {
+        const { time } = message.payload;
+        await executeWithRetry(() => evalTS("jumpToTime", time));
+        // We don't necessarily need to send a response back
+        break;
+      }
       case "pong":
         updateState({ lastHeartbeat: Date.now() });
         break;
@@ -218,7 +224,11 @@ export const useWebSocket = (port: number) => {
       reconnectAttemptsRef.current = 0;
       updateState({ status: 'connected', reconnectAttempts: 0, lastHeartbeat: Date.now() });
       addLog("Connected to AutoSubs app", "success");
-      sendMessage({ type: "handshake", payload: "premiere", clientVersion: "1.0.0" });
+      
+      const hostEnv = window.__adobe_cep__ ? JSON.parse(window.__adobe_cep__.getHostEnvironment()) : { appId: "PPRO" };
+      const integration = hostEnv.appId.toLowerCase() === 'aeft' ? 'aftereffects' : 'premiere';
+      
+      sendMessage({ type: "handshake", payload: integration, clientVersion: "1.0.0" });
       processQueue();
       refreshSequenceInfo();
       if (heartbeatTimer.current) clearInterval(heartbeatTimer.current);

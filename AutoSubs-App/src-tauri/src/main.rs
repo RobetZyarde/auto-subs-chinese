@@ -30,7 +30,7 @@ mod transcription_api;
 mod transcript_types;
 mod logging;
 mod resolve_bridge;
-mod premiere_bridge;
+mod adobe_bridge;
 #[cfg(target_os = "macos")]
 mod traffic_lights;
 
@@ -84,7 +84,7 @@ fn main() {
         .setup(|app| {
             // Initialize backend logging (file + in-memory ring buffer)
             crate::logging::init_logging(&app.handle());
-            crate::premiere_bridge::init_premiere_server(app.handle().clone());
+            crate::adobe_bridge::init_adobe_server(app.handle().clone());
 
             // Set window title to "AutoSubs" on Windows and Linux for taskbar display
             #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -114,7 +114,6 @@ fn main() {
                 }
             }
             if let Some(window) = app.get_webview_window("main") {
-                let _ = app.handle().show();
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
@@ -291,7 +290,7 @@ fn main() {
             logging::export_backend_logs,
             logging::open_log_dir,
             resolve_bridge::resolve_bridge,
-            premiere_bridge::send_to_premiere,
+            adobe_bridge::send_to_adobe,
             trigger_install_update
         ])
         .build(tauri::generate_context!())
@@ -304,7 +303,6 @@ fn main() {
                         for delay_ms in [100_u64, 500, 1200] {
                             tokio::time::sleep(Duration::from_millis(delay_ms)).await;
                             if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = app_handle.show();
                                 let _ = window.show();
                                 let _ = window.unminimize();
                                 let _ = window.set_focus();

@@ -24,7 +24,7 @@ export interface ProcessingStepProps {
     livePreviewSegments?: any[];
     settings?: Settings;
     timelineInfo?: TimelineInfo;
-    selectedIntegration?: "davinci" | "premiere";
+    selectedIntegration?: "davinci" | "premiere" | "aftereffects";
 }
 
 export function ProcessingStepItem({

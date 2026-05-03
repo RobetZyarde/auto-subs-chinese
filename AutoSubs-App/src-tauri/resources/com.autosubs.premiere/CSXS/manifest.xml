@@ -12,6 +12,7 @@ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 <ExecutionEnvironment>
   <HostList>
     <Host Name="PPRO" Version="[0.0,99.9]" />
+    <Host Name="AEFT" Version="[0.0,99.9]" />
   </HostList>
   <LocaleList>
     <Locale Code="All" />

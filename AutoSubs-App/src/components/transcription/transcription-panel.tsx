@@ -7,12 +7,12 @@ import {
   X,
   PlayCircle,
   ChevronRight,
+  ChevronDown,
   ScrollText,
   Info,
-  Airplay,
   RefreshCw,
+
   SlidersHorizontal,
-  ChevronDown,
   PartyPopper,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -53,6 +53,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { ModelPicker } from "@/components/settings/model-picker";
 import { LanguageSelector } from "@/components/settings/language-selector";
@@ -64,7 +70,7 @@ import { useProgress } from "@/contexts/ProgressContext";
 import { useSubtitleDocument } from "@/contexts/SubtitleDocumentContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useResolve } from "@/contexts/ResolveContext";
-import { usePremiere } from "@/contexts/PremiereContext";
+import { useAdobe } from "@/contexts/AdobeContext";
 import { useIntegration } from "@/contexts/IntegrationContext";
 import { useErrorDialog } from "@/contexts/ErrorDialogContext";
 import { ResolveApiError } from "@/api/resolve-api";
@@ -79,6 +85,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { diarizeModel } from "@/lib/models";
 import SubSlateCard from "@/components/SubSlateCard";
+
 
 const SUPPORTED_MEDIA_EXTENSIONS = [
   "wav",
@@ -227,8 +234,10 @@ interface TranscriptionPanelViewProps {
   onCancel?: () => void;
   onRefreshAudioTracks?: () => Promise<void>;
   isProcessing?: boolean;
-  selectedIntegration: "davinci" | "premiere";
+  selectedIntegration: "davinci" | "premiere" | "aftereffects";
+  onSelectedIntegrationChange: (integration: "davinci" | "premiere" | "aftereffects") => void;
 }
+
 
 function TranscriptionPanelView({
   modelsState,
@@ -248,7 +257,7 @@ function TranscriptionPanelView({
   onAddToTimeline,
   onViewSubtitles,
   livePreviewSegments,
-  settings,
+  settings: _settings, // Renamed to avoid clash with useSettings()
   timelineInfo,
   selectedFile: selectedFileProp,
   onSelectedFileChange,
@@ -257,7 +266,9 @@ function TranscriptionPanelView({
   onRefreshAudioTracks,
   isProcessing,
   selectedIntegration,
+  onSelectedIntegrationChange,
 }: TranscriptionPanelViewProps) {
+
   const { t, i18n } = useTranslation();
   const { settings: currentSettings, updateSetting } = useSettings();
   const isTourActive = !currentSettings.tourCompleted;
@@ -279,6 +290,7 @@ function TranscriptionPanelView({
   const [refreshSpinKey, setRefreshSpinKey] = React.useState(0);
   const [localTerms, setLocalTerms] = React.useState("");
   const [localContext, setLocalContext] = React.useState("");
+
   const customPromptParts = React.useMemo(
     () => parseCustomPrompt(currentSettings.customPrompt),
     [currentSettings.customPrompt],
@@ -357,7 +369,9 @@ function TranscriptionPanelView({
     setSelectedFile(file);
   };
 
-  const selectedTrackCount = currentSettings.selectedInputTracks.length;
+  const selectedTracks =
+    currentSettings.selectedInputTracksByApp[selectedIntegration] || [];
+  const selectedTrackCount = selectedTracks.length;
   const hasProcessingSteps = processingSteps.length > 0;
   const showProcessing = isProcessing || hasProcessingSteps;
   const hasCompletedRun = !isProcessing && hasProcessingSteps;
@@ -387,17 +401,21 @@ function TranscriptionPanelView({
 
   const toggleInputTrack = React.useCallback(
     (trackId: string) => {
-      const isSelected = currentSettings.selectedInputTracks.includes(trackId);
-      updateSetting(
-        "selectedInputTracks",
-        isSelected
-          ? currentSettings.selectedInputTracks.filter(
-              (id: string) => id !== trackId,
-            )
-          : [...currentSettings.selectedInputTracks, trackId],
-      );
+      const currentTracks =
+        currentSettings.selectedInputTracksByApp[selectedIntegration] || [];
+      const isSelected = currentTracks.includes(trackId);
+      const nextTracks = isSelected
+        ? currentTracks.filter((id: string) => id !== trackId)
+        : [...currentTracks, trackId];
+
+      const nextMap = {
+        ...currentSettings.selectedInputTracksByApp,
+        [selectedIntegration]: nextTracks,
+      };
+
+      updateSetting("selectedInputTracksByApp", nextMap);
     },
-    [currentSettings.selectedInputTracks, updateSetting],
+    [currentSettings.selectedInputTracksByApp, selectedIntegration, updateSetting],
   );
 
   const renderFileDropArea = (className = "h-[160px]") => (
@@ -451,10 +469,12 @@ function TranscriptionPanelView({
       currentSettings.exportRange === "inout"
         ? t("actionBar.tracks.exportRange.inout")
         : t("actionBar.tracks.exportRange.entire");
+    const selectedTracks =
+      currentSettings.selectedInputTracksByApp[selectedIntegration] || [];
     const tracksLabel =
       selectedTrackCount === 1
         ? t("actionBar.tracks.trackN", {
-            n: currentSettings.selectedInputTracks[0],
+            n: selectedTracks[0],
           })
         : t("actionBar.tracks.countSelected", { count: selectedTrackCount });
 
@@ -462,7 +482,8 @@ function TranscriptionPanelView({
   }, [
     currentSettings.audioInputMode,
     currentSettings.exportRange,
-    currentSettings.selectedInputTracks,
+    currentSettings.selectedInputTracksByApp,
+    selectedIntegration,
     selectedFile,
     selectedTrackCount,
     t,
@@ -537,9 +558,10 @@ function TranscriptionPanelView({
       {inputTracks.length > 0 ? (
         <div className="max-h-[28vh] space-y-2 overflow-y-auto rounded-lg pr-2">
           {inputTracks.map((track, index) => {
-            const isChecked = currentSettings.selectedInputTracks.includes(
-              track.value,
-            );
+            const currentTracks =
+              currentSettings.selectedInputTracksByApp[selectedIntegration] ||
+              [];
+            const isChecked = currentTracks.includes(track.value);
 
             return (
               <div
@@ -623,14 +645,83 @@ function TranscriptionPanelView({
               <UploadIcon ref={uploadIconRef} />
               {t("actionBar.mode.fileInput")}
             </TabsTrigger>
-            <TabsTrigger
-              value="timeline"
-              className=""
-              onPointerDown={() => onAudioInputModeChange("timeline")}
-            >
-              <Airplay className="h-4 w-4" />
-              {t("actionBar.mode.timeline")}
-            </TabsTrigger>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                asChild
+                onPointerDown={() => onAudioInputModeChange("timeline")}
+              >
+                <TabsTrigger
+                  value="timeline"
+                  data-state={audioInputMode === "timeline" ? "active" : "inactive"}
+                  className="text-sm px-4 flex items-center gap-1"
+                >
+                  <img
+                    src={
+                      selectedIntegration === "premiere"
+                        ? "/premiere-logo.png"
+                        : selectedIntegration === "aftereffects"
+                        ? "/aftereffects-logo.png"
+                        : "/davinci-resolve-logo.png"
+                    }
+                    alt={
+                      selectedIntegration === "premiere"
+                        ? "Premiere Pro"
+                        : selectedIntegration === "aftereffects"
+                        ? "After Effects"
+                        : "DaVinci Resolve"
+                    }
+                    className="w-4 h-4 mr-1"
+                  />
+                  {t("actionBar.mode.timeline")}
+                  <ChevronDown className="h-3 w-3 opacity-50 ml-1" />
+                </TabsTrigger>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="z-[100]">
+                <DropdownMenuItem
+                  onClick={() => {
+                    onAudioInputModeChange("timeline");
+                    onSelectedIntegrationChange("davinci");
+                  }}
+                  className="cursor-pointer"
+                >
+                  <img
+                    src="/davinci-resolve-logo.png"
+                    alt="DaVinci"
+                    className="w-4 h-4 mr-2"
+                  />
+                  <span>DaVinci Resolve</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    onAudioInputModeChange("timeline");
+                    onSelectedIntegrationChange("premiere");
+                  }}
+                  className="cursor-pointer"
+                >
+                  <img
+                    src="/premiere-logo.png"
+                    alt="Premiere"
+                    className="w-4 h-4 mr-2"
+                  />
+                  <span>Premiere Pro</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    onAudioInputModeChange("timeline");
+                    onSelectedIntegrationChange("aftereffects");
+                  }}
+                  className="cursor-pointer"
+                >
+                  <img
+                    src="/aftereffects-logo.png"
+                    alt="After Effects"
+                    className="w-4 h-4 mr-2"
+                  />
+                  <span>After Effects</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
           </TabsList>
         </Tabs>
       </div>
@@ -663,7 +754,7 @@ function TranscriptionPanelView({
                     onAddToTimeline={onAddToTimeline}
                     onViewSubtitles={onViewSubtitles}
                     livePreviewSegments={livePreviewSegments}
-                    settings={settings}
+                    settings={currentSettings}
                     timelineInfo={timelineInfo}
                     selectedIntegration={selectedIntegration}
                   />
@@ -772,6 +863,7 @@ function TranscriptionPanelView({
                     />
                   </Button>
                 </CollapsibleTrigger>
+
               </div>
 
               <CollapsibleContent>
@@ -1046,11 +1138,11 @@ export function TranscriptionPanel({
     isExporting: premiereIsExporting,
     exportProgress: premiereExportProgress,
     getSourceAudio: premiereGetSourceAudio,
-  } = usePremiere();
+  } = useAdobe();
 
-  const { selectedIntegration } = useIntegration();
+  const { selectedIntegration, setSelectedIntegration } = useIntegration();
 
-  const isPremiereActive = selectedIntegration === "premiere";
+  const isPremiereActive = selectedIntegration === "premiere" || selectedIntegration === "aftereffects";
   const timelineInfo = isPremiereActive ? premiereTimeline : resolveTimeline;
   const refreshAudioTracks = isPremiereActive
     ? refreshPremiere
@@ -1073,6 +1165,10 @@ export function TranscriptionPanel({
   const exportProgress = isPremiereActive
     ? premiereExportProgress
     : resolveExportProgress;
+
+  // Senior Pattern: derive active tracks from the app-aware map instead of a global list
+  const activeSelectedTracks =
+    settings.selectedInputTracksByApp[selectedIntegration] || [];
   const cancelExport = resolveCancelExport; // Fallback for cancel
   const setIsExporting = resolveSetIsExporting; // Fallback
   const setExportProgress = resolveSetExportProgress; // Fallback
@@ -1243,7 +1339,7 @@ export function TranscriptionPanel({
       const audioInfo = await getSourceAudio(
         settings.audioInputMode,
         fileInput,
-        settings.selectedInputTracks,
+        activeSelectedTracks,
       );
 
       if (!audioInfo) {
@@ -1394,9 +1490,13 @@ export function TranscriptionPanel({
             onRefreshAudioTracks={refreshAudioTracks}
             isProcessing={isProcessing}
             selectedIntegration={selectedIntegration}
+            onSelectedIntegrationChange={setSelectedIntegration}
           />
+
         </div>
       </div>
+
+
       <SubSlateCard
         open={showSubSlate}
         onClose={() => {

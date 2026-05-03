@@ -4,7 +4,7 @@ import { getVersion } from "@tauri-apps/api/app";
 
 import { useSettings } from "@/contexts/SettingsContext";
 import { useResolve } from "@/contexts/ResolveContext";
-import { usePremiere } from "@/contexts/PremiereContext";
+import { useAdobe } from "@/contexts/AdobeContext";
 import { initI18n, normalizeUiLanguage } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { models, getFirstRecommendedModelForLanguage } from "@/lib/models";
@@ -29,7 +29,7 @@ export function GettingStartedOverlay() {
   const { settings, updateSetting, isHydrated } = useSettings();
   const { t } = useTranslation();
   const { timelineInfo: resolveTimeline } = useResolve();
-  const { isConnected: isPremiereConnected } = usePremiere();
+  const { isConnected: isPremiereConnected } = useAdobe();
   
   const isResolveConnected = resolveTimeline.timelineId !== "";
   const isIntegrationConnected = isResolveConnected || isPremiereConnected;

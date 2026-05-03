@@ -18,7 +18,7 @@ export interface CompletionStepProps {
     onViewSubtitles?: () => void;
     settings: Settings;
     timelineInfo: TimelineInfo;
-    selectedIntegration?: "davinci" | "premiere";
+    selectedIntegration?: "davinci" | "premiere" | "aftereffects";
 }
 
 export function CompletionStepItem({
@@ -36,8 +36,11 @@ export function CompletionStepItem({
         templatesLoaded: resolveTemplatesLoaded,
         refreshTemplates: refreshResolveTemplates,
     } = useResolve()
-    const isResolveConnected = Boolean(timelineInfo?.timelineId) && selectedIntegration !== "premiere"
-    const isPremiereConnected = Boolean(timelineInfo?.timelineId) && selectedIntegration === "premiere"
+
+    const isResolveConnected = Boolean(timelineInfo?.timelineId) && selectedIntegration === "davinci"
+    const isAdobeConnected = Boolean(timelineInfo?.timelineId) && (selectedIntegration === "premiere" || selectedIntegration === "aftereffects")
+    const isAdobe = selectedIntegration === "premiere" || selectedIntegration === "aftereffects"
+
 
     return (
         <div className="flex w-full flex-col gap-2">
@@ -74,16 +77,17 @@ export function CompletionStepItem({
                                 {t("completion.exportToFile")}
                             </Button>
                         )}
-                        {(isResolveConnected || isPremiereConnected) && (
+                        {(isResolveConnected || isAdobeConnected) && (
                             <AddToTimelineDialog
                                 settings={settings}
                                 timelineInfo={timelineInfo}
-                                templates={selectedIntegration === "premiere" ? [] : resolveTemplates}
-                                templatesLoading={selectedIntegration !== "premiere" && resolveTemplatesLoading}
-                                templatesLoaded={selectedIntegration === "premiere" || resolveTemplatesLoaded}
-                                onLoadTemplates={selectedIntegration === "premiere" ? undefined : refreshResolveTemplates}
+                                templates={isAdobe ? [] : resolveTemplates}
+                                templatesLoading={!isAdobe && resolveTemplatesLoading}
+                                templatesLoaded={isAdobe || resolveTemplatesLoaded}
+                                onLoadTemplates={isAdobe ? undefined : refreshResolveTemplates}
                                 onAddToTimeline={onAddToTimeline}
                                 selectedIntegration={selectedIntegration}
+
                             >
                                 <Button
                                     variant="outline"

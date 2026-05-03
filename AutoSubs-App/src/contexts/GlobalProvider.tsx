@@ -8,7 +8,7 @@ import { PresetsProvider } from './PresetsContext';
 import { ErrorDialogProvider } from './ErrorDialogContext';
 import { IntegrationProvider } from './IntegrationContext';
 
-import { PremiereProvider } from './PremiereContext';
+import { AdobeProvider } from './AdobeContext';
 
 interface GlobalProviderProps {
   children: React.ReactNode;
@@ -49,7 +49,7 @@ export function GlobalProvider({ children }: GlobalProviderProps) {
 export function EditorWorkspaceProviders({ children }: EditorWorkspaceProvidersProps) {
   return (
     <ResolveProvider>
-      <PremiereProvider>
+      <AdobeProvider>
         <SubtitleDocumentProvider>
           <ProgressProvider>
             <PresetsProvider>
@@ -57,7 +57,8 @@ export function EditorWorkspaceProviders({ children }: EditorWorkspaceProvidersP
             </PresetsProvider>
           </ProgressProvider>
         </SubtitleDocumentProvider>
-      </PremiereProvider>
+      </AdobeProvider>
     </ResolveProvider>
   );
 }
+

@@ -21,7 +21,9 @@ interface ResolveContextType {
   setIsExporting: (isExporting: boolean) => void;
   setExportProgress: (progress: number) => void;
   cancelExport: () => Promise<any>;
+  jumpToTime: (seconds: number) => Promise<void>;
 }
+
 
 const ResolveContext = createContext<ResolveContextType | null>(null);
 
@@ -293,7 +295,12 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
       setIsExporting,
       setExportProgress,
       cancelExport,
+      jumpToTime: async (seconds: number) => {
+        const { jumpToTime: resolveJump } = await import("@/api/resolve-api");
+        await resolveJump(seconds);
+      },
     }}>
+
       {children}
     </ResolveContext.Provider>
   );

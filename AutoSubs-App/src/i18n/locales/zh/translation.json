@@ -511,6 +511,19 @@
         "disconnected": "扩展已断开",
         "openPremiere": "打开 Premiere Pro 即可自动连接。"
       }
+    },
+    "aftereffects": {
+      "productName": "After Effects",
+      "status": {
+        "connected": "已连接",
+        "disconnected": "已断开"
+      },
+      "tooltip": {
+        "connected": "已连接",
+        "canGetAudio": "您可以从合成中获取音频并将字幕添加回去。",
+        "disconnected": "扩展已断开",
+        "openAfterEffects": "打开 After Effects 以自动连接。"
+      }
     }
   },
   "theme": {
@@ -522,6 +535,10 @@
       "hasConflicts": "该轨道存在冲突的剪辑。字幕可能与现有内容重叠。"
     },
     "title": "添加到时间线",
+    "ready": {
+      "title": "字幕已就绪",
+      "description": "您的字幕已生成，可以添加到时间线中。"
+    },
     "templateTheme": "模板主题",
     "selectTemplate": "选择模板",
     "outputTrack": "输出轨道",

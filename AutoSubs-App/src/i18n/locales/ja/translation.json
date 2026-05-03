@@ -116,11 +116,11 @@
     }
   },
   "completion": {
-    "addToTimeline": "タイムラインに追加",
-    "exportToFile": "ファイルに書き出し",
     "processingComplete": "処理完了",
     "subtitlesReady": "字幕の準備ができました！",
-    "viewSubtitles": "字幕を表示"
+    "viewSubtitles": "字幕を表示",
+    "exportToFile": "ファイルに書き出し",
+    "addToTimeline": "タイムラインに追加"
   },
   "importExport": {
     "button": "エクスポート / インポート",
@@ -496,6 +496,19 @@
         }
       }
     },
+    "aftereffects": {
+      "productName": "After Effects",
+      "status": {
+        "connected": "接続済み",
+        "disconnected": "未接続"
+      },
+      "tooltip": {
+        "connected": "接続済み",
+        "canGetAudio": "コンポジションから音声を取得し、字幕を追加できます。",
+        "disconnected": "拡張機能が切断されました",
+        "openAfterEffects": "After Effectsを開いて自動的に接続します。"
+      }
+    },
     "windowControls": {
       "close": "閉じる",
       "maximize": "最大化",
@@ -522,6 +535,10 @@
       "hasConflicts": "このトラックには競合するクリップがあります。字幕が既存のコンテンツと重複する可能性があります。"
     },
     "title": "タイムラインに追加",
+    "ready": {
+      "title": "字幕の準備完了",
+      "description": "字幕が生成されました。タイムラインに追加する準備ができています。"
+    },
     "templateTheme": "テンプレートテーマ",
     "selectTemplate": "テンプレートを選択",
     "outputTrack": "出力トラック",

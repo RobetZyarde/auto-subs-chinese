@@ -23,9 +23,8 @@ interface SubtitleListProps {
     error?: string | null;
     selectedIndex?: number | null;
     onSelectedIndexChange?: (index: number | null) => void;
+    onJumpToTime?: (seconds: number) => Promise<void>;
 }
-
-import { jumpToTime } from "@/api/resolve-api";
 
 const SubtitleList = ({
     searchQuery = "",
@@ -37,6 +36,7 @@ const SubtitleList = ({
     error = null,
     selectedIndex: controlledSelectedIndex,
     onSelectedIndexChange,
+    onJumpToTime,
 }: SubtitleListProps) => {
     const { t } = useTranslation();
     const { subtitles, updateSubtitles, speakers, updateSpeakers } = useSubtitleDocument();
@@ -121,7 +121,8 @@ const SubtitleList = ({
         count: filteredSubtitleItems.length,
         getScrollElement: () => containerRef.current?.parentElement ?? null,
         estimateSize: () => ESTIMATED_SUBTITLE_ROW_HEIGHT,
-        getItemKey: (index) => filteredSubtitleItems[index]?.subtitle.id ?? index,
+        getItemKey: (index: number) => filteredSubtitleItems[index]?.subtitle.id ?? index,
+
         overscan: SUBTITLE_ROW_OVERSCAN,
     });
 
@@ -303,7 +304,8 @@ const SubtitleList = ({
             className={`relative ${className}`}
             style={{ height: rowVirtualizer.getTotalSize() }}
         >
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            {rowVirtualizer.getVirtualItems().map((virtualRow: any) => {
+
                 const item = filteredSubtitleItems[virtualRow.index];
                 if (!item) return null;
                 const { subtitle, index } = item;
@@ -325,7 +327,9 @@ const SubtitleList = ({
                                             className="text-xs text-muted-foreground font-mono cursor-pointer hover:text-primary"
                                             onClick={async (e) => {
                                                 e.stopPropagation();
-                                                await jumpToTime(subtitle.start);
+                                                if (onJumpToTime) {
+                                                    await onJumpToTime(subtitle.start);
+                                                }
                                             }}
                                         >
                                             {formatTimecode(subtitle.start)}

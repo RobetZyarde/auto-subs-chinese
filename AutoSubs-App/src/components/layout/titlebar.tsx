@@ -31,15 +31,19 @@ import { diarizeModel } from "@/lib/models";
 import { SubtitleHistoryPopover } from "@/components/common/subtitle-history-popover";
 
 import { useResolve } from "@/contexts/ResolveContext";
-import { usePremiere } from "@/contexts/PremiereContext";
+import { useAdobe } from "@/contexts/AdobeContext";
 import { useIntegration, type Integration } from "@/contexts/IntegrationContext";
-
-
 
 function IntegrationStatus() {
   const { t } = useTranslation();
   const { timelineInfo: resolveTimeline, refresh: refreshResolve } = useResolve();
-  const { timelineInfo: premiereTimeline, isConnected: isPremiereConnected, refresh: refreshPremiere } = usePremiere();
+  const {
+    premiereTimeline,
+    afterEffectsTimeline,
+    isPremiereConnected,
+    isAfterEffectsConnected,
+    refresh: refreshAdobe
+  } = useAdobe();
   const { selectedIntegration, setSelectedIntegration } = useIntegration();
 
   const isResolveConnected = Boolean(resolveTimeline?.timelineId);
@@ -66,7 +70,19 @@ function IntegrationStatus() {
       helperText: isPremiereConnected
         ? t("titlebar.premiere.tooltip.canGetAudio")
         : t("titlebar.premiere.tooltip.openPremiere"),
-      refresh: refreshPremiere,
+      refresh: refreshAdobe,
+    },
+    aftereffects: {
+      productName: t("titlebar.aftereffects.productName"),
+      logo: "/aftereffects-logo.png",
+      connected: isAfterEffectsConnected,
+      timelineName: afterEffectsTimeline?.name,
+      connectedText: t("titlebar.aftereffects.tooltip.connected"),
+      disconnectedText: t("titlebar.aftereffects.tooltip.disconnected"),
+      helperText: isAfterEffectsConnected
+        ? t("titlebar.aftereffects.tooltip.canGetAudio")
+        : t("titlebar.aftereffects.tooltip.openAfterEffects"),
+      refresh: refreshAdobe,
     },
   } satisfies Record<Integration, {
     productName: string;
@@ -78,6 +94,7 @@ function IntegrationStatus() {
     helperText: string;
     refresh: () => Promise<void>;
   }>;
+
   const activeIntegration = integrations[selectedIntegration];
   const activeLabel = activeIntegration.connected
     ? (activeIntegration.timelineName || activeIntegration.connectedText)
@@ -153,7 +170,7 @@ function IntegrationStatus() {
             }}
             className="cursor-pointer"
           >
-            <RotateCcw />
+            <RotateCcw className="h-4 w-4" />
             <span>{t("common.refresh", "Refresh")}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -161,6 +178,7 @@ function IntegrationStatus() {
     </div>
   );
 }
+
 
 function SettingsDropdown() {
   const { t } = useTranslation();
@@ -176,9 +194,9 @@ function SettingsDropdown() {
   // download/management pattern.
   const managerModels: Model[] = downloadedModelValues.includes(diarizeModel.value)
     ? [
-        ...modelsState,
-        { ...diarizeModel, isDownloaded: true },
-      ]
+      ...modelsState,
+      { ...diarizeModel, isDownloaded: true },
+    ]
     : modelsState;
 
   const handleThemeChange = (themeValue: string) => {
@@ -225,7 +243,7 @@ function SettingsDropdown() {
                 rel="noopener noreferrer"
                 className="group"
               >
-                <GitMerge/>
+                <GitMerge />
                 <span>{t("settings.support.viewSource", "View Source")}</span>
               </a>
             </DropdownMenuItem>
@@ -406,10 +424,10 @@ export function Titlebar({ onOpenCompactViewer }: { onOpenCompactViewer?: () => 
 
   const centerContent =
     phase === "downloading" ||
-    phase === "ready" ||
-    phase === "installing" ||
-    phase === "restarting" ||
-    phase === "available-link" ? (
+      phase === "ready" ||
+      phase === "installing" ||
+      phase === "restarting" ||
+      phase === "available-link" ? (
       <UpdateStatusIndicator
         phase={phase}
         percentage={percentage}

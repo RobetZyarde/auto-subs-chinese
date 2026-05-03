@@ -50,7 +50,7 @@ import { AddToTimelineDialog } from "@/components/dialogs/add-to-timeline-dialog
 import { TextFormattingPanel } from "@/components/settings/text-formatting-panel";
 import { useSubtitleDocument } from "@/contexts/SubtitleDocumentContext";
 import { useResolve } from "@/contexts/ResolveContext";
-import { usePremiere } from "@/contexts/PremiereContext";
+import { useAdobe } from "@/contexts/AdobeContext";
 import { useIntegration } from "@/contexts/IntegrationContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { Speaker, Template, Track } from "@/types";
@@ -63,6 +63,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { PlusIcon, type PlusIconHandle } from "../ui/plus";
 import { cn } from "@/lib/utils";
+
 
 type SubtitleViewerVariant = "desktop" | "compact";
 
@@ -529,16 +530,19 @@ function SubtitleToolbar({
 }
 
 interface SubtitleContentProps {
+  variant: SubtitleViewerVariant;
   subtitlesLength: number;
   searchQuery: string;
   searchCaseSensitive: boolean;
   searchWholeWord: boolean;
   selectedIndex: number | null;
   onSelectedIndexChange: (index: number | null) => void;
+  onJumpToTime: (seconds: number) => Promise<void>;
   t: (key: string) => string;
   subtitleDocumentDateLocale?: string;
   onSubtitleDocumentOpen: () => void;
 }
+
 
 interface SubtitleHistoryListProps {
   searchQuery: string;
@@ -679,11 +683,13 @@ function SubtitleHistoryList({
   const rowVirtualizer = useVirtualizer({
     count: groupedItems.length,
     getScrollElement: () => scrollContainerRef.current,
-    estimateSize: (index) =>
+    estimateSize: (index: number) =>
+
       groupedItems[index]?.type === "header"
         ? 32
         : ESTIMATED_SUBTITLE_DOCUMENT_ROW_HEIGHT,
-    getItemKey: (index) => {
+    getItemKey: (index: number) => {
+
       const item = groupedItems[index];
       if (item?.type === "header") return `header-${item.label}`;
       return item?.data.filename ?? index;
@@ -769,7 +775,8 @@ function SubtitleHistoryList({
           className="relative"
           style={{ height: rowVirtualizer.getTotalSize() }}
         >
-          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          {rowVirtualizer.getVirtualItems().map((virtualRow: any) => {
+
             const item = groupedItems[virtualRow.index];
             if (!item) return null;
 
@@ -909,6 +916,7 @@ function SubtitleHistoryList({
       </AlertDialog>
     </>
   );
+
 }
 
 function SubtitleContent({
@@ -918,6 +926,7 @@ function SubtitleContent({
   searchWholeWord,
   selectedIndex,
   onSelectedIndexChange,
+  onJumpToTime,
   t,
   subtitleDocumentDateLocale,
   onSubtitleDocumentOpen,
@@ -936,6 +945,7 @@ function SubtitleContent({
           searchWholeWord={searchWholeWord}
           selectedIndex={selectedIndex}
           onSelectedIndexChange={onSelectedIndexChange}
+          onJumpToTime={onJumpToTime}
           itemClassName="hover:bg-sidebar-accent transition-colors"
         />
       ) : (
@@ -968,8 +978,9 @@ interface AddToTimelineFooterProps {
   ) => Promise<void>;
   t: (key: string) => string;
   isAdding: boolean;
-  selectedIntegration?: "davinci" | "premiere";
+  selectedIntegration?: "davinci" | "premiere" | "aftereffects";
 }
+
 
 function AddToTimelineFooter({
   variant,
@@ -1047,6 +1058,7 @@ export function SubtitleViewerPanel({
   const [isAddingToTimeline, setIsAddingToTimeline] = React.useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const layersIconRef = React.useRef<PlusIconHandle>(null);
+
   const {
     subtitles,
     currentSubtitleDocumentFilename,
@@ -1057,6 +1069,7 @@ export function SubtitleViewerPanel({
     speakers,
     updateSpeakers,
   } = useSubtitleDocument();
+
   const {
     timelineInfo: resolveTimeline,
     templates: resolveTemplates,
@@ -1064,24 +1077,32 @@ export function SubtitleViewerPanel({
     templatesLoaded: resolveTemplatesLoaded,
     refreshTemplates: refreshResolveTemplates,
     pushToTimeline: resolvePush,
+    jumpToTime: resolveJumpToTime,
   } = useResolve();
+
   const {
-    timelineInfo: premiereTimeline,
-    pushToTimeline: premierePush,
-    isConnected: isPremiereConnected,
-  } = usePremiere();
+    timelineInfo: adobeTimeline,
+    pushToTimeline: adobePush,
+    jumpToTime: adobeJumpToTime,
+  } = useAdobe();
 
   const { selectedIntegration } = useIntegration();
-  const isPremiereActive = selectedIntegration === "premiere";
-  const timelineInfo = isPremiereActive ? premiereTimeline : resolveTimeline;
-  const pushToTimeline = isPremiereActive
+  const isAdobeActive =
+    selectedIntegration === "premiere" || selectedIntegration === "aftereffects";
+
+  const timelineInfo = isAdobeActive ? adobeTimeline : resolveTimeline;
+
+  const pushToTimeline = isAdobeActive
     ? (
         filename?: string,
         _selectedTemplate?: string,
         _selectedOutputTrack?: string,
         _presetSettings?: Record<string, unknown>,
-      ) => premierePush(filename)
+      ) => adobePush(filename)
     : resolvePush;
+
+  const jumpToTime = isAdobeActive ? adobeJumpToTime : resolveJumpToTime;
+
   const { settings } = useSettings();
   const { t, i18n } = useTranslation();
   const hasSubtitles = subtitles.length > 0;
@@ -1118,9 +1139,9 @@ export function SubtitleViewerPanel({
     variant === "desktop"
       ? Boolean(replaceValue.trim())
       : Boolean(searchQuery.trim());
-  const isIntegrationConnected = isPremiereActive
-    ? isPremiereConnected
-    : Boolean(timelineInfo?.timelineId);
+  const isIntegrationConnected = isAdobeActive
+    ? Boolean(adobeTimeline?.timelineId)
+    : Boolean(resolveTimeline?.timelineId);
   const shellClassName =
     variant === "desktop"
       ? "flex flex-col h-full border-l bg-card/50"
@@ -1266,12 +1287,14 @@ export function SubtitleViewerPanel({
       )}
 
       <SubtitleContent
+        variant={variant}
         subtitlesLength={subtitles.length}
         searchQuery={searchQuery}
         searchCaseSensitive={searchCaseSensitive}
         searchWholeWord={searchWholeWord}
         selectedIndex={selectedIndex}
         onSelectedIndexChange={setSelectedIndex}
+        onJumpToTime={jumpToTime}
         t={t}
         subtitleDocumentDateLocale={subtitleDocumentDateLocale}
         onSubtitleDocumentOpen={() => {
@@ -1285,17 +1308,18 @@ export function SubtitleViewerPanel({
           variant={variant}
           settings={settings}
           timelineInfo={timelineInfo}
-          templates={isPremiereActive ? [] : resolveTemplates}
-          templatesLoading={!isPremiereActive && resolveTemplatesLoading}
-          templatesLoaded={isPremiereActive || resolveTemplatesLoaded}
+          templates={isAdobeActive ? [] : resolveTemplates}
+          templatesLoading={!isAdobeActive && resolveTemplatesLoading}
+          templatesLoaded={isAdobeActive || resolveTemplatesLoaded}
           onLoadTemplates={
-            isPremiereActive ? undefined : refreshResolveTemplates
+            isAdobeActive ? undefined : refreshResolveTemplates
           }
+
           layersIconRef={layersIconRef}
           onAddToTimeline={handleAddToTimeline}
           t={t}
           isAdding={isAddingToTimeline}
-          selectedIntegration={isPremiereActive ? "premiere" : "davinci"}
+          selectedIntegration={selectedIntegration as any}
         />
       )}
     </div>
