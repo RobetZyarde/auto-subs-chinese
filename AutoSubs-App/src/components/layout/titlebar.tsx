@@ -28,7 +28,7 @@ import {
 } from "@/hooks/use-update-status";
 import { invoke } from "@tauri-apps/api/core";
 import { diarizeModel } from "@/lib/models";
-import { TranscriptSearchPopover } from "@/components/common/transcript-search-popover";
+import { SubtitleHistoryPopover } from "@/components/common/subtitle-history-popover";
 
 import { useResolve } from "@/contexts/ResolveContext";
 import { usePremiere } from "@/contexts/PremiereContext";
@@ -308,11 +308,11 @@ function SettingsDropdown() {
   );
 }
 
-function TranscriptsButton({ onTranscriptOpen }: { onTranscriptOpen?: () => void }) {
+function SubtitleHistoryButton({ onSubtitleDocumentOpen }: { onSubtitleDocumentOpen?: () => void }) {
   const historyIconRef = useRef<HistoryIconHandle>(null);
 
   return (
-    <TranscriptSearchPopover
+    <SubtitleHistoryPopover
       trigger={
         <Button
           variant="ghost"
@@ -325,7 +325,7 @@ function TranscriptsButton({ onTranscriptOpen }: { onTranscriptOpen?: () => void
           <ArchiveIcon ref={historyIconRef} size={16} />
         </Button>
       }
-      onTranscriptOpen={onTranscriptOpen}
+      onSubtitleDocumentOpen={onSubtitleDocumentOpen}
       align="end"
     />
   );
@@ -447,10 +447,10 @@ export function Titlebar({ onOpenCompactViewer }: { onOpenCompactViewer?: () => 
             {centerContent}
           </div>
 
-          {/* Right side - Transcripts and Settings buttons */}
+          {/* Right side - Subtitle history and settings buttons */}
           <div className="flex items-center w-24 justify-end">
             <div data-tauri-drag-region="false" data-tour="history-button">
-              <TranscriptsButton onTranscriptOpen={onOpenCompactViewer} />
+              <SubtitleHistoryButton onSubtitleDocumentOpen={onOpenCompactViewer} />
             </div>
             <div data-tauri-drag-region="false">
               <SettingsDropdown />
@@ -460,13 +460,13 @@ export function Titlebar({ onOpenCompactViewer }: { onOpenCompactViewer?: () => 
       ) : (
         // Windows/Linux layout: Settings on left, status in center, window buttons on right
         <>
-          {/* Left side - Transcripts and Settings */}
+          {/* Left side - Subtitle history and settings */}
           <div className="flex items-center">
             <div data-tauri-drag-region="false">
               <SettingsDropdown />
             </div>
             <div data-tauri-drag-region="false" data-tour="history-button">
-              <TranscriptsButton onTranscriptOpen={onOpenCompactViewer} />
+              <SubtitleHistoryButton onSubtitleDocumentOpen={onOpenCompactViewer} />
             </div>
           </div>
 

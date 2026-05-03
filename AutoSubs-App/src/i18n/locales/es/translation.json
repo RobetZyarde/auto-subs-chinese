@@ -458,7 +458,7 @@
     "finish": "Empezar"
   },
   "titlebar": {
-    "transcripts": {
+    "subtitleHistory": {
       "empty": "No se encontraron transcripciones.",
       "empty_title": "No se encontraron transcripciones",
       "empty_detail": "Tu historial de transcripciones aparecerá aquí una vez que generes subtítulos.",

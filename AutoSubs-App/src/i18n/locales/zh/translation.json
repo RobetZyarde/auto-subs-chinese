@@ -458,7 +458,7 @@
     "finish": "开始使用"
   },
   "titlebar": {
-    "transcripts": {
+    "subtitleHistory": {
       "empty": "未找到记录。",
       "empty_title": "未找到记录",
       "empty_detail": "生成字幕后，您的转录历史记录将显示在这里。",

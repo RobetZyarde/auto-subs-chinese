@@ -403,7 +403,7 @@
     "loading": "Loading subtitles...",
     "jumpToTimeline": "Jump to point on timeline",
     "unknownSpeaker": "Unknown Speaker",
-    "previousTranscripts": "Previous Transcripts",
+    "previousSubtitles": "Subtitle History",
     "empty": {
       "noSubtitlesFound": "No subtitles found",
       "tryDifferentSearch": "Try a different search term",
@@ -453,24 +453,24 @@
       "description": "Configure language, speaker identification, text formatting, then click Generate Subtitles to start."
     },
     "history": {
-      "title": "Previous Transcripts",
-      "description": "Access and search through all your past transcriptions here."
+      "title": "Subtitle History",
+      "description": "Access and search through your saved subtitle documents here."
     },
     "skip": "Skip tour",
     "next": "Next",
     "finish": "Get Started"
   },
   "titlebar": {
-    "transcripts": {
-      "searchPlaceholder": "Search transcripts...",
+    "subtitleHistory": {
+      "searchPlaceholder": "Search subtitle history...",
       "loading": "Loading...",
-      "empty": "No transcripts found.",
-      "empty_title": "No transcripts found",
-      "empty_detail": "Your transcript history will appear here once you generate some subtitles.",
+      "empty": "No subtitle documents found.",
+      "empty_title": "No subtitle documents found",
+      "empty_detail": "Your subtitle history will appear here once you generate subtitles.",
       "no_results": "No results found",
       "no_results_detail": "Try adjusting your search query.",
-      "delete_title": "Delete transcript?",
-      "delete_description": "This will permanently remove the transcript from your history. This action cannot be undone.",
+      "delete_title": "Delete subtitle document?",
+      "delete_description": "This will permanently remove the subtitle document from your history. This action cannot be undone.",
       "sections": {
         "today": "Today",
         "yesterday": "Yesterday",

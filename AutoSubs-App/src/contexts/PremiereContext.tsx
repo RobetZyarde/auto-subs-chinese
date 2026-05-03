@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { toast } from 'sonner';
 import { TimelineInfo } from '@/types';
 import { requestSequenceInfo, requestAudioExport, requestImportSRT } from '@/api/premiere-api';
-import { getAudioExportDir, getTranscriptPath, loadTranscriptSubtitles } from '@/utils/file-utils';
+import { getAudioExportDir, getSubtitleDocumentPath, loadSubtitleDocumentSubtitles } from '@/utils/file-utils';
 import { generateSrt } from '@/utils/srt-utils';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -154,8 +154,8 @@ export function PremiereProvider({ children }: { children: React.ReactNode }) {
   async function pushToTimeline(filename?: string) {
     if (!filename) return;
     try {
-      const filePath = await getTranscriptPath(filename);
-      const subtitles = await loadTranscriptSubtitles(filename);
+      const filePath = await getSubtitleDocumentPath(filename);
+      const subtitles = await loadSubtitleDocumentSubtitles(filename);
       const srtPath = filePath.replace(/\.json$/, '.srt');
       const srtData = generateSrt(subtitles);
       await writeTextFile(srtPath, srtData);

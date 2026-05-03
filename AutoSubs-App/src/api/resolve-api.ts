@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { getTranscriptPath, getAudioExportDir } from '@/utils/file-utils';
+import { getSubtitleDocumentPath, getAudioExportDir } from '@/utils/file-utils';
 import { Speaker, Template } from '@/types';
 
 /**
@@ -168,7 +168,7 @@ export async function checkTrackConflicts(
   filename: string,
   outputTrack: string,
 ): Promise<ConflictInfo> {
-  const filePath = await getTranscriptPath(filename);
+  const filePath = await getSubtitleDocumentPath(filename);
   return callResolve({
     func: 'CheckTrackConflicts',
     filePath,
@@ -183,7 +183,7 @@ export async function addSubtitlesToTimeline(
   conflictMode: ConflictMode = null,
   presetSettings?: Record<string, unknown>,
 ): Promise<AddSubtitlesResult> {
-  const filePath = await getTranscriptPath(filename);
+  const filePath = await getSubtitleDocumentPath(filename);
   const data = await callResolve({
     func: 'AddSubtitles',
     filePath,

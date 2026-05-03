@@ -61,7 +61,7 @@ import { TextFormattingPanel } from "@/components/settings/text-formatting-panel
 import { ProcessingStepItem } from "@/components/processing/processing-step-item";
 import { useModels } from "@/contexts/ModelsContext";
 import { useProgress } from "@/contexts/ProgressContext";
-import { useTranscript } from "@/contexts/TranscriptContext";
+import { useSubtitleDocument } from "@/contexts/SubtitleDocumentContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useResolve } from "@/contexts/ResolveContext";
 import { usePremiere } from "@/contexts/PremiereContext";
@@ -587,8 +587,8 @@ function TranscriptionPanelView({
   );
 
   return (
-    <div className="h-full flex flex-col relative pb-4">
-      <div className="sticky top-0 z-10 flex items-center justify-between p-4 pb-3 bg-transparent">
+    <div className="h-full flex flex-col relative p-3">
+      <div className="sticky top-0 z-10 flex items-center justify-between pb-3 bg-transparent">
         <div className="flex items-center gap-2">
           <ModelPicker
             modelsState={modelsState}
@@ -697,9 +697,9 @@ function TranscriptionPanelView({
 
       <div className="flex-shrink-0">
         <Card
-          className={`p-3 ${isTourActive ? "" : "sticky bottom-4"} mx-4 z-50 shadow-lg bg-card`}
+          className={`p-3 ${isTourActive ? "" : "sticky bottom-4"} m-1 z-50 shadow-lg bg-card`}
         >
-          <div className="grid w-full gap-4" data-tour="transcription-controls">
+          <div className="grid w-full gap-3" data-tour="transcription-controls">
             {!isProcessing &&
               (shouldShowExpandedSourceControls
                 ? currentSettings.audioInputMode === "timeline"
@@ -1018,11 +1018,11 @@ export function TranscriptionPanel({
   const {
     subtitles,
     speakers,
-    currentTranscriptFilename,
+    currentSubtitleDocumentFilename,
     processTranscriptionResults,
     exportSubtitlesAs,
     loadSubtitles,
-  } = useTranscript();
+  } = useSubtitleDocument();
   const { settings, updateSetting } = useSettings();
   const { modelsState, downloadedModelValues, checkDownloadedModels } =
     useModels();
@@ -1192,13 +1192,13 @@ export function TranscriptionPanel({
     presetSettings?: Record<string, unknown>,
   ) => {
     try {
-      if (!currentTranscriptFilename) {
-        console.error("No active transcript file to add to timeline");
+      if (!currentSubtitleDocumentFilename) {
+        console.error("No active subtitle document to add to timeline");
         return;
       }
 
       await pushToTimeline(
-        currentTranscriptFilename,
+        currentSubtitleDocumentFilename,
         selectedTemplate,
         selectedOutputTrack,
         presetSettings,

@@ -453,7 +453,7 @@
     "toggle": "테마 전환"
   },
   "titlebar": {
-    "transcripts": {
+    "subtitleHistory": {
       "empty": "전사된 내용이 없습니다.",
       "empty_title": "전사된 내용이 없습니다",
       "empty_detail": "자막을 생성하면 여기에 전사 기록이 표시됩니다.",

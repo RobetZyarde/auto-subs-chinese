@@ -24,7 +24,7 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Settings, Speaker, Template, TimelineInfo } from "@/types"
-import { useTranscript } from "@/contexts/TranscriptContext"
+import { useSubtitleDocument } from "@/contexts/SubtitleDocumentContext"
 import { usePresets, DEFAULT_PRESET_ID } from "@/contexts/PresetsContext"
 import { useSettings } from "@/contexts/SettingsContext"
 import { SpeakerSettings } from "@/components/common/speaker-settings"
@@ -93,7 +93,7 @@ export function AddToTimelineDialog({
 }: AddToTimelineDialogProps) {
     const isPremiere = selectedIntegration === "premiere"
     const { t } = useTranslation()
-    const { speakers, updateSpeakers, currentTranscriptFilename } = useTranscript()
+    const { speakers, updateSpeakers, currentSubtitleDocumentFilename } = useSubtitleDocument()
     const { updateSetting } = useSettings()
     const {
         presets,
@@ -178,12 +178,12 @@ export function AddToTimelineDialog({
 
     // Check for track conflicts whenever the selected output track changes.
     React.useEffect(() => {
-        if (!open || !currentTranscriptFilename || !selection.outputTrack) {
+        if (!open || !currentSubtitleDocumentFilename || !selection.outputTrack) {
             setConflictInfo(null)
             return
         }
         let cancelled = false
-        checkTrackConflicts(currentTranscriptFilename, selection.outputTrack)
+        checkTrackConflicts(currentSubtitleDocumentFilename, selection.outputTrack)
             .then((info) => {
                 if (!cancelled) setConflictInfo(info)
             })
@@ -192,7 +192,7 @@ export function AddToTimelineDialog({
                 if (!cancelled) setConflictInfo(null)
             })
         return () => { cancelled = true }
-    }, [open, selection.outputTrack, currentTranscriptFilename])
+    }, [open, selection.outputTrack, currentSubtitleDocumentFilename])
 
     // Intercept close while a preset-edit session is active so the temporary
     // track is always torn down. We explicitly cancel here rather than relying

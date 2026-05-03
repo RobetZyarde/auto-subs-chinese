@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useTranscript } from "@/contexts/TranscriptContext"
+import { useSubtitleDocument } from "@/contexts/SubtitleDocumentContext"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { ArrowDown, ArrowUp, X } from "lucide-react"
@@ -39,7 +39,7 @@ const SubtitleList = ({
     onSelectedIndexChange,
 }: SubtitleListProps) => {
     const { t } = useTranslation();
-    const { subtitles, updateSubtitles, speakers, updateSpeakers } = useTranscript();
+    const { subtitles, updateSubtitles, speakers, updateSpeakers } = useSubtitleDocument();
     const [uncontrolledSelectedIndex, setUncontrolledSelectedIndex] = useState<number | null>(null);
     const selectedIndex = controlledSelectedIndex ?? uncontrolledSelectedIndex;
 

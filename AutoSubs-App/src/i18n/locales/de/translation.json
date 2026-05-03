@@ -458,7 +458,7 @@
     "finish": "Los geht's"
   },
   "titlebar": {
-    "transcripts": {
+    "subtitleHistory": {
       "searchPlaceholder": "Transkripte durchsuchen...",
       "loading": "Lädt...",
       "empty": "Keine Transkripte gefunden.",

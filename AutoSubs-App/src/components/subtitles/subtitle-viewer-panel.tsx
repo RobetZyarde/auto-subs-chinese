@@ -1,12 +1,10 @@
 import * as React from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
-  Calendar,
   Clock,
   FileText,
   History,
   Loader2,
-  MoreVertical,
   Repeat2,
   Search,
   Trash2,
@@ -27,12 +25,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   InputGroup,
@@ -56,17 +48,17 @@ import { SpeakerSettings } from "@/components/common/speaker-settings";
 import { ImportExportPopover } from "@/components/common/import-export-popover";
 import { AddToTimelineDialog } from "@/components/dialogs/add-to-timeline-dialog";
 import { TextFormattingPanel } from "@/components/settings/text-formatting-panel";
-import { useTranscript } from "@/contexts/TranscriptContext";
+import { useSubtitleDocument } from "@/contexts/SubtitleDocumentContext";
 import { useResolve } from "@/contexts/ResolveContext";
 import { usePremiere } from "@/contexts/PremiereContext";
 import { useIntegration } from "@/contexts/IntegrationContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { Speaker, Template, Track } from "@/types";
 import {
-  deleteTranscript,
-  listTranscriptIndexFiles,
-  readTranscript,
-  type TranscriptListItem,
+  deleteSubtitleDocument,
+  listSubtitleDocumentIndex,
+  readSubtitleDocument,
+  type SubtitleDocumentListItem,
 } from "@/utils/file-utils";
 import { useTranslation } from "react-i18next";
 import { PlusIcon, type PlusIconHandle } from "../ui/plus";
@@ -74,9 +66,9 @@ import { cn } from "@/lib/utils";
 
 type SubtitleViewerVariant = "desktop" | "compact";
 
-const ESTIMATED_TRANSCRIPT_ROW_HEIGHT = 60;
-const TRANSCRIPT_ROW_OVERSCAN = 8;
-const TRANSCRIPT_SKELETON_ROWS = 10;
+const ESTIMATED_SUBTITLE_DOCUMENT_ROW_HEIGHT = 60;
+const SUBTITLE_DOCUMENT_ROW_OVERSCAN = 8;
+const SUBTITLE_DOCUMENT_SKELETON_ROWS = 10;
 
 interface SubtitleViewerPanelProps {
   variant: SubtitleViewerVariant;
@@ -417,9 +409,9 @@ interface SubtitleToolbarProps {
   speakers: Speaker[];
   showSpeakerEditor: boolean;
   showReformat: boolean;
-  importSubtitles: ReturnType<typeof useTranscript>["importSubtitles"];
-  exportSubtitlesAs: ReturnType<typeof useTranscript>["exportSubtitlesAs"];
-  subtitles: ReturnType<typeof useTranscript>["subtitles"];
+  importSubtitles: ReturnType<typeof useSubtitleDocument>["importSubtitles"];
+  exportSubtitlesAs: ReturnType<typeof useSubtitleDocument>["exportSubtitlesAs"];
+  subtitles: ReturnType<typeof useSubtitleDocument>["subtitles"];
   onSpeakerEditorOpenChange: (open: boolean) => void;
   onSpeakerChange: (index: number, speaker: Speaker) => void;
   onReformatOpenChange: (open: boolean) => void;
@@ -544,24 +536,24 @@ interface SubtitleContentProps {
   selectedIndex: number | null;
   onSelectedIndexChange: (index: number | null) => void;
   t: (key: string) => string;
-  transcriptDateLocale?: string;
-  onTranscriptOpen: () => void;
+  subtitleDocumentDateLocale?: string;
+  onSubtitleDocumentOpen: () => void;
 }
 
-interface PreviousTranscriptsListProps {
+interface SubtitleHistoryListProps {
   searchQuery: string;
-  transcriptDateLocale?: string;
-  onTranscriptOpen: () => void;
+  subtitleDocumentDateLocale?: string;
+  onSubtitleDocumentOpen: () => void;
   t: (key: string) => string;
 }
 
-function PreviousTranscriptsList({
+function SubtitleHistoryList({
   searchQuery,
-  transcriptDateLocale,
-  onTranscriptOpen,
+  subtitleDocumentDateLocale,
+  onSubtitleDocumentOpen,
   t,
-}: PreviousTranscriptsListProps) {
-  const [transcripts, setTranscripts] = React.useState<TranscriptListItem[]>(
+}: SubtitleHistoryListProps) {
+  const [subtitleDocuments, setSubtitleDocuments] = React.useState<SubtitleDocumentListItem[]>(
     [],
   );
   const [hasLoaded, setHasLoaded] = React.useState(false);
@@ -572,55 +564,55 @@ function PreviousTranscriptsList({
   const {
     setSubtitles,
     setSpeakers,
-    setCurrentTranscriptFilename,
-    currentTranscriptFilename,
-  } = useTranscript();
+    setCurrentSubtitleDocumentFilename,
+    currentSubtitleDocumentFilename,
+  } = useSubtitleDocument();
 
-  const loadTranscripts = React.useCallback(async () => {
+  const loadSubtitleDocuments = React.useCallback(async () => {
     try {
-      setTranscripts(await listTranscriptIndexFiles());
+      setSubtitleDocuments(await listSubtitleDocumentIndex());
     } catch (error) {
-      console.error("Failed to load transcripts:", error);
+      console.error("Failed to load subtitle documents:", error);
     } finally {
       setHasLoaded(true);
     }
   }, []);
 
   React.useEffect(() => {
-    void loadTranscripts();
-  }, [loadTranscripts]);
+    void loadSubtitleDocuments();
+  }, [loadSubtitleDocuments]);
 
-  const formatTranscriptDate = React.useCallback(
+  const formatSubtitleDocumentDate = React.useCallback(
     (createdAt: Date) =>
-      createdAt.toLocaleDateString(transcriptDateLocale, {
+      createdAt.toLocaleDateString(subtitleDocumentDateLocale, {
         month: "short",
         day: "numeric",
         year: "numeric",
         hour: "numeric",
         minute: "2-digit",
       }),
-    [transcriptDateLocale],
+    [subtitleDocumentDateLocale],
   );
 
-  const filteredTranscripts = React.useMemo(() => {
+  const filteredSubtitleDocuments = React.useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
-    if (!query) return transcripts;
+    if (!query) return subtitleDocuments;
 
-    return transcripts.filter((transcript) => {
-      const createdAt = transcript.createdAt;
+    return subtitleDocuments.filter((subtitleDocument) => {
+      const createdAt = subtitleDocument.createdAt;
       const month = String(createdAt.getMonth() + 1).padStart(2, "0");
       const day = String(createdAt.getDate()).padStart(2, "0");
       const year = String(createdAt.getFullYear());
       const hours = String(createdAt.getHours()).padStart(2, "0");
       const minutes = String(createdAt.getMinutes()).padStart(2, "0");
       const searchableText = [
-        transcript.displayName,
-        transcript.filename,
-        transcript.timelineName,
-        formatTranscriptDate(createdAt),
-        createdAt.toLocaleString(transcriptDateLocale),
-        createdAt.toLocaleDateString(transcriptDateLocale),
-        createdAt.toLocaleTimeString(transcriptDateLocale, {
+        subtitleDocument.displayName,
+        subtitleDocument.filename,
+        subtitleDocument.timelineName,
+        formatSubtitleDocumentDate(createdAt),
+        createdAt.toLocaleString(subtitleDocumentDateLocale),
+        createdAt.toLocaleDateString(subtitleDocumentDateLocale),
+        createdAt.toLocaleTimeString(subtitleDocumentDateLocale, {
           hour: "numeric",
           minute: "2-digit",
         }),
@@ -635,15 +627,15 @@ function PreviousTranscriptsList({
 
       return searchableText.includes(query);
     });
-  }, [formatTranscriptDate, searchQuery, transcriptDateLocale, transcripts]);
+  }, [formatSubtitleDocumentDate, searchQuery, subtitleDocumentDateLocale, subtitleDocuments]);
 
   const groupedItems = React.useMemo(() => {
     const items: (
       | { type: "header"; label: string }
-      | { type: "transcript"; data: TranscriptListItem }
+      | { type: "document"; data: SubtitleDocumentListItem }
     )[] = [];
 
-    if (filteredTranscripts.length === 0) return items;
+    if (filteredSubtitleDocuments.length === 0) return items;
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -654,23 +646,23 @@ function PreviousTranscriptsList({
 
     let currentSection: string | null = null;
 
-    filteredTranscripts.forEach((transcript) => {
-      const date = new Date(transcript.createdAt);
-      const transcriptDate = new Date(
+    filteredSubtitleDocuments.forEach((subtitleDocument) => {
+      const date = new Date(subtitleDocument.createdAt);
+      const subtitleDocumentDate = new Date(
         date.getFullYear(),
         date.getMonth(),
         date.getDate(),
       );
 
       let section = "";
-      if (transcriptDate.getTime() === today.getTime()) {
-        section = t("titlebar.transcripts.sections.today");
-      } else if (transcriptDate.getTime() === yesterday.getTime()) {
-        section = t("titlebar.transcripts.sections.yesterday");
-      } else if (transcriptDate.getTime() >= lastWeek.getTime()) {
-        section = t("titlebar.transcripts.sections.last_week");
+      if (subtitleDocumentDate.getTime() === today.getTime()) {
+        section = t("titlebar.subtitleHistory.sections.today");
+      } else if (subtitleDocumentDate.getTime() === yesterday.getTime()) {
+        section = t("titlebar.subtitleHistory.sections.yesterday");
+      } else if (subtitleDocumentDate.getTime() >= lastWeek.getTime()) {
+        section = t("titlebar.subtitleHistory.sections.last_week");
       } else {
-        section = t("titlebar.transcripts.sections.older");
+        section = t("titlebar.subtitleHistory.sections.older");
       }
 
       if (section !== currentSection) {
@@ -678,11 +670,11 @@ function PreviousTranscriptsList({
         currentSection = section;
       }
 
-      items.push({ type: "transcript", data: transcript });
+      items.push({ type: "document", data: subtitleDocument });
     });
 
     return items;
-  }, [filteredTranscripts, t]);
+  }, [filteredSubtitleDocuments, t]);
 
   const rowVirtualizer = useVirtualizer({
     count: groupedItems.length,
@@ -690,40 +682,40 @@ function PreviousTranscriptsList({
     estimateSize: (index) =>
       groupedItems[index]?.type === "header"
         ? 32
-        : ESTIMATED_TRANSCRIPT_ROW_HEIGHT,
+        : ESTIMATED_SUBTITLE_DOCUMENT_ROW_HEIGHT,
     getItemKey: (index) => {
       const item = groupedItems[index];
       if (item?.type === "header") return `header-${item.label}`;
       return item?.data.filename ?? index;
     },
-    overscan: TRANSCRIPT_ROW_OVERSCAN,
+    overscan: SUBTITLE_DOCUMENT_ROW_OVERSCAN,
   });
 
-  const openTranscript = async (filename: string) => {
+  const openSubtitleDocument = async (filename: string) => {
     try {
-      const transcriptData = await readTranscript(filename);
-      if (transcriptData) {
-        setSubtitles(transcriptData.segments || []);
-        setSpeakers(transcriptData.speakers || []);
-        setCurrentTranscriptFilename(filename);
-        onTranscriptOpen();
+      const subtitleDocumentData = await readSubtitleDocument(filename);
+      if (subtitleDocumentData) {
+        setSubtitles(subtitleDocumentData.segments || []);
+        setSpeakers(subtitleDocumentData.speakers || []);
+        setCurrentSubtitleDocumentFilename(filename);
+        onSubtitleDocumentOpen();
       }
     } catch (error) {
-      console.error("Failed to load transcript:", error);
+      console.error("Failed to load subtitle document:", error);
     }
   };
 
-  const handleDeleteTranscript = async (filename: string) => {
+  const handleDeleteSubtitleDocument = async (filename: string) => {
     try {
-      await deleteTranscript(filename);
-      if (currentTranscriptFilename === filename) {
+      await deleteSubtitleDocument(filename);
+      if (currentSubtitleDocumentFilename === filename) {
         setSubtitles([]);
         setSpeakers([]);
-        setCurrentTranscriptFilename(null);
+        setCurrentSubtitleDocumentFilename(null);
       }
-      void loadTranscripts();
+      void loadSubtitleDocuments();
     } catch (error) {
-      console.error("Failed to delete transcript:", error);
+      console.error("Failed to delete subtitle document:", error);
     } finally {
       setDeletingFilename(null);
     }
@@ -733,7 +725,7 @@ function PreviousTranscriptsList({
     return (
       <div className="h-full overflow-hidden px-2 py-2">
         <div className="space-y-1">
-          {Array.from({ length: TRANSCRIPT_SKELETON_ROWS }).map((_, index) => (
+          {Array.from({ length: SUBTITLE_DOCUMENT_SKELETON_ROWS }).map((_, index) => (
             <div
               key={index}
               className="flex items-start gap-3 rounded-md px-3 py-2.5"
@@ -750,7 +742,7 @@ function PreviousTranscriptsList({
     );
   }
 
-  if (filteredTranscripts.length === 0) {
+  if (filteredSubtitleDocuments.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-8 py-8 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/50 text-muted-foreground/50">
@@ -758,13 +750,13 @@ function PreviousTranscriptsList({
         </div>
         <h3 className="mt-4 text-sm font-semibold text-foreground">
           {searchQuery
-            ? t("titlebar.transcripts.no_results")
-            : t("titlebar.transcripts.empty_title")}
+            ? t("titlebar.subtitleHistory.no_results")
+            : t("titlebar.subtitleHistory.empty_title")}
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">
           {searchQuery
-            ? t("titlebar.transcripts.no_results_detail")
-            : t("titlebar.transcripts.empty_detail")}
+            ? t("titlebar.subtitleHistory.no_results_detail")
+            : t("titlebar.subtitleHistory.empty_detail")}
         </p>
       </div>
     );
@@ -796,12 +788,12 @@ function PreviousTranscriptsList({
               );
             }
 
-            const transcript = item.data;
-            const isActive = currentTranscriptFilename === transcript.filename;
+            const subtitleDocument = item.data;
+            const isActive = currentSubtitleDocumentFilename === subtitleDocument.filename;
 
             return (
               <div
-                key={transcript.filename}
+                key={subtitleDocument.filename}
                 data-index={virtualRow.index}
                 ref={rowVirtualizer.measureElement}
                 style={{
@@ -829,18 +821,18 @@ function PreviousTranscriptsList({
                     </div>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold tracking-tight">
-                        {transcript.displayName}
+                        {subtitleDocument.displayName}
                       </span>
                       <span className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3 opacity-70" />
-                          {formatTranscriptDate(transcript.createdAt)}
+                          {formatSubtitleDocumentDate(subtitleDocument.createdAt)}
                         </span>
-                        {transcript.timelineName && (
+                        {subtitleDocument.timelineName && (
                           <>
                             <span className="h-0.5 w-0.5 rounded-full bg-muted-foreground/30" />
                             <span className="truncate">
-                              {transcript.timelineName}
+                              {subtitleDocument.timelineName}
                             </span>
                           </>
                         )}
@@ -853,7 +845,7 @@ function PreviousTranscriptsList({
                       variant="outline"
                       size="sm"
                       className="h-8 px-3 text-xs font-medium hover:bg-background text-muted-foreground hover:text-foreground"
-                      onClick={() => void openTranscript(transcript.filename)}
+                      onClick={() => void openSubtitleDocument(subtitleDocument.filename)}
                     >
                       {t("common.open")}
                     </Button>
@@ -865,7 +857,7 @@ function PreviousTranscriptsList({
                           size="icon"
                           className="h-8 w-8 hover:bg-background text-muted-foreground hover:text-destructive"
                           onClick={() =>
-                            setDeletingFilename(transcript.filename)
+                            setDeletingFilename(subtitleDocument.filename)
                           }
                         >
                           <Trash2 className="h-4 w-4" />
@@ -895,10 +887,10 @@ function PreviousTranscriptsList({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t("titlebar.transcripts.delete_title")}
+              {t("titlebar.subtitleHistory.delete_title")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("titlebar.transcripts.delete_description")}
+              {t("titlebar.subtitleHistory.delete_description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -907,7 +899,7 @@ function PreviousTranscriptsList({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() =>
                 deletingFilename &&
-                void handleDeleteTranscript(deletingFilename)
+                void handleDeleteSubtitleDocument(deletingFilename)
               }
             >
               {t("common.delete")}
@@ -927,8 +919,8 @@ function SubtitleContent({
   selectedIndex,
   onSelectedIndexChange,
   t,
-  transcriptDateLocale,
-  onTranscriptOpen,
+  subtitleDocumentDateLocale,
+  onSubtitleDocumentOpen,
 }: SubtitleContentProps) {
   const contentClassName =
     subtitlesLength > 0
@@ -948,10 +940,10 @@ function SubtitleContent({
         />
       ) : (
         <div className="h-full min-h-0">
-          <PreviousTranscriptsList
+          <SubtitleHistoryList
             searchQuery={searchQuery}
-            transcriptDateLocale={transcriptDateLocale}
-            onTranscriptOpen={onTranscriptOpen}
+            subtitleDocumentDateLocale={subtitleDocumentDateLocale}
+            onSubtitleDocumentOpen={onSubtitleDocumentOpen}
             t={t}
           />
         </div>
@@ -1057,14 +1049,14 @@ export function SubtitleViewerPanel({
   const layersIconRef = React.useRef<PlusIconHandle>(null);
   const {
     subtitles,
-    currentTranscriptFilename,
+    currentSubtitleDocumentFilename,
     updateSubtitles,
     exportSubtitlesAs,
     importSubtitles,
     reformatSubtitles,
     speakers,
     updateSpeakers,
-  } = useTranscript();
+  } = useSubtitleDocument();
   const {
     timelineInfo: resolveTimeline,
     templates: resolveTemplates,
@@ -1093,7 +1085,7 @@ export function SubtitleViewerPanel({
   const { settings } = useSettings();
   const { t, i18n } = useTranslation();
   const hasSubtitles = subtitles.length > 0;
-  const transcriptDateLocale =
+  const subtitleDocumentDateLocale =
     i18n.resolvedLanguage || i18n.language || undefined;
 
   React.useEffect(() => {
@@ -1166,14 +1158,14 @@ export function SubtitleViewerPanel({
     presetSettings?: Record<string, unknown>,
   ) => {
     try {
-      if (!currentTranscriptFilename) {
-        console.error("No active transcript file to add to timeline");
+      if (!currentSubtitleDocumentFilename) {
+        console.error("No active subtitle document to add to timeline");
         return;
       }
 
       setIsAddingToTimeline(true);
       await pushToTimeline(
-        currentTranscriptFilename,
+        currentSubtitleDocumentFilename,
         selectedTemplate,
         selectedOutputTrack,
         presetSettings,
@@ -1218,10 +1210,10 @@ export function SubtitleViewerPanel({
           <InputGroup>
             <InputGroupInput
               ref={searchInputRef}
-              placeholder={t("titlebar.transcripts.searchPlaceholder")}
+              placeholder={t("titlebar.subtitleHistory.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label={t("titlebar.transcripts.searchPlaceholder")}
+              aria-label={t("titlebar.subtitleHistory.searchPlaceholder")}
               className="text-sm"
             />
             {searchQuery ? (
@@ -1281,8 +1273,8 @@ export function SubtitleViewerPanel({
         selectedIndex={selectedIndex}
         onSelectedIndexChange={setSelectedIndex}
         t={t}
-        transcriptDateLocale={transcriptDateLocale}
-        onTranscriptOpen={() => {
+        subtitleDocumentDateLocale={subtitleDocumentDateLocale}
+        onSubtitleDocumentOpen={() => {
           setSelectedIndex(null);
           setSearchQuery("");
         }}

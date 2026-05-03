@@ -2,7 +2,7 @@ import React from 'react';
 import { SettingsProvider } from './SettingsContext';
 import { ModelsProvider } from './ModelsContext';
 import { ResolveProvider } from './ResolveContext';
-import { TranscriptProvider } from './TranscriptContext';
+import { SubtitleDocumentProvider } from './SubtitleDocumentContext';
 import { ProgressProvider } from './ProgressContext';
 import { PresetsProvider } from './PresetsContext';
 import { ErrorDialogProvider } from './ErrorDialogContext';
@@ -27,7 +27,7 @@ interface EditorWorkspaceProvidersProps {
  * 3. IntegrationProvider - Active host app selection
  * 
  * Editor-specific providers are mounted by EditorWorkspaceProviders, closer to
- * the UI that actually needs host app state, transcript data, and progress.
+ * the UI that actually needs host app state, subtitle document state, and progress.
  */
 export function GlobalProvider({ children }: GlobalProviderProps) {
   // ErrorDialogProvider is mounted at the outermost layer so any inner
@@ -50,13 +50,13 @@ export function EditorWorkspaceProviders({ children }: EditorWorkspaceProvidersP
   return (
     <ResolveProvider>
       <PremiereProvider>
-        <TranscriptProvider>
+        <SubtitleDocumentProvider>
           <ProgressProvider>
             <PresetsProvider>
               {children}
             </PresetsProvider>
           </ProgressProvider>
-        </TranscriptProvider>
+        </SubtitleDocumentProvider>
       </PremiereProvider>
     </ResolveProvider>
   );

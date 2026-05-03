@@ -13,46 +13,46 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import { listTranscriptFiles, readTranscript, type TranscriptListItem } from "@/utils/file-utils"
-import { useTranscript } from "@/contexts/TranscriptContext"
+import { listSubtitleDocuments, readSubtitleDocument, type SubtitleDocumentListItem } from "@/utils/file-utils"
+import { useSubtitleDocument } from "@/contexts/SubtitleDocumentContext"
 
-interface TranscriptSearchPopoverProps {
+interface SubtitleHistoryPopoverProps {
   trigger: React.ReactNode
-  onTranscriptOpen?: () => void
+  onSubtitleDocumentOpen?: () => void
   align?: "start" | "center" | "end"
 }
 
-export function TranscriptSearchPopover({ trigger, onTranscriptOpen, align = "center" }: TranscriptSearchPopoverProps) {
+export function SubtitleHistoryPopover({ trigger, onSubtitleDocumentOpen, align = "center" }: SubtitleHistoryPopoverProps) {
   const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(false)
-  const [transcripts, setTranscripts] = useState<TranscriptListItem[]>([])
+  const [subtitleDocuments, setSubtitleDocuments] = useState<SubtitleDocumentListItem[]>([])
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
-  const { setSubtitles, setSpeakers, setCurrentTranscriptFilename } = useTranscript()
+  const { setSubtitles, setSpeakers, setCurrentSubtitleDocumentFilename } = useSubtitleDocument()
 
   useEffect(() => {
-    loadTranscripts()
+    loadSubtitleDocuments()
   }, [])
 
   useEffect(() => {
     if (open) {
-      loadTranscripts()
+      loadSubtitleDocuments()
     }
   }, [open])
 
-  const loadTranscripts = async () => {
+  const loadSubtitleDocuments = async () => {
     setLoading(true)
     try {
-      setTranscripts(await listTranscriptFiles())
+      setSubtitleDocuments(await listSubtitleDocuments())
       setHasLoaded(true)
     } catch (error) {
-      console.error('Failed to load transcripts:', error)
+      console.error('Failed to load subtitle documents:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const transcriptDateLocale = i18n.resolvedLanguage || i18n.language || undefined
+  const subtitleDocumentDateLocale = i18n.resolvedLanguage || i18n.language || undefined
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -61,42 +61,42 @@ export function TranscriptSearchPopover({ trigger, onTranscriptOpen, align = "ce
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align={align}>
         <Command>
-          <CommandInput placeholder={t("titlebar.transcripts.searchPlaceholder")} />
+          <CommandInput placeholder={t("titlebar.subtitleHistory.searchPlaceholder")} />
           <CommandList>
-            {loading && transcripts.length === 0 && !hasLoaded ? (
+            {loading && subtitleDocuments.length === 0 && !hasLoaded ? (
               <div className="py-4 text-center text-sm text-muted-foreground">
-                {t("titlebar.transcripts.loading")}
+                {t("titlebar.subtitleHistory.loading")}
               </div>
-            ) : transcripts.length === 0 ? (
-              <CommandEmpty>{t("titlebar.transcripts.empty")}</CommandEmpty>
+            ) : subtitleDocuments.length === 0 ? (
+              <CommandEmpty>{t("titlebar.subtitleHistory.empty")}</CommandEmpty>
             ) : (
               <CommandGroup>
-                {transcripts.map((transcript) => (
+                {subtitleDocuments.map((subtitleDocument) => (
                   <CommandItem
-                    key={transcript.filename}
-                    value={`${transcript.displayName} ${transcript.filename}`}
+                    key={subtitleDocument.filename}
+                    value={`${subtitleDocument.displayName} ${subtitleDocument.filename}`}
                     className="cursor-pointer"
                     onSelect={async () => {
                       try {
-                        const transcriptData = await readTranscript(transcript.filename)
-                        if (transcriptData) {
-                          setSubtitles(transcriptData.segments || [])
-                          setSpeakers(transcriptData.speakers || [])
-                          setCurrentTranscriptFilename(transcript.filename)
-                          onTranscriptOpen?.()
+                        const subtitleDocumentData = await readSubtitleDocument(subtitleDocument.filename)
+                        if (subtitleDocumentData) {
+                          setSubtitles(subtitleDocumentData.segments || [])
+                          setSpeakers(subtitleDocumentData.speakers || [])
+                          setCurrentSubtitleDocumentFilename(subtitleDocument.filename)
+                          onSubtitleDocumentOpen?.()
                         }
                       } catch (error) {
-                        console.error('Failed to load transcript:', error)
+                        console.error('Failed to load subtitle document:', error)
                       }
                       setOpen(false)
                     }}
                   >
                     <div className="flex flex-col items-start gap-1">
                       <span className="text-sm font-medium">
-                        {transcript.displayName}
+                        {subtitleDocument.displayName}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {transcript.createdAt.toLocaleDateString(transcriptDateLocale, {
+                        {subtitleDocument.createdAt.toLocaleDateString(subtitleDocumentDateLocale, {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric',

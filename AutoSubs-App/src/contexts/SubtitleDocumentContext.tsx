@@ -7,25 +7,25 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { downloadDir } from '@tauri-apps/api/path';
 import {
-  generateTranscriptFilename,
+  generateSubtitleDocumentFilename,
   generateTranscriptTxt,
-  resolveTranscriptFilename,
-  readTranscript,
-  saveTranscript,
-  updateTranscript
+  resolveSubtitleDocumentFilename,
+  readSubtitleDocument,
+  saveSubtitleDocument,
+  updateSubtitleDocument
 } from '../utils/file-utils';
 import { reformatSubtitles as rustReformatSubtitles } from '@/api/formatting-api';
 import { generateSrt, parseSrt } from '@/utils/srt-utils';
 import { loadFontForLanguage } from '@/lib/font-loader';
 
-interface TranscriptContextType {
+interface SubtitleDocumentContextType {
   subtitles: Subtitle[];
   speakers: Speaker[];
   markIn: number;
-  currentTranscriptFilename: string | null;
+  currentSubtitleDocumentFilename: string | null;
   setSubtitles: (subtitles: Subtitle[]) => void;
   setSpeakers: (speakers: Speaker[]) => void;
-  setCurrentTranscriptFilename: (filename: string | null) => void;
+  setCurrentSubtitleDocumentFilename: (filename: string | null) => void;
   updateSpeakers: (newSpeakers: Speaker[]) => Promise<void>;
   updateSubtitles: (newSubtitles: Subtitle[], filename?: string) => Promise<void>;
   processTranscriptionResults: (transcript: any, settings: Settings, fileInput: string | null, timelineId: string) => Promise<string>;
@@ -35,13 +35,13 @@ interface TranscriptContextType {
   loadSubtitles: (audioInputMode: "file" | "timeline", fileInput: string | null, timelineId: string) => Promise<void>;
 }
 
-const TranscriptContext = createContext<TranscriptContextType | null>(null);
+const SubtitleDocumentContext = createContext<SubtitleDocumentContextType | null>(null);
 
-export function TranscriptProvider({ children }: { children: React.ReactNode }) {
+export function SubtitleDocumentProvider({ children }: { children: React.ReactNode }) {
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [markIn, setMarkIn] = useState(0);
-  const [currentTranscriptFilename, setCurrentTranscriptFilename] = useState<string | null>(null);
+  const [currentSubtitleDocumentFilename, setCurrentSubtitleDocumentFilename] = useState<string | null>(null);
   const { timelineInfo: resolveTimeline } = useResolve();
   const { timelineInfo: premiereTimeline } = usePremiere();
   const { selectedIntegration } = useIntegration();
@@ -49,26 +49,26 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
 
   // Load subtitles when timelineId or fileInput changes
   const loadSubtitles = useCallback(async (audioInputMode: "file" | "timeline", fileInput: string | null, timelineId: string) => {
-    const filename = await resolveTranscriptFilename(audioInputMode === "file", fileInput, timelineId);
+    const filename = await resolveSubtitleDocumentFilename(audioInputMode === "file", fileInput, timelineId);
     if (filename && filename.length > 0) {
       console.log("Loading subtitles:", filename);
-      const transcript = await readTranscript(filename);
+      const transcript = await readSubtitleDocument(filename);
       if (transcript) {
         console.log("Transcript loaded:", transcript);
-        setCurrentTranscriptFilename(filename);
+        setCurrentSubtitleDocumentFilename(filename);
         setMarkIn(transcript.mark_in);
         setSubtitles(transcript.segments || []);
         setSpeakers(transcript.speakers || []);
         loadFontForLanguage(transcript.language);
       } else {
         console.warn("No transcript found for:", filename);
-        setCurrentTranscriptFilename(null);
+        setCurrentSubtitleDocumentFilename(null);
         setSubtitles([]);
         setSpeakers([]);
       }
     } else {
       console.log("No matching transcript found");
-      setCurrentTranscriptFilename(null);
+      setCurrentSubtitleDocumentFilename(null);
       setSubtitles([]);
       setSpeakers([]);
     }
@@ -79,8 +79,8 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
     setSpeakers(newSpeakers);
 
     try {
-      if (currentTranscriptFilename) {
-        await updateTranscript(currentTranscriptFilename, {
+      if (currentSubtitleDocumentFilename) {
+        await updateSubtitleDocument(currentSubtitleDocumentFilename, {
           speakers: newSpeakers
         });
         console.log('Speakers updated in both UI and file');
@@ -97,9 +97,9 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
 
     // Save to JSON file if we have the necessary context
     try {
-      const targetFilename = filename ?? currentTranscriptFilename;
+      const targetFilename = filename ?? currentSubtitleDocumentFilename;
       if (targetFilename) {
-        await updateTranscript(targetFilename, {
+        await updateSubtitleDocument(targetFilename, {
           subtitles: newSubtitles
         });
         console.log('Subtitle updated in both UI and file');
@@ -119,19 +119,19 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
     timelineId: string
   ): Promise<string> => {
     // Generate filename for new transcript based on mode and input
-    const filename = generateTranscriptFilename(
+    const filename = generateSubtitleDocumentFilename(
       settings.audioInputMode === "file",
       fileInput,
       timelineId,
       settings.audioInputMode === "file" ? undefined : timelineInfo?.name
     )
 
-    setCurrentTranscriptFilename(filename);
+    setCurrentSubtitleDocumentFilename(filename);
 
     // Save transcript to JSON file.
     // Content formatting (case, punctuation, censoring) is already applied by the
     // Rust backend during transcription, so no post-processing is needed here.
-    const { segments, speakers } = await saveTranscript(transcript, filename, {
+    const { segments, speakers } = await saveSubtitleDocument(transcript, filename, {
       metadata: {
         sourceType: settings.audioInputMode === "file" ? 'standalone' : 'resolve',
         displayName: settings.audioInputMode === "file"
@@ -160,15 +160,15 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
   }
 
   const reformatSubtitles = async (settings: Settings, fileInput: string | null, timelineId: string) => {
-    const filename = currentTranscriptFilename
-      ?? generateTranscriptFilename(settings.audioInputMode === "file", fileInput, timelineId);
-    const transcript = await readTranscript(filename);
+    const filename = currentSubtitleDocumentFilename
+      ?? generateSubtitleDocumentFilename(settings.audioInputMode === "file", fileInput, timelineId);
+    const transcript = await readSubtitleDocument(filename);
     if (!transcript) {
       console.error("Failed to read transcript");
       return;
     }
 
-    setCurrentTranscriptFilename(filename);
+    setCurrentSubtitleDocumentFilename(filename);
     const originalSegments: Subtitle[] = transcript.originalSegments || transcript.segments || [];
 
     // Single Rust call applies BOTH structural splitting and content formatting
@@ -187,8 +187,8 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
     });
 
     // Save reformatted segments and update state.
-    // Use updateTranscript (not saveTranscript) to preserve originalSegments unchanged.
-    await updateTranscript(filename, { subtitles: segments });
+    // Use updateSubtitleDocument (not saveSubtitleDocument) to preserve originalSegments unchanged.
+    await updateSubtitleDocument(filename, { subtitles: segments });
     console.log("Subtitle list updated with", segments.length, "subtitles");
     setSpeakers(transcript.speakers || []);
     setSubtitles(segments);
@@ -286,7 +286,7 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
       let transcript = { segments: subtitles };
 
       // Save transcript to file in Transcripts directory
-      let filename = generateTranscriptFilename(
+      let filename = generateSubtitleDocumentFilename(
         settings.audioInputMode === "file",
         fileInput,
         timelineId,
@@ -296,7 +296,7 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
       // No speakers for imported subtitles.
       // Content formatting is skipped here — imported SRTs lack word-level data.
       // Users can apply formatting via the reformat flow after import.
-      let { segments } = await saveTranscript(transcript, filename, {
+      let { segments } = await saveSubtitleDocument(transcript, filename, {
         metadata: {
           sourceType: settings.audioInputMode === "file" ? 'standalone' : 'resolve',
           displayName: settings.audioInputMode === "file"
@@ -310,7 +310,7 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
             : undefined,
         }
       });
-      setCurrentTranscriptFilename(filename)
+      setCurrentSubtitleDocumentFilename(filename)
       setSubtitles(segments)
     } catch (error) {
       console.error('Failed to open file', error);
@@ -320,14 +320,14 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <TranscriptContext.Provider value={{
+    <SubtitleDocumentContext.Provider value={{
       subtitles,
       speakers,
       markIn,
-      currentTranscriptFilename,
+      currentSubtitleDocumentFilename,
       setSubtitles,
       setSpeakers,
-      setCurrentTranscriptFilename,
+      setCurrentSubtitleDocumentFilename,
       updateSpeakers,
       updateSubtitles,
       processTranscriptionResults,
@@ -337,14 +337,14 @@ export function TranscriptProvider({ children }: { children: React.ReactNode }) 
       loadSubtitles,
     }}>
       {children}
-    </TranscriptContext.Provider>
+    </SubtitleDocumentContext.Provider>
   );
 }
 
-export const useTranscript = () => {
-  const context = useContext(TranscriptContext);
+export const useSubtitleDocument = () => {
+  const context = useContext(SubtitleDocumentContext);
   if (!context) {
-    throw new Error('useTranscript must be used within a TranscriptProvider');
+    throw new Error('useSubtitleDocument must be used within a SubtitleDocumentProvider');
   }
   return context;
 };

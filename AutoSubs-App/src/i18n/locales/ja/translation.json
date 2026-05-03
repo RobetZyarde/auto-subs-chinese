@@ -453,7 +453,7 @@
     "toggle": "テーマを切り替え"
   },
   "titlebar": {
-    "transcripts": {
+    "subtitleHistory": {
       "empty": "文字起こしが見つかりません。",
       "empty_title": "文字起こしが見つかりません",
       "empty_detail": "字幕を生成すると、ここに文字起こしの履歴が表示されます。",

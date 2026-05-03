@@ -128,7 +128,7 @@ interface TranscriptIndexItem {
   createdAt?: string;
 }
 
-export interface StoredTranscript {
+export interface StoredSubtitleDocument {
   filename: string;
   createdAt: string;
   processingTime?: number;
@@ -147,7 +147,7 @@ export interface StoredTranscript {
   mark_out?: number;
 }
 
-export interface TranscriptListItem {
+export interface SubtitleDocumentListItem {
   filename: string;
   displayName: string;
   createdAt: Date;
@@ -158,14 +158,14 @@ export interface TranscriptListItem {
   markOut?: number;
 }
 
-export interface GenerateTranscriptFilenameOptions {
+export interface GenerateSubtitleDocumentFilenameOptions {
   isStandaloneMode: boolean;
   selectedFile: string | null;
   timelineId?: string;
   timelineName?: string;
 }
 
-export interface SaveTranscriptOptions {
+export interface SaveSubtitleDocumentOptions {
   // Content formatting (case, punctuation, censoring) is applied by the Rust backend
   // during transcription / reformat, so no per-save options are needed.
   metadata?: Partial<TranscriptMetadata>;
@@ -278,13 +278,13 @@ function parseValidDate(value: unknown): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-async function getTranscriptIndexPath(): Promise<string> {
-  const dir = await getTranscriptsDir();
+async function getSubtitleDocumentIndexPath(): Promise<string> {
+  const dir = await getSubtitleDocumentsDir();
   return await join(dir, TRANSCRIPT_INDEX_FILENAME);
 }
 
-async function readTranscriptIndex(): Promise<TranscriptIndexItem[]> {
-  const indexPath = await getTranscriptIndexPath();
+async function readSubtitleDocumentIndex(): Promise<TranscriptIndexItem[]> {
+  const indexPath = await getSubtitleDocumentIndexPath();
   if (!(await exists(indexPath))) {
     return [];
   }
@@ -299,18 +299,18 @@ async function readTranscriptIndex(): Promise<TranscriptIndexItem[]> {
   }
 }
 
-async function writeTranscriptIndex(
+async function writeSubtitleDocumentIndex(
   items: TranscriptIndexItem[],
 ): Promise<void> {
-  const indexPath = await getTranscriptIndexPath();
+  const indexPath = await getSubtitleDocumentIndexPath();
   await writeTextFile(indexPath, JSON.stringify(items, null, 2));
 }
 
-async function upsertTranscriptIndexItem(
+async function upsertSubtitleDocumentIndexItem(
   filename: string,
   metadata: TranscriptMetadata,
 ): Promise<void> {
-  const items = await readTranscriptIndex();
+  const items = await readSubtitleDocumentIndex();
   const nextItem: TranscriptIndexItem = {
     filename,
     metadata,
@@ -324,21 +324,21 @@ async function upsertTranscriptIndexItem(
     items.push(nextItem);
   }
 
-  await writeTranscriptIndex(items);
+  await writeSubtitleDocumentIndex(items);
 }
 
-async function ensureTranscriptIndexItem(
+async function ensureSubtitleDocumentIndexItem(
   filename: string,
 ): Promise<TranscriptIndexItem | null> {
-  const items = await readTranscriptIndex();
+  const items = await readSubtitleDocumentIndex();
   const existingItem = items.find((item) => item.filename === filename);
   if (existingItem) {
     return existingItem;
   }
 
-  const transcript = (await readTranscript(
+  const transcript = (await readSubtitleDocument(
     filename,
-  )) as StoredTranscript | null;
+  )) as StoredSubtitleDocument | null;
   if (!transcript) {
     return null;
   }
@@ -351,8 +351,15 @@ async function ensureTranscriptIndexItem(
   };
 
   items.push(nextItem);
-  await writeTranscriptIndex(items);
+  await writeSubtitleDocumentIndex(items);
   return nextItem;
+}
+
+async function removeSubtitleDocumentIndexItem(filename: string): Promise<void> {
+  const items = await readSubtitleDocumentIndex();
+  await writeSubtitleDocumentIndex(
+    items.filter((item) => item.filename !== filename),
+  );
 }
 
 function getLegacyTranscriptFilename(
@@ -452,7 +459,7 @@ async function migrateLegacyTranscriptsOnce(newDir: string): Promise<void> {
 // ~/Library/Application Support/<bundle-id>/Transcripts). This keeps
 // user-generated data out of Documents and avoids cloud-sync surprises
 // (OneDrive/iCloud), while surviving app updates.
-export async function getTranscriptsDir(): Promise<string> {
+export async function getSubtitleDocumentsDir(): Promise<string> {
   const dir = await join(await appLocalDataDir(), "Transcripts");
 
   // Ensure the directory exists
@@ -495,13 +502,13 @@ export async function getAudioExportDir(): Promise<string> {
   return dir;
 }
 
-export async function getTranscriptPath(filename: string): Promise<string> {
-  const dir = await getTranscriptsDir();
+export async function getSubtitleDocumentPath(filename: string): Promise<string> {
+  const dir = await getSubtitleDocumentsDir();
   return await join(dir, filename);
 }
 
-export async function readTranscript(filename: string): Promise<any | null> {
-  const filePath = await getTranscriptPath(filename);
+export async function readSubtitleDocument(filename: string): Promise<any | null> {
+  const filePath = await getSubtitleDocumentPath(filename);
   console.log("Reading transcript from:", filePath);
   if (!(await exists(filePath))) {
     console.log("Transcript file not found.");
@@ -511,8 +518,8 @@ export async function readTranscript(filename: string): Promise<any | null> {
   return JSON.parse(contents);
 }
 
-export function generateTranscriptFilename(
-  isStandaloneModeOrOptions: boolean | GenerateTranscriptFilenameOptions,
+export function generateSubtitleDocumentFilename(
+  isStandaloneModeOrOptions: boolean | GenerateSubtitleDocumentFilenameOptions,
   selectedFile?: string | null,
   timelineId?: string,
   timelineName?: string,
@@ -536,11 +543,11 @@ export function generateTranscriptFilename(
   return `${safeDisplayName}__${createTranscriptId()}.json`;
 }
 
-export async function listTranscriptFiles(): Promise<TranscriptListItem[]> {
-  const transcriptsDir = await getTranscriptsDir();
+export async function listSubtitleDocuments(): Promise<SubtitleDocumentListItem[]> {
+  const transcriptsDir = await getSubtitleDocumentsDir();
   const entries = await readDir(transcriptsDir);
 
-  const transcriptFiles: Array<TranscriptListItem | null> = await Promise.all(
+  const transcriptFiles: Array<SubtitleDocumentListItem | null> = await Promise.all(
     entries
       .filter(
         (entry) =>
@@ -549,9 +556,9 @@ export async function listTranscriptFiles(): Promise<TranscriptListItem[]> {
       )
       .map(async (entry) => {
         try {
-          const filePath = await getTranscriptPath(entry.name);
+          const filePath = await getSubtitleDocumentPath(entry.name);
           const fileStats = await stat(filePath);
-          const indexItem = await ensureTranscriptIndexItem(entry.name);
+          const indexItem = await ensureSubtitleDocumentIndexItem(entry.name);
           const metadata = indexItem?.metadata
             ? buildMetadata(indexItem, entry.name, indexItem.metadata)
             : undefined;
@@ -571,7 +578,7 @@ export async function listTranscriptFiles(): Promise<TranscriptListItem[]> {
             timelineName: metadata?.timelineName,
             markIn: metadata?.markIn,
             markOut: metadata?.markOut,
-          } satisfies TranscriptListItem;
+          } satisfies SubtitleDocumentListItem;
         } catch (error) {
           console.error(
             "Failed to parse transcript metadata for:",
@@ -588,10 +595,10 @@ export async function listTranscriptFiles(): Promise<TranscriptListItem[]> {
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
-export async function listTranscriptIndexFiles(): Promise<
-  TranscriptListItem[]
+export async function listSubtitleDocumentIndex(): Promise<
+  SubtitleDocumentListItem[]
 > {
-  const items = await readTranscriptIndex();
+  const items = await readSubtitleDocumentIndex();
 
   return items
     .map((item) => {
@@ -617,18 +624,18 @@ export async function listTranscriptIndexFiles(): Promise<
         timelineName: metadata?.timelineName,
         markIn: metadata?.markIn,
         markOut: metadata?.markOut,
-      } satisfies TranscriptListItem;
+      } satisfies SubtitleDocumentListItem;
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
-export async function resolveTranscriptFilename(
+export async function resolveSubtitleDocumentFilename(
   isStandaloneMode: boolean,
   selectedFile: string | null,
   timelineId?: string,
 ): Promise<string | null> {
-  const transcripts = await listTranscriptFiles();
+  const transcripts = await listSubtitleDocuments();
 
   const matchingTranscript = transcripts.find((transcript) => {
     if (isStandaloneMode && selectedFile) {
@@ -657,7 +664,7 @@ export async function resolveTranscriptFilename(
     return null;
   }
 
-  const legacyPath = await getTranscriptPath(legacyFilename);
+  const legacyPath = await getSubtitleDocumentPath(legacyFilename);
   return (await exists(legacyPath)) ? legacyFilename : null;
 }
 
@@ -681,13 +688,13 @@ function interpolateWordsFromText(text: string, start: number, end: number) {
 // Save a new transcript to JSON file.
 // Segments are assumed to already be structurally split by the Rust backend.
 // This function only applies content formatting (case, punctuation, censoring).
-export async function saveTranscript(
+export async function saveSubtitleDocument(
   transcript: any,
   filename: string,
-  options?: SaveTranscriptOptions,
+  options?: SaveSubtitleDocumentOptions,
 ): Promise<{ segments: Subtitle[]; speakers: Speaker[] }> {
   try {
-    const storageDir = await getTranscriptsDir();
+    const storageDir = await getSubtitleDocumentsDir();
     const filePath = await join(storageDir, filename);
 
     console.log("Saving transcript to:", filePath);
@@ -747,7 +754,7 @@ export async function saveTranscript(
     const speakers: Speaker[] = transcript.speakers || [];
     const metadata = buildMetadata(transcript, filename, options?.metadata);
 
-    const transcriptData: StoredTranscript = {
+    const transcriptData: StoredSubtitleDocument = {
       filename,
       transcriptId: metadata.transcriptId,
       createdAt: metadata.createdAt,
@@ -768,7 +775,7 @@ export async function saveTranscript(
 
     // Save transcript to file
     await writeTextFile(filePath, JSON.stringify(transcriptData, null, 2));
-    await upsertTranscriptIndexItem(filename, metadata);
+    await upsertSubtitleDocumentIndexItem(filename, metadata);
     console.log("Successfully saved transcript to:", filePath);
     return { segments, speakers };
   } catch (error) {
@@ -778,10 +785,10 @@ export async function saveTranscript(
 }
 
 // Load transcript and return subtitles
-export async function loadTranscriptSubtitles(
+export async function loadSubtitleDocumentSubtitles(
   filename: string,
 ): Promise<Subtitle[]> {
-  const storageDir = await getTranscriptsDir();
+  const storageDir = await getSubtitleDocumentsDir();
   const filePath = await join(storageDir, filename);
 
   if (!(await exists(filePath))) {
@@ -795,7 +802,7 @@ export async function loadTranscriptSubtitles(
 }
 
 // Update the transcript file for the specified timeline with new speakers or subtitles
-export async function updateTranscript(
+export async function updateSubtitleDocument(
   filename: string,
   opts: { subtitles?: Subtitle[]; speakers?: Speaker[] },
 ) {
@@ -805,7 +812,7 @@ export async function updateTranscript(
   if (!speakers && !subtitles) return;
 
   // read current file
-  let transcript = await readTranscript(filename);
+  let transcript = await readSubtitleDocument(filename);
   if (!transcript) return;
 
   const metadata = buildMetadata(transcript, filename, transcript.metadata);
@@ -829,20 +836,20 @@ export async function updateTranscript(
   transcript.mark_out = metadata.markOut;
 
   // write to file
-  const filePath = await getTranscriptPath(filename);
+  const filePath = await getSubtitleDocumentPath(filename);
   await writeTextFile(filePath, JSON.stringify(transcript, null, 2));
-  await upsertTranscriptIndexItem(filename, metadata);
+  await upsertSubtitleDocumentIndexItem(filename, metadata);
 }
 
 /**
  * Delete a transcript file and its entry in the index
  */
-export async function deleteTranscript(filename: string): Promise<void> {
+export async function deleteSubtitleDocument(filename: string): Promise<void> {
   try {
-    const filePath = await getTranscriptPath(filename);
+    const filePath = await getSubtitleDocumentPath(filename);
 
     // 1. Remove from index first to ensure it doesn't show up if file deletion fails
-    await removeTranscriptIndexItem(filename);
+    await removeSubtitleDocumentIndexItem(filename);
 
     // 2. Remove the actual file
     if (await exists(filePath)) {
