@@ -511,6 +511,19 @@
         "disconnected": "Extension déconnectée",
         "openPremiere": "Ouvrez Premiere Pro pour vous connecter automatiquement."
       }
+    },
+    "aftereffects": {
+      "productName": "After Effects",
+      "status": {
+        "connected": "Connecté",
+        "disconnected": "Déconnecté"
+      },
+      "tooltip": {
+        "connected": "Connecté",
+        "canGetAudio": "Vous pouvez récupérer l'audio de la composition et y ajouter des sous-titres.",
+        "disconnected": "Extension déconnectée",
+        "openAfterEffects": "Ouvrez After Effects pour vous connecter automatiquement."
+      }
     }
   },
   "theme": {

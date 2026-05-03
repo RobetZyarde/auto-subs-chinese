@@ -496,6 +496,19 @@
         }
       }
     },
+    "aftereffects": {
+      "productName": "After Effects",
+      "status": {
+        "connected": "接続済み",
+        "disconnected": "未接続"
+      },
+      "tooltip": {
+        "connected": "接続済み",
+        "canGetAudio": "コンポジションから音声を取得し、字幕を追加できます。",
+        "disconnected": "拡張機能が切断されました",
+        "openAfterEffects": "After Effectsを開いて自動的に接続します。"
+      }
+    },
     "windowControls": {
       "close": "閉じる",
       "maximize": "最大化",

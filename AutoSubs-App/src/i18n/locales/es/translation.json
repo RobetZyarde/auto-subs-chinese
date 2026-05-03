@@ -507,9 +507,22 @@
       },
       "tooltip": {
         "connected": "Conectado",
-        "canGetAudio": "Puedes obter el audio de la línea de tiempo y añadirle subtítulos.",
+        "canGetAudio": "Puedes obtener el audio de la línea de tiempo y añadirle subtítulos.",
         "disconnected": "Extensión desconectada",
         "openPremiere": "Abre Premiere Pro para conectarte automáticamente."
+      }
+    },
+    "aftereffects": {
+      "productName": "After Effects",
+      "status": {
+        "connected": "Conectado",
+        "disconnected": "Desconectado"
+      },
+      "tooltip": {
+        "connected": "Conectado",
+        "canGetAudio": "Puedes obtener el audio de la composición y añadirle subtítulos.",
+        "disconnected": "Extensión desconectada",
+        "openAfterEffects": "Abre After Effects para conectarte automáticamente."
       }
     }
   },
