@@ -1141,24 +1141,6 @@ export function TranscriptionPanel({
   } = useAdobe();
 
   const { selectedIntegration, setSelectedIntegration } = useIntegration();
-  const [hasInitializedIntegration, setHasInitializedIntegration] =
-    React.useState(false);
-
-  const { isConnected: isAdobeConnected } = useAdobe();
-
-  React.useEffect(() => {
-    if (!hasInitializedIntegration && isAdobeConnected) {
-      if (selectedIntegration !== "aftereffects") {
-        setSelectedIntegration("premiere");
-      }
-      setHasInitializedIntegration(true);
-    }
-  }, [
-    isAdobeConnected,
-    hasInitializedIntegration,
-    selectedIntegration,
-    setSelectedIntegration,
-  ]);
 
   const isPremiereActive = selectedIntegration === "premiere" || selectedIntegration === "aftereffects";
   const timelineInfo = isPremiereActive ? premiereTimeline : resolveTimeline;

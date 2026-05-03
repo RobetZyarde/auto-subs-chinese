@@ -43,9 +43,10 @@ export function SubtitleDocumentProvider({ children }: { children: React.ReactNo
   const [markIn, setMarkIn] = useState(0);
   const [currentSubtitleDocumentFilename, setCurrentSubtitleDocumentFilename] = useState<string | null>(null);
   const { timelineInfo: resolveTimeline } = useResolve();
-  const { timelineInfo: premiereTimeline } = useAdobe();
+  const { timelineInfo: adobeTimeline } = useAdobe();
   const { selectedIntegration } = useIntegration();
-  const timelineInfo = selectedIntegration === "premiere" ? premiereTimeline : resolveTimeline;
+  const isAdobeActive = selectedIntegration === "premiere" || selectedIntegration === "aftereffects";
+  const timelineInfo = isAdobeActive ? adobeTimeline : resolveTimeline;
 
   // Load subtitles when timelineId or fileInput changes
   const loadSubtitles = useCallback(async (audioInputMode: "file" | "timeline", fileInput: string | null, timelineId: string) => {
