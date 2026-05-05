@@ -16,6 +16,7 @@ permissions:
 env:
   TAG: ${{ github.event.release.tag_name || inputs.tag }}
   CARGO_TARGET_DIR: C:\cargo-target
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
   build-windows-installer:
@@ -59,7 +60,11 @@ jobs:
         shell: pwsh
         run: |
           choco install nsis -y
-          makensis /VERSION
+          $makensis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (-not (Test-Path -LiteralPath $makensis)) {
+            throw "makensis.exe not found at $makensis"
+          }
+          & $makensis /VERSION
 
       - name: Install Vulkan SDK
         shell: pwsh
@@ -82,7 +87,7 @@ jobs:
         run: |
           $binDir = "AutoSubs-App/src-tauri/binaries"
           New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-          Invoke-WebRequest -Uri "https://github.com/tmoroney/ffmpeg-binaries/releases/latest/download/ffmpeg-x86_64-pc-windows-msvc.exe" -OutFile "$binDir/ffmpeg-x86_64-pc-windows-msvc.exe"
+          gh release download --repo tmoroney/ffmpeg-binaries --pattern "ffmpeg-x86_64-pc-windows-msvc.exe" --dir $binDir --clobber
 
       - name: Build unsigned Windows installer
         shell: pwsh
