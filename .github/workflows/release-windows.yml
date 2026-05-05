@@ -82,8 +82,17 @@ jobs:
         shell: pwsh
         run: |
           $binDir = "AutoSubs-App/src-tauri/binaries"
+          $tmpDir = Join-Path $env:RUNNER_TEMP "ffmpeg-download"
           New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-          gh release download --repo tmoroney/ffmpeg-binaries --pattern "ffmpeg-x86_64-pc-windows-msvc.exe" --dir $binDir --clobber
+          Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
+          gh release download --repo tmoroney/ffmpeg-binaries --pattern "ffmpeg-x86_64-pc-windows-msvc.zip" --dir $tmpDir --clobber
+          Expand-Archive -LiteralPath (Join-Path $tmpDir "ffmpeg-x86_64-pc-windows-msvc.zip") -DestinationPath $tmpDir -Force
+          $ffmpegExe = Get-ChildItem -LiteralPath $tmpDir -Recurse -Filter *.exe | Select-Object -First 1
+          if (-not $ffmpegExe) {
+            throw "ffmpeg executable not found after extracting archive"
+          }
+          Copy-Item -LiteralPath $ffmpegExe.FullName -Destination (Join-Path $binDir "ffmpeg-x86_64-pc-windows-msvc.exe") -Force
 
       - name: Build unsigned Windows app
         shell: pwsh
