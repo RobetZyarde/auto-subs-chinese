@@ -1,0 +1,120 @@
+name: Build Windows Installer Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build for
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  CARGO_TARGET_DIR: C:\cargo-target
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: AutoSubs-App/package-lock.json
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install libclang for bindgen
+        shell: pwsh
+        run: |
+          python -m pip install libclang
+          $libclang = python -c "import pathlib, site; roots=site.getsitepackages()+[site.getusersitepackages()]; matches=[]; [matches.extend(pathlib.Path(root).rglob('libclang.dll')) for root in roots if pathlib.Path(root).exists()]; print(matches[0].parent if matches else '')"
+          if ([string]::IsNullOrWhiteSpace($libclang)) {
+            throw "libclang.dll not found after installation"
+          }
+          "LIBCLANG_PATH=$libclang" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Ensure CMake is available
+        shell: pwsh
+        run: |
+          cmake --version
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis -y
+          makensis /VERSION
+
+      - name: Install Vulkan SDK
+        shell: pwsh
+        run: |
+          choco install vulkan-sdk -y
+          $vulkanDir = Get-ChildItem "C:\VulkanSDK" -Directory | Sort-Object Name -Descending | Select-Object -First 1
+          if (-not $vulkanDir) {
+            throw "Vulkan SDK installation did not create C:\VulkanSDK"
+          }
+          "VULKAN_SDK=$($vulkanDir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install frontend dependencies
+        shell: pwsh
+        run: |
+          Set-Location "AutoSubs-App"
+          npm ci
+
+      - name: Download ffmpeg sidecar
+        shell: pwsh
+        run: |
+          $binDir = "AutoSubs-App/src-tauri/binaries"
+          New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/tmoroney/ffmpeg-binaries/releases/latest/download/ffmpeg-x86_64-pc-windows-msvc.exe" -OutFile "$binDir/ffmpeg-x86_64-pc-windows-msvc.exe"
+
+      - name: Build unsigned Windows installer
+        shell: pwsh
+        run: |
+          Set-Location "AutoSubs-App"
+          $env:AUTOSUBS_SKIP_SIGN = "1"
+          npm run build:win
+
+      - name: Collect installer assets
+        shell: pwsh
+        run: |
+          $nsisDir = "AutoSubs-App/src-tauri/target/release/bundle/nsis"
+          if (-not (Test-Path -LiteralPath $nsisDir)) {
+            throw "NSIS bundle directory not found: $nsisDir"
+          }
+
+          $artifactsDir = Join-Path $env:RUNNER_TEMP "windows-installer-artifacts"
+          Remove-Item -LiteralPath $artifactsDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $artifactsDir | Out-Null
+
+          $installers = Get-ChildItem -LiteralPath $nsisDir -Filter *.exe
+          if (-not $installers) {
+            throw "No Windows installer exe found in $nsisDir"
+          }
+
+          foreach ($installer in $installers) {
+            Copy-Item -LiteralPath $installer.FullName -Destination $artifactsDir
+          }
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          files: |
+            ${{ runner.temp }}\windows-installer-artifacts\*.exe
