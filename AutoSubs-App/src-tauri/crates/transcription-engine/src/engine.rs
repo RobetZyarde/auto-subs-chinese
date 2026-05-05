@@ -14,6 +14,7 @@ pub struct ContentFormatting {
 use crate::engines::moonshine::{is_moonshine_model, moonshine_variant_from_model_name};
 
 use crate::engines::parakeet::is_parakeet_model;
+use crate::engines::qwen3asr::is_qwen3asr_model;
 // callback type aliases are defined in crate::types
 
 #[derive(Clone, Debug)]
@@ -91,6 +92,7 @@ impl Engine {
         // Route to appropriate engine based on model name
         let is_moonshine = is_moonshine_model(&options.model);
         let is_parakeet = is_parakeet_model(&options.model);
+        let is_qwen3asr = is_qwen3asr_model(&options.model);
 
         // Ensure/download the appropriate model
         let _model_path = if is_moonshine {
@@ -103,6 +105,9 @@ impl Engine {
                 .models
                 .ensure_parakeet_v3_model(cb.progress, cb.is_cancelled.as_deref())
                 .await?
+        } else if is_qwen3asr {
+            std::fs::create_dir_all(&self.cfg.cache_dir)?;
+            self.cfg.cache_dir.clone()
         } else {
             self
                 .models
@@ -154,7 +159,7 @@ impl Engine {
                 diarize_progress_callback,
                 cb.is_cancelled.as_deref(),
             )?;
-        } else if let Some(true) = options.enable_vad {
+        } else if !is_qwen3asr && matches!(options.enable_vad, Some(true)) {
             // Use provided VAD model path if present; otherwise download via ModelManager
             let vad_model_path: PathBuf = if let Some(ref p) = self.cfg.vad_model_path {
                 PathBuf::from(p)
@@ -200,7 +205,20 @@ impl Engine {
         let from_lang = options.lang.clone().unwrap_or_else(|| "auto".to_string());
         let whisper_to_en = options.whisper_to_english.unwrap_or(false);
 
-        let (mut segments, detected_lang) = if is_parakeet {
+        let (mut segments, detected_lang) = if is_qwen3asr {
+            crate::engines::qwen3asr::transcribe_qwen3asr(
+                std::path::Path::new(audio_path),
+                &speech_segments,
+                &options,
+                _model_path.as_path(),
+                self.cfg.use_gpu,
+                self.cfg.gpu_device,
+                cb.progress,
+                cb.new_segment_callback,
+                cb.is_cancelled,
+            )
+            .await?
+        } else if is_parakeet {
             // Use Parakeet engine
             crate::engines::parakeet::transcribe_parakeet(
                 _model_path.as_path(),
@@ -254,7 +272,7 @@ impl Engine {
 
         // `whisper_to_english` only applies to Whisper models (they can do built-in translate-to-English).
         // If a non-Whisper model is used, we should not suppress the normal post-translation step.
-        let suppress_post_translation = !is_parakeet && !is_moonshine && whisper_to_en;
+        let suppress_post_translation = !is_parakeet && !is_moonshine && !is_qwen3asr && whisper_to_en;
 
         if !suppress_post_translation {
             if let Some(to_lang) = translate_to.as_deref() {

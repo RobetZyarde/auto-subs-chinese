@@ -29,8 +29,6 @@
       "confirmTitle": "重置设置"
     },
     "support": {
-      "supportAutoSubs": "支持 AutoSubs",
-      "helpSupportDevelopment": "帮助支持开发",
       "viewSource": "查看源代码"
     }
   },
@@ -118,16 +116,16 @@
       "customCharsTitle": "最大字符数",
       "customCharsDescription": "每行字符数",
       "formatButton": "格式",
-      "customPromptButton": "提示",
+      "customPromptButton": "上下文",
       "customPromptTitle": "词汇和上下文",
-      "customPromptDescription": "帮助 Whisper 识别名称、品牌、术语、缩写和首选拼写。",
+      "customPromptDescription": "帮助 ASR 模型识别名称、品牌、术语、缩写和首选拼写。最适合填写简短术语表或主题提示。",
       "customPromptTermsTitle": "关键术语",
       "customPromptTermsPlaceholder": "添加名称、品牌、缩写或术语...",
       "customPromptTermsExample": "示例：OpenAI, DaVinci Resolve, SubSlate, FFmpeg",
-      "customPromptContextTitle": "上下文 / 风格说明",
-      "customPromptContextPlaceholder": "添加简短主题或拼写偏好...",
-      "customPromptContextExample": "示例：这是 DaVinci Resolve 教程。优先使用“AutoSubs”，而不是“Auto Subs”。",
-      "customPromptWhisperOnly": "仅 Whisper 模型支持。"
+      "customPromptContextTitle": "主题 / 上下文说明",
+      "customPromptContextPlaceholder": "添加简短主题、领域提示或拼写偏好...",
+      "customPromptContextExample": "示例：这是 DaVinci Resolve 教程。优先使用“AutoSubs”，而不是“Auto Subs”。术语：Fairlight、Fusion、Render Queue。",
+      "customPromptWhisperOnly": "对于 Qwen3-ASR，尽量保持简短，并聚焦术语，不要写成长篇改写指令。"
     },
     "censor": {
       "title": "审查词汇",
@@ -305,6 +303,12 @@
       "description": "最高准确性",
       "details": "复杂音频的最高准确性，但速度较慢且需要大量内存。",
       "badge": "多语言"
+    },
+    "qwen3_asr": {
+      "label": "Qwen3-ASR",
+      "description": "中文准确率最佳",
+      "details": "Qwen3-ASR-1.7B 搭配 ForcedAligner 时间戳。需要安装带 qwen-asr 的 Python 环境，实际使用建议 CUDA GPU。",
+      "badge": "中文与方言"
     },
     "parakeet": {
       "label": "Parakeet（鹦鹉）",

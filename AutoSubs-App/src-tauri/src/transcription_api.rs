@@ -234,9 +234,9 @@ pub async fn transcribe_audio<R: Runtime>(
         match transcription_engine::list_cached_models(&cache_dir) {
             Ok(models) => {
                 if models.iter().any(|m| m == &model_name_for_log) {
-                    tracing::info!("whisper model '{}' already cached", model_name_for_log);
+                    tracing::info!("model '{}' already cached", model_name_for_log);
                 } else {
-                    tracing::info!("whisper model '{}' not cached, will download", model_name_for_log);
+                    tracing::info!("model '{}' not cached, will download", model_name_for_log);
                 }
                 if enable_diarize_for_log {
                     tracing::info!("diarization enabled (models will be downloaded if missing)");

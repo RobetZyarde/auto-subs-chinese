@@ -14,6 +14,9 @@ use once_cell::sync::Lazy;
 const DIARIZE_MODEL_ID: &str = "speaker-diarize";
 const DIARIZE_REPO_ID: &str = "altunenes/speaker-diarization-community-1-onnx";
 const DIARIZE_REQUIRED_FILES: [&str; 2] = ["segmentation-community-1.onnx", "embedding_model.onnx"];
+const QWEN3_ASR_MODEL_ID: &str = "qwen3-asr";
+const QWEN3_ASR_REPO_ID: &str = "Qwen/Qwen3-ASR-1.7B";
+const QWEN3_ALIGNER_REPO_ID: &str = "Qwen/Qwen3-ForcedAligner-0.6B";
 
 // Global download state to ensure only one download runs at a time
 static ACTIVE_DOWNLOAD: Lazy<Mutex<Option<Arc<CancellationToken>>>> = Lazy::new(|| Mutex::new(None));
@@ -659,6 +662,28 @@ impl ModelManager {
         Ok(())
     }
 
+    pub fn delete_qwen3asr_model(&self) -> Result<()> {
+        let cache_dir = self.model_cache_dir()?;
+        let mut deleted_any = false;
+
+        for repo_dir in [
+            cache_dir.join("models--Qwen--Qwen3-ASR-1.7B"),
+            cache_dir.join("models--Qwen--Qwen3-ForcedAligner-0.6B"),
+        ] {
+            if repo_dir.exists() {
+                fs::remove_dir_all(&repo_dir)
+                    .with_context(|| format!("Failed to delete Qwen3 model directory: {}", repo_dir.display()))?;
+                deleted_any = true;
+                tracing::info!("Deleted Qwen3 model cache: {}", repo_dir.display());
+            }
+        }
+
+        if !deleted_any {
+            bail!("Qwen3-ASR model not found in cache");
+        }
+        Ok(())
+    }
+
     /// Clean up orphaned blob files that are no longer referenced by any symlinks
     /// This should be called periodically to free up disk space
     pub fn cleanup_orphaned_blobs(&self) -> Result<()> {
@@ -843,6 +868,16 @@ impl ModelManager {
             models.insert(DIARIZE_MODEL_ID.to_string());
         }
 
+        if self.find_cached_snapshot_with_files(
+            QWEN3_ASR_REPO_ID,
+            &["config.json"],
+        ).unwrap_or(None).is_some() || self.find_cached_snapshot_with_files(
+            QWEN3_ALIGNER_REPO_ID,
+            &["config.json"],
+        ).unwrap_or(None).is_some() {
+            models.insert(QWEN3_ASR_MODEL_ID.to_string());
+        }
+
         let mut result: Vec<String> = models.into_iter().collect();
         result.sort(); // Sort for consistent ordering
         Ok(result)
@@ -859,6 +894,9 @@ impl ModelManager {
         }
         if model_name == DIARIZE_MODEL_ID {
             return self.delete_diarize_model().is_ok();
+        }
+        if model_name == QWEN3_ASR_MODEL_ID {
+            return self.delete_qwen3asr_model().is_ok();
         }
         self.delete_whisper_model(model_name).is_ok()
     }

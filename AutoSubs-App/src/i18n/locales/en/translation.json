@@ -29,8 +29,6 @@
       "confirmTitle": "Reset Settings"
     },
     "support": {
-      "supportAutoSubs": "Support AutoSubs",
-      "helpSupportDevelopment": "Help support development",
       "viewSource": "Contribute"
     }
   },
@@ -118,16 +116,16 @@
       "customCharsTitle": "Max Characters",
       "customCharsDescription": "Characters per line",
       "formatButton": "Format",
-      "customPromptButton": "Prompt",
+      "customPromptButton": "Context",
       "customPromptTitle": "Vocabulary & Context",
-      "customPromptDescription": "Helps Whisper recognize names, brands, jargon, acronyms, and preferred spellings.",
+      "customPromptDescription": "Helps ASR models recognize names, brands, jargon, acronyms, and preferred spellings. Works best as a short glossary of important terms.",
       "customPromptTermsTitle": "Key Terms",
       "customPromptTermsPlaceholder": "Add names, brands, acronyms, or jargon...",
       "customPromptTermsExample": "Example: OpenAI, DaVinci Resolve, SubSlate, FFmpeg",
-      "customPromptContextTitle": "Context / Style Note",
-      "customPromptContextPlaceholder": "Add a short topic or spelling preference...",
-      "customPromptContextExample": "Example: This is a DaVinci Resolve tutorial. Prefer “AutoSubs”, not “Auto Subs”.",
-      "customPromptWhisperOnly": "Only supported by Whisper models."
+      "customPromptContextTitle": "Topic / Context Note",
+      "customPromptContextPlaceholder": "Add a short topic, domain hint, or spelling preference...",
+      "customPromptContextExample": "Example: DaVinci Resolve tutorial. Prefer “AutoSubs”, not “Auto Subs”. Terms: Fairlight, Fusion, Render Queue.",
+      "customPromptWhisperOnly": "For Qwen3-ASR, keep this short and focused on terminology rather than long writing instructions."
     },
     "censor": {
       "title": "Censor Words",
@@ -307,6 +305,12 @@
       "description": "Highest Accuracy",
       "details": "Highest accuracy for complex audio, but slower and requires significant memory.",
       "badge": "Multilingual"
+    },
+    "qwen3_asr": {
+      "label": "Qwen3-ASR",
+      "description": "Best Chinese Accuracy",
+      "details": "Qwen3-ASR-1.7B with forced alignment timestamps. Requires Python with qwen-asr and a CUDA GPU for practical speed.",
+      "badge": "Chinese + Dialects"
     },
     "parakeet": {
       "label": "Parakeet",

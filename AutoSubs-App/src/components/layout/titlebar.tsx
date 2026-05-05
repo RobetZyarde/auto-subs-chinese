@@ -1,5 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Minus, Square, X, Settings, Sun, Moon, Monitor, Heart, Boxes, RotateCcw, GitMerge, ChevronDown, Check } from "lucide-react";
+import { Minus, Square, X, Settings, Sun, Moon, Monitor, Boxes, RotateCcw, GitMerge, ChevronDown, Check } from "lucide-react";
 import type { HistoryIconHandle } from "@/components/ui/history";
 import { platform } from "@tauri-apps/plugin-os";
 import { useTranslation } from "react-i18next";
@@ -19,7 +19,6 @@ import type { Model } from "@/types";
 import { useState, useEffect, useRef } from "react";
 import { SettingsDialog } from "@/components/dialogs/settings-dialog";
 import { ManageModelsDialog } from "@/components/settings/model-manager";
-import { SupportDialog } from "@/components/dialogs/support-dialog";
 import { ArchiveIcon } from "../ui/archive";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -186,7 +185,6 @@ function SettingsDropdown() {
   const { modelsState, downloadedModelValues, handleDeleteModel } = useModels();
   const [manageModelsOpen, setManageModelsOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
-  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
 
   // The diarization model is handled separately from transcription models and only added
   // to the model manager when it's actually downloaded. This is because it's a different
@@ -247,42 +245,6 @@ function SettingsDropdown() {
                 <span>{t("settings.support.viewSource", "View Source")}</span>
               </a>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => setSupportDialogOpen(true)}
-              className="cursor-pointer focus:bg-pink-100 focus:text-pink-700 data-[highlighted]:bg-pink-100 data-[highlighted]:text-pink-700 dark:focus:bg-pink-900/50 dark:focus:text-pink-500 dark:data-[highlighted]:bg-pink-900/50 dark:data-[highlighted]:text-pink-500"
-            >
-              <div
-                className="group relative flex w-full items-center"
-              >
-                <Heart className="h-4 w-4 mr-2 text-pink-500 group-data-[highlighted]:fill-pink-500 group-focus:fill-pink-500 transition-all" />
-                <span>{t("settings.support.supportAutoSubs", "Support AutoSubs")}</span>
-
-                {/* Bursting hearts animation */}
-                <div className="absolute inset-0 pointer-events-none">
-                  {[
-                    { tx: '-90px', ty: '-90px', s: 1.8, r: '-20deg', d: '0s' },
-                    { tx: '80px', ty: '-100px', s: 1.5, r: '25deg', d: '0.05s' },
-                    { tx: '-30px', ty: '-120px', s: 1.7, r: '5deg', d: '0.1s' },
-                    { tx: '100px', ty: '-80px', s: 1.4, r: '-15deg', d: '0.15s' },
-                    { tx: '0px', ty: '-115px', s: 1.9, r: '0deg', d: '0.2s' },
-                    { tx: '-100px', ty: '-75px', s: 1.5, r: '15deg', d: '0.25s' },
-                    { tx: '70px', ty: '-115px', s: 1.6, r: '-5deg', d: '0.3s' },
-                  ].map((p, i) => (
-                    <Heart
-                      key={i}
-                      className="heart-anim absolute top-1/2 left-1/2 h-5 w-5 text-pink-400 opacity-0"
-                      style={{
-                        '--tx': p.tx,
-                        '--ty': p.ty,
-                        '--s': p.s,
-                        '--r': p.r,
-                        animationDelay: p.d,
-                      } as React.CSSProperties}
-                    />
-                  ))}
-                </div>
-              </div>
-            </DropdownMenuItem>
           </DropdownMenuGroup>
 
           <DropdownMenuSeparator />
@@ -316,11 +278,6 @@ function SettingsDropdown() {
       <SettingsDialog
         open={settingsDialogOpen}
         onOpenChange={setSettingsDialogOpen}
-      />
-
-      <SupportDialog
-        open={supportDialogOpen}
-        onOpenChange={setSupportDialogOpen}
       />
     </>
   );

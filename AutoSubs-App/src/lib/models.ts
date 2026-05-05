@@ -22,16 +22,16 @@ export const modelFilterOrders = {
     // 5-6GB RAM
     "medium.en", "medium", "large-v3-turbo",
     // 10GB RAM
-    "large-v3"
+    "large-v3", "qwen3-asr"
   ],
   accuracy: [
-    "large-v3", "large-v3-turbo", "parakeet", "moonshine-tiny-vi", "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja", "moonshine-tiny-ko", "medium.en", "medium",
+    "qwen3-asr", "large-v3", "large-v3-turbo", "parakeet", "moonshine-tiny-vi", "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja", "moonshine-tiny-ko", "medium.en", "medium",
     "moonshine-base", "small.en", "small", "moonshine-tiny-uk", 
     "moonshine-base-es",
     "tiny", "tiny.en", "base", "base.en", "moonshine-tiny"
   ],
   recommended: [
-    "parakeet", "large-v3-turbo", "large-v3", "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja", 
+    "qwen3-asr", "parakeet", "large-v3-turbo", "large-v3", "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja",
     "moonshine-tiny-ko", "moonshine-tiny-uk", "moonshine-tiny-vi", "moonshine-base", "moonshine-base-es", "small.en", "small",
     "medium", "medium.en",
     "tiny", "tiny.en", "base", "base.en", "moonshine-tiny"
@@ -39,6 +39,20 @@ export const modelFilterOrders = {
 };
 
 export const models: Model[] = [
+  {
+    value: "qwen3-asr",
+    label: "models.qwen3_asr.label",
+    description: "models.qwen3_asr.description",
+    size: "4GB+",
+    ram: "8GB+ VRAM",
+    image: "/phoenix.png",
+    details: "models.qwen3_asr.details",
+    badge: "models.qwen3_asr.badge",
+    languageSupport: { kind: "multilingual" },
+    accuracy: 4,
+    weight: 1,
+    isDownloaded: false,
+  },
   {
     value: "parakeet",
     label: "models.parakeet.label",

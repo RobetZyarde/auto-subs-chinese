@@ -29,8 +29,6 @@
       "confirmTitle": "Réinitialiser les paramètres"
     },
     "support": {
-      "supportAutoSubs": "Soutenir AutoSubs",
-      "helpSupportDevelopment": "Aider à soutenir le développement",
       "viewSource": "Voir le code source"
     }
   },
@@ -305,6 +303,12 @@
       "description": "Précision maximale",
       "details": "Précision maximale pour audio complexe, mais plus lent et gourmand en mémoire.",
       "badge": "Multilingue"
+    },
+    "qwen3_asr": {
+      "label": "Qwen3-ASR",
+      "description": "Meilleure précision en chinois",
+      "details": "Qwen3-ASR-1.7B avec horodatage par alignement forcé. Nécessite Python avec qwen-asr et un GPU CUDA pour une vitesse pratique.",
+      "badge": "Chinois + dialectes"
     },
     "parakeet": {
       "label": "Parakeet",

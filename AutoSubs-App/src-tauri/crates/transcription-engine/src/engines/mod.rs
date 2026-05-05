@@ -8,9 +8,11 @@ pub mod whisper;
 
 pub mod moonshine;
 pub mod parakeet;
+pub mod qwen3asr;
 
 // Re-export commonly used items
 pub use whisper::{create_context, run_transcription_pipeline, SHOULD_CANCEL};
 
 pub use moonshine::transcribe_moonshine;
 pub use parakeet::transcribe_parakeet;
+pub use qwen3asr::transcribe_qwen3asr;

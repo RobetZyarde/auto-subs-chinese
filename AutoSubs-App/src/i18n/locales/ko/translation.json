@@ -237,6 +237,12 @@
       "details": "복잡한 오디오에 최고의 정확도를 제공하지만 느리고 많은 메모리가 필요합니다.",
       "label": "Whisper 대형"
     },
+    "qwen3_asr": {
+      "badge": "중국어 + 방언",
+      "description": "중국어 최고 정확도",
+      "details": "Qwen3-ASR-1.7B와 forced alignment 타임스탬프를 사용합니다. 실용적인 속도에는 qwen-asr가 설치된 Python과 CUDA GPU가 필요합니다.",
+      "label": "Qwen3-ASR"
+    },
     "large_v3_turbo": {
       "badge": "다국어",
       "description": "빠르고 정확",
@@ -386,8 +392,6 @@
       "transcription": "자막 생성"
     },
     "support": {
-      "helpSupportDevelopment": "개발 지원하기",
-      "supportAutoSubs": "AutoSubs 지원",
       "viewSource": "기여하기"
     },
     "title": "설정",

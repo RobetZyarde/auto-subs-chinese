@@ -1,5 +1,10 @@
 param([Parameter(Mandatory=$true)][string]$Path)
 
+if ($env:AUTOSUBS_SKIP_SIGN -eq "1") {
+  Write-Host "Skipping signing because AUTOSUBS_SKIP_SIGN=1"
+  exit 0
+}
+
 $ext = [IO.Path]::GetExtension($Path).ToLower()
 if ($ext -in @('.exe', '.dll', '.msi')) {
   # Try the fixed path first; fall back to "versioned" SDK folders.

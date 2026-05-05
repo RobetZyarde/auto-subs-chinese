@@ -2,6 +2,13 @@ use tauri::{AppHandle, Runtime, Manager};
 
 /// Gets the cache directory for whisper-diarize-rs models
 pub fn get_cache_dir<R: Runtime>(app: AppHandle<R>) -> Result<std::path::PathBuf, String> {
+    if let Some(override_dir) = std::env::var_os("AUTOSUBS_MODEL_CACHE_DIR") {
+        let model_dir = std::path::PathBuf::from(override_dir);
+        std::fs::create_dir_all(&model_dir)
+            .map_err(|e| format!("Failed to create overridden model cache directory: {}", e))?;
+        return Ok(model_dir);
+    }
+
     let model_dir = app
         .path()
         .app_cache_dir()

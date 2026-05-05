@@ -237,6 +237,12 @@
       "details": "複雑な音声に対して最高の精度を発揮しますが、低速で大量のメモリが必要です。",
       "label": "Whisper 大型版"
     },
+    "qwen3_asr": {
+      "badge": "中国語 + 方言",
+      "description": "中国語で最高精度",
+      "details": "Qwen3-ASR-1.7B と forced alignment タイムスタンプ。実用速度には qwen-asr を入れた Python と CUDA GPU が必要です。",
+      "label": "Qwen3-ASR"
+    },
     "large_v3_turbo": {
       "badge": "多言語",
       "description": "高速・高精度",
@@ -386,8 +392,6 @@
       "transcription": "文字起こし"
     },
     "support": {
-      "helpSupportDevelopment": "開発を支援",
-      "supportAutoSubs": "AutoSubs をサポート",
       "viewSource": "コントリビュート"
     },
     "title": "設定",
