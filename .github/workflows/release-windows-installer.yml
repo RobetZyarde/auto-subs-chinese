@@ -101,6 +101,11 @@ jobs:
       - name: Build unsigned Windows installer
         shell: pwsh
         run: |
+          $configPath = "AutoSubs-App/src-tauri/tauri.conf.json"
+          $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json -AsHashtable
+          $config.bundle.createUpdaterArtifacts = $false
+          $config | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $configPath -Encoding utf8
+
           Set-Location "AutoSubs-App"
           $env:AUTOSUBS_SKIP_SIGN = "1"
           npm run build:win
