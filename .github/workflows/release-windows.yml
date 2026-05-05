@@ -1,0 +1,131 @@
+name: Build Windows Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build for
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  CARGO_TARGET_DIR: C:\cargo-target
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: AutoSubs-App/package-lock.json
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install libclang for bindgen
+        shell: pwsh
+        run: |
+          python -m pip install libclang
+          $libclang = python -c "import pathlib, site; roots=site.getsitepackages()+[site.getusersitepackages()]; matches=[]; [matches.extend(pathlib.Path(root).rglob('libclang.dll')) for root in roots if pathlib.Path(root).exists()]; print(matches[0].parent if matches else '')"
+          if ([string]::IsNullOrWhiteSpace($libclang)) {
+            throw "libclang.dll not found after installation"
+          }
+          "LIBCLANG_PATH=$libclang" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Ensure CMake is available
+        shell: pwsh
+        run: |
+          cmake --version
+
+      - name: Install Vulkan SDK
+        shell: pwsh
+        run: |
+          choco install vulkan-sdk -y
+          $vulkanDir = Get-ChildItem "C:\VulkanSDK" -Directory | Sort-Object Name -Descending | Select-Object -First 1
+          if (-not $vulkanDir) {
+            throw "Vulkan SDK installation did not create C:\VulkanSDK"
+          }
+          "VULKAN_SDK=$($vulkanDir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install frontend dependencies
+        shell: pwsh
+        run: |
+          Set-Location "AutoSubs-App"
+          npm ci
+
+      - name: Build frontend assets
+        shell: pwsh
+        run: |
+          Set-Location "AutoSubs-App"
+          npm run build
+
+      - name: Download ffmpeg sidecar
+        shell: pwsh
+        run: |
+          $binDir = "AutoSubs-App/src-tauri/binaries"
+          New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/tmoroney/ffmpeg-binaries/releases/latest/download/ffmpeg-x86_64-pc-windows-msvc.exe" -OutFile "$binDir/ffmpeg-x86_64-pc-windows-msvc.exe"
+
+      - name: Build unsigned Windows app
+        shell: pwsh
+        run: |
+          Set-Location "AutoSubs-App/src-tauri"
+          cargo build --release --bin autosubs --no-default-features --features windows
+
+      - name: Assemble portable package
+        shell: pwsh
+        run: |
+          $releaseDir = Join-Path $env:CARGO_TARGET_DIR "release"
+          $stageRoot = Join-Path $env:RUNNER_TEMP "windows-release"
+          $packageDir = Join-Path $stageRoot "AutoSubs-windows-x86_64-portable"
+          $zipPath = Join-Path $env:GITHUB_WORKSPACE "AutoSubs-windows-x86_64-portable.zip"
+
+          if (-not (Test-Path -LiteralPath (Join-Path $releaseDir "autosubs.exe"))) {
+            throw "autosubs.exe not found in $releaseDir"
+          }
+
+          Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+
+          Copy-Item -LiteralPath (Join-Path $releaseDir "autosubs.exe") -Destination $packageDir
+
+          if (Test-Path -LiteralPath (Join-Path $releaseDir "ffmpeg.exe")) {
+            Copy-Item -LiteralPath (Join-Path $releaseDir "ffmpeg.exe") -Destination $packageDir
+          }
+
+          if (Test-Path -LiteralPath (Join-Path $releaseDir "DirectML.dll")) {
+            Copy-Item -LiteralPath (Join-Path $releaseDir "DirectML.dll") -Destination $packageDir
+          }
+
+          if (Test-Path -LiteralPath (Join-Path $releaseDir "resources")) {
+            Copy-Item -LiteralPath (Join-Path $releaseDir "resources") -Destination $packageDir -Recurse
+          }
+
+          Push-Location $stageRoot
+          Compress-Archive -Path "AutoSubs-windows-x86_64-portable" -DestinationPath $zipPath -Force
+          Pop-Location
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          files: |
+            AutoSubs-windows-x86_64-portable.zip
