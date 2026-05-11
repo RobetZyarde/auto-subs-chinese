@@ -135,7 +135,18 @@ fn emit_progress<R: Runtime>(app: &AppHandle<R>, stage: &str, percent: i32, mess
 /// Check Python environment status (Tauri command).
 #[tauri::command]
 pub async fn check_python_env<R: Runtime>(app: AppHandle<R>) -> Result<PythonEnvStatus, String> {
-    Ok(check_env_status(&app).await)
+    let python = get_venv_python(&app);
+    if !python.exists() {
+        return Ok(PythonEnvStatus::NotReady);
+    }
+    let output = Command::new(&python)
+        .args(["-c", "import qwen_asr; print('ok')"])
+        .output()
+        .await;
+    match output {
+        Ok(out) if out.status.success() => Ok(PythonEnvStatus::Ready),
+        _ => Ok(PythonEnvStatus::NotReady),
+    }
 }
 
 /// Ensure the Python environment is set up with qwen-asr installed (Tauri command).
