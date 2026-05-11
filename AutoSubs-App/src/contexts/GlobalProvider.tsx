@@ -7,6 +7,7 @@ import { ProgressProvider } from './ProgressContext';
 import { PresetsProvider } from './PresetsContext';
 import { ErrorDialogProvider } from './ErrorDialogContext';
 import { IntegrationProvider } from './IntegrationContext';
+import { PythonEnvProvider } from './PythonEnvContext';
 
 import { AdobeProvider } from './AdobeContext';
 
@@ -36,11 +37,13 @@ export function GlobalProvider({ children }: GlobalProviderProps) {
   return (
     <ErrorDialogProvider>
       <SettingsProvider>
-        <ModelsProvider>
-          <IntegrationProvider>
-            {children}
-          </IntegrationProvider>
-        </ModelsProvider>
+        <PythonEnvProvider>
+          <ModelsProvider>
+            <IntegrationProvider>
+              {children}
+            </IntegrationProvider>
+          </ModelsProvider>
+        </PythonEnvProvider>
       </SettingsProvider>
     </ErrorDialogProvider>
   );

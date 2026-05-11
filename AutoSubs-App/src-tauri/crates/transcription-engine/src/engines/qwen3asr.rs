@@ -1,7 +1,10 @@
 //! Qwen3-ASR Python sidecar backend.
 
-use crate::types::{LabeledProgressFn, NewSegmentFn, ProgressType, Segment, SpeechSegment, TranscribeOptions, WordTimestamp};
-use eyre::{bail, eyre, Context, Result};
+use crate::types::{
+    LabeledProgressFn, NewSegmentFn, ProgressType, Segment, SpeechSegment, TranscribeOptions,
+    WordTimestamp,
+};
+use eyre::{Context, Result, bail, eyre};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use tokio::process::Command;
@@ -91,10 +94,12 @@ pub async fn transcribe_qwen3asr(
         audio_path.display()
     );
 
-    let output = cmd
-        .output()
-        .await
-        .with_context(|| format!("Failed to start Qwen3-ASR sidecar with {}", python.display()))?;
+    let output = cmd.output().await.with_context(|| {
+        format!(
+            "Failed to start Qwen3-ASR sidecar with {}",
+            python.display()
+        )
+    })?;
 
     if let Some(is_cancelled) = abort_callback.as_deref() {
         if is_cancelled() {
@@ -110,7 +115,8 @@ pub async fn transcribe_qwen3asr(
         );
     }
 
-    let stdout = String::from_utf8(output.stdout).context("Qwen3-ASR stdout was not valid UTF-8")?;
+    let stdout =
+        String::from_utf8(output.stdout).context("Qwen3-ASR stdout was not valid UTF-8")?;
     let qwen_output: Qwen3Output = serde_json::from_str(stdout.trim())
         .with_context(|| format!("Failed to parse Qwen3-ASR JSON output: {}", stdout.trim()))?;
 
@@ -164,7 +170,11 @@ fn qwen_device_arg(use_gpu: Option<bool>, gpu_device: Option<i32>) -> String {
     }
 }
 
-fn speaker_for_segment(start: f64, end: f64, diarized_segments: &[SpeechSegment]) -> Option<String> {
+fn speaker_for_segment(
+    start: f64,
+    end: f64,
+    diarized_segments: &[SpeechSegment],
+) -> Option<String> {
     if diarized_segments.is_empty() {
         return None;
     }
@@ -176,6 +186,7 @@ fn speaker_for_segment(start: f64, end: f64, diarized_segments: &[SpeechSegment]
 }
 
 fn find_python() -> Result<PathBuf> {
+    // 1. Check environment variable override
     if let Some(path) = std::env::var_os("AUTOSUBS_QWEN3_PYTHON") {
         let candidate = PathBuf::from(path);
         if candidate.exists() {
@@ -183,13 +194,42 @@ fn find_python() -> Result<PathBuf> {
         }
     }
 
+    // 2. Check managed venv in app data directory
+    // This is where the auto-installed Python environment lives
+    if let Ok(data_dir) = std::env::var("LOCALAPPDATA") {
+        let managed_python = PathBuf::from(&data_dir)
+            .join("com.autosubs")
+            .join("python")
+            .join(".venv")
+            .join(if cfg!(target_os = "windows") {
+                "Scripts"
+            } else {
+                "bin"
+            })
+            .join(if cfg!(target_os = "windows") {
+                "python.exe"
+            } else {
+                "python"
+            });
+        if managed_python.exists() {
+            tracing::info!("using managed Python venv: {}", managed_python.display());
+            return Ok(managed_python);
+        }
+    }
+
+    // 3. Check local .venv candidates (for development)
     for candidate in local_python_candidates()? {
         if candidate.exists() {
             return Ok(candidate);
         }
     }
 
-    Ok(PathBuf::from(if cfg!(target_os = "windows") { "python" } else { "python3" }))
+    // 4. Fallback to system Python
+    Ok(PathBuf::from(if cfg!(target_os = "windows") {
+        "python"
+    } else {
+        "python3"
+    }))
 }
 
 fn local_python_candidates() -> Result<Vec<PathBuf>> {
@@ -225,12 +265,22 @@ fn find_sidecar_script() -> Result<PathBuf> {
     let mut candidates = Vec::new();
     if let Ok(cwd) = std::env::current_dir() {
         candidates.push(cwd.join("resources").join("qwen3_asr_transcribe.py"));
-        candidates.push(cwd.join("src-tauri").join("resources").join("qwen3_asr_transcribe.py"));
+        candidates.push(
+            cwd.join("src-tauri")
+                .join("resources")
+                .join("qwen3_asr_transcribe.py"),
+        );
     }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
             candidates.push(parent.join("resources").join("qwen3_asr_transcribe.py"));
-            candidates.push(parent.join(".." ).join("Resources").join("resources").join("qwen3_asr_transcribe.py"));
+            candidates.push(
+                parent
+                    .join("..")
+                    .join("Resources")
+                    .join("resources")
+                    .join("qwen3_asr_transcribe.py"),
+            );
         }
     }
 

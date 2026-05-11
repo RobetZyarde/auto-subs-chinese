@@ -5,11 +5,14 @@ use eyre::Result;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicI32, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use tauri::{command, AppHandle, Emitter, Manager, Runtime};
-use transcription_engine::{Engine, EngineConfig, TranscribeOptions, Callbacks, Segment as WDSegment, ProgressType, PostProcessConfig, process_segments, ContentFormatting, TextCase, TextDensity};
+use tauri::{AppHandle, Emitter, Manager, Runtime, command};
+use transcription_engine::{
+    Callbacks, ContentFormatting, Engine, EngineConfig, PostProcessConfig, ProgressType,
+    Segment as WDSegment, TextCase, TextDensity, TranscribeOptions, process_segments,
+};
 
 // Frontend-compatible progress data type
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -21,7 +24,9 @@ pub struct LabeledProgress {
 }
 
 impl From<(&i32, &Option<ProgressType>, &Option<String>)> for LabeledProgress {
-    fn from((progress, progress_type, label): (&i32, &Option<ProgressType>, &Option<String>)) -> Self {
+    fn from(
+        (progress, progress_type, label): (&i32, &Option<ProgressType>, &Option<String>),
+    ) -> Self {
         Self {
             progress: *progress,
             progress_type: progress_type.as_ref().map(|t| format!("{:?}", t)),
@@ -29,7 +34,6 @@ impl From<(&i32, &Option<ProgressType>, &Option<String>)> for LabeledProgress {
         }
     }
 }
-
 
 // Global cancellation state (public so main.rs can access it for exit handling)
 pub static SHOULD_CANCEL: Mutex<bool> = Mutex::new(false);
@@ -56,7 +60,7 @@ fn round_to_places(val: f64, places: u32) -> f64 {
 pub struct FrontendTranscribeOptions {
     pub audio_path: String,
     pub offset: Option<f64>,
-    pub model: String, // e.g., "tiny", "base", "small", "medium", "large"
+    pub model: String, // e.g., "qwen3-asr", "parakeet", "moonshine-tiny", etc.
     pub lang: Option<String>,
     pub translate: Option<bool>,
     pub target_language: Option<String>,
@@ -141,7 +145,11 @@ impl<'a> From<&'a FrontendTranscribeOptions> for TranscribeOptionsLogView<'a> {
             text_case: o.text_case.as_deref(),
             remove_punctuation: o.remove_punctuation,
             censored_words_count: o.censored_words.as_ref().map(|v| v.len()).unwrap_or(0),
-            custom_prompt_chars: o.custom_prompt.as_deref().map(|v| v.trim().chars().count()).unwrap_or(0),
+            custom_prompt_chars: o
+                .custom_prompt
+                .as_deref()
+                .map(|v| v.trim().chars().count())
+                .unwrap_or(0),
         }
     }
 }
@@ -154,8 +162,12 @@ pub async fn transcribe_audio<R: Runtime>(
     let start_time = Instant::now();
     let options_log = TranscribeOptionsLogView::from(&options);
     match serde_json::to_string(&options_log) {
-        Ok(j) => tracing::info!(target: "autosubs::transcribe", "transcribe_audio: starting options={}", j),
-        Err(_) => tracing::info!(target: "autosubs::transcribe", "transcribe_audio: starting (options failed to serialize)"),
+        Ok(j) => {
+            tracing::info!(target: "autosubs::transcribe", "transcribe_audio: starting options={}", j)
+        }
+        Err(_) => {
+            tracing::info!(target: "autosubs::transcribe", "transcribe_audio: starting (options failed to serialize)")
+        }
     }
 
     // Reset progress and cancellation state
@@ -183,7 +195,7 @@ pub async fn transcribe_audio<R: Runtime>(
                     let progress = LATEST_PROGRESS.load(Ordering::Relaxed).clamp(0, 100);
                     let progress_type = LATEST_PROGRESS_TYPE.lock().unwrap().clone();
                     let progress_label = LATEST_PROGRESS_LABEL.lock().unwrap().clone();
-                    
+
                     if progress != last_progress || progress_type != last_progress_type || progress_label != last_progress_label {
                         // Emit labeled progress with type and label
                         let labeled_progress = LabeledProgress::from((&progress, &progress_type, &progress_label));
@@ -244,7 +256,7 @@ pub async fn transcribe_audio<R: Runtime>(
             }
             Err(e) => tracing::warn!("list_cached_models failed: {}", e),
         }
-        
+
         // Create engine config with proper cache directory
         let engine_config = EngineConfig {
             cache_dir,
@@ -256,7 +268,7 @@ pub async fn transcribe_audio<R: Runtime>(
             diarize_segment_model_path: None, // Download segmentation model if needed
             diarize_embedding_model_path: None, // Download embedding model if needed
         };
-        
+
         let mut engine = Engine::new(engine_config);
 
         // Map frontend options to crate options
@@ -461,11 +473,7 @@ pub async fn transcribe_audio<R: Runtime>(
             );
 
             // Optional deep-debug dump controlled by env var.
-            if std::env::var("AUTOSUBS_DEBUG_TRANSCRIPT")
-                .ok()
-                .as_deref()
-                == Some("1")
-            {
+            if std::env::var("AUTOSUBS_DEBUG_TRANSCRIPT").ok().as_deref() == Some("1") {
                 match serde_json::to_string_pretty(&transcript) {
                     Ok(json) => tracing::debug!("final transcript JSON:\n{}", json),
                     Err(e) => tracing::warn!("failed to serialize transcript for debug: {}", e),
@@ -483,12 +491,10 @@ pub async fn transcribe_audio<R: Runtime>(
     }
 }
 
-
 /// Always normalize audio to ensure it's mono 16kHz WAV for whisper-diarize-rs
 fn should_normalize(_source: PathBuf) -> bool {
     true
 }
-
 
 // This function must now be `async` because it calls the async `normalize` function.
 pub async fn create_normalized_audio<R: Runtime>(
@@ -519,7 +525,6 @@ pub async fn create_normalized_audio<R: Runtime>(
 
     Ok(out_path)
 }
-
 
 /// Convert a `transcription_engine` segment to the app's `Segment` type.
 fn wd_to_app_segment(seg: &WDSegment) -> Segment {
@@ -668,7 +673,7 @@ pub async fn reformat_subtitles(
             _ => TextDensity::Standard,
         };
         config.apply_density(density);
-        
+
         // If custom density, set max_chars_per_line directly from the provided value
         if density == TextDensity::Custom {
             if let Some(custom_cpl) = options.custom_max_chars_per_line {

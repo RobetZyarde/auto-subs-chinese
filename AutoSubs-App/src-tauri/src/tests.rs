@@ -1,6 +1,6 @@
-use crate::transcription_api::{transcribe_audio, FrontendTranscribeOptions};
-use tauri::test::{mock_builder, mock_context, noop_assets};
+use crate::transcription_api::{FrontendTranscribeOptions, transcribe_audio};
 use std::fs;
+use tauri::test::{mock_builder, mock_context, noop_assets};
 
 #[cfg(test)]
 mod tests {
@@ -21,7 +21,7 @@ mod tests {
         let options = FrontendTranscribeOptions {
             audio_path: wav,
             offset: None,
-            model: "tiny.en".into(),
+            model: "moonshine-tiny".into(),
             lang: Some("en".into()),
             translate: Some(false),
             target_language: None,
@@ -47,8 +47,8 @@ mod tests {
                 "{}/tests/data/transcript-smoke.json",
                 env!("CARGO_MANIFEST_DIR")
             );
-            let json = serde_json::to_string_pretty(&transcript)
-                .expect("failed to serialize transcript");
+            let json =
+                serde_json::to_string_pretty(&transcript).expect("failed to serialize transcript");
             fs::write(&out_path, json).expect("failed to write transcript file");
             eprintln!("Saved transcript to {}", out_path);
         }
@@ -69,7 +69,7 @@ mod tests {
         let options = FrontendTranscribeOptions {
             audio_path: wav,
             offset: None,
-            model: "tiny.en".into(),
+            model: "moonshine-tiny".into(),
             lang: Some("en".into()),
             translate: Some(false),
             target_language: None,
@@ -105,10 +105,22 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn transcribe_audio_qwen3_smoke() {
         unsafe {
-            std::env::set_var("HF_HOME", r"C:\Users\33287\AppData\Local\com.autosubs\models");
-            std::env::set_var("HF_HUB_CACHE", r"C:\Users\33287\AppData\Local\com.autosubs\models");
-            std::env::set_var("TRANSFORMERS_CACHE", r"C:\Users\33287\AppData\Local\com.autosubs\models");
-            std::env::set_var("AUTOSUBS_MODEL_CACHE_DIR", r"C:\Users\33287\AppData\Local\com.autosubs\models");
+            std::env::set_var(
+                "HF_HOME",
+                r"C:\Users\33287\AppData\Local\com.autosubs\models",
+            );
+            std::env::set_var(
+                "HF_HUB_CACHE",
+                r"C:\Users\33287\AppData\Local\com.autosubs\models",
+            );
+            std::env::set_var(
+                "TRANSFORMERS_CACHE",
+                r"C:\Users\33287\AppData\Local\com.autosubs\models",
+            );
+            std::env::set_var(
+                "AUTOSUBS_MODEL_CACHE_DIR",
+                r"C:\Users\33287\AppData\Local\com.autosubs\models",
+            );
         }
 
         let app = mock_builder()
@@ -143,12 +155,16 @@ mod tests {
         assert!(res.is_ok(), "qwen3 transcription failed: {:?}", res.err());
 
         if let Ok(transcript) = res {
-            assert!(!transcript.segments.is_empty(), "qwen3 transcript returned no segments");
             assert!(
-                transcript
-                    .segments
-                    .iter()
-                    .any(|segment| segment.words.as_ref().map(|words| !words.is_empty()).unwrap_or(false)),
+                !transcript.segments.is_empty(),
+                "qwen3 transcript returned no segments"
+            );
+            assert!(
+                transcript.segments.iter().any(|segment| segment
+                    .words
+                    .as_ref()
+                    .map(|words| !words.is_empty())
+                    .unwrap_or(false)),
                 "qwen3 transcript returned no word timestamps"
             );
 
@@ -157,7 +173,8 @@ mod tests {
                 env!("CARGO_MANIFEST_DIR")
             );
             if let Some(parent) = std::path::Path::new(&out_path).parent() {
-                fs::create_dir_all(parent).expect("failed to create qwen3 transcript output directory");
+                fs::create_dir_all(parent)
+                    .expect("failed to create qwen3 transcript output directory");
             }
             let json = serde_json::to_string_pretty(&transcript)
                 .expect("failed to serialize qwen3 transcript");

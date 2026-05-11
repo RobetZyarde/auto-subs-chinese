@@ -1,13 +1,13 @@
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::collections::HashMap;
-use tokio::sync::mpsc;
-use tokio::sync::Mutex;
-use tokio::net::{TcpListener, TcpStream};
-use tokio_tungstenite::tungstenite::Message;
 use futures_util::{SinkExt, StreamExt};
 use serde_json::json;
-use tauri::Manager;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::Emitter;
+use tauri::Manager;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Mutex;
+use tokio::sync::mpsc;
+use tokio_tungstenite::tungstenite::Message;
 
 static CONNECTION_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 const ADOBE_BRIDGE_ADDR: &str = "127.0.0.1:8185";
@@ -29,7 +29,7 @@ pub async fn send_to_adobe(
     integration: Option<String>,
 ) -> Result<String, String> {
     let app_id = integration.unwrap_or_else(|| "adobe".to_string());
-    
+
     let sender = {
         let conn_guard = state.connections.lock().await;
         conn_guard.get(&app_id).map(|conn| conn.sender.clone())
@@ -38,7 +38,10 @@ pub async fn send_to_adobe(
     if let Some(sender) = sender {
         let msg = payload.to_string();
         if sender.send(msg).await.is_err() {
-            return Err(format!("Failed to send message to {} (connection lost)", app_id));
+            return Err(format!(
+                "Failed to send message to {} (connection lost)",
+                app_id
+            ));
         }
         Ok("Message sent".into())
     } else {
@@ -81,7 +84,10 @@ pub fn init_adobe_server(app_handle: tauri::AppHandle) {
     });
 }
 
-async fn handle_connection(stream: TcpStream, app_handle: tauri::AppHandle) -> Result<(), eyre::Report> {
+async fn handle_connection(
+    stream: TcpStream,
+    app_handle: tauri::AppHandle,
+) -> Result<(), eyre::Report> {
     let ws_stream = tokio_tungstenite::accept_async(stream).await?;
     tracing::info!("Adobe extension attempting to connect...");
 
@@ -92,10 +98,8 @@ async fn handle_connection(stream: TcpStream, app_handle: tauri::AppHandle) -> R
     let mut detected_app = String::new();
 
     // Wait for handshake to identify the app with a timeout
-    let handshake_res = tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        ws_receiver.next()
-    ).await;
+    let handshake_res =
+        tokio::time::timeout(std::time::Duration::from_secs(5), ws_receiver.next()).await;
 
     if let Ok(Some(Ok(msg))) = handshake_res {
         if let Message::Text(text) = msg {
@@ -118,18 +122,24 @@ async fn handle_connection(stream: TcpStream, app_handle: tauri::AppHandle) -> R
     {
         let state = app_handle.state::<AdobeState>();
         let mut conn_guard = state.connections.lock().await;
-        conn_guard.insert(detected_app.clone(), AdobeConnection {
-            id: connection_id,
-            sender: tx,
-            app_name: detected_app.clone(),
-        });
+        conn_guard.insert(
+            detected_app.clone(),
+            AdobeConnection {
+                id: connection_id,
+                sender: tx,
+                app_name: detected_app.clone(),
+            },
+        );
     }
 
     // Emit event to frontend with app info
-    let _ = app_handle.emit("adobe-status", json!({ 
-        "status": "connected", 
-        "app": detected_app 
-    }));
+    let _ = app_handle.emit(
+        "adobe-status",
+        json!({
+            "status": "connected",
+            "app": detected_app
+        }),
+    );
 
     // Task to send messages from channel to WS
     let mut send_task = tauri::async_runtime::spawn(async move {
@@ -170,10 +180,13 @@ async fn handle_connection(stream: TcpStream, app_handle: tauri::AppHandle) -> R
         if let Some(conn) = conn_guard.get(&detected_app) {
             if conn.id == connection_id {
                 conn_guard.remove(&detected_app);
-                let _ = app_handle.emit("adobe-status", json!({ 
-                    "status": "disconnected", 
-                    "app": detected_app 
-                }));
+                let _ = app_handle.emit(
+                    "adobe-status",
+                    json!({
+                        "status": "disconnected",
+                        "app": detected_app
+                    }),
+                );
                 tracing::info!("Adobe extension disconnected: {}", detected_app);
             }
         }

@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Runtime, Manager};
+use tauri::{AppHandle, Manager, Runtime};
 
 /// Gets the cache directory for whisper-diarize-rs models
 pub fn get_cache_dir<R: Runtime>(app: AppHandle<R>) -> Result<std::path::PathBuf, String> {
@@ -25,10 +25,10 @@ pub fn get_cache_dir<R: Runtime>(app: AppHandle<R>) -> Result<std::path::PathBuf
 #[tauri::command]
 pub fn get_downloaded_models<R: Runtime>(app: AppHandle<R>) -> Result<Vec<String>, String> {
     let model_dir = get_cache_dir(app)?;
-    
+
     let models = transcription_engine::list_cached_models(&model_dir)
-    .map_err(|e| format!("Failed to list cached models: {}", e))?;
-    
+        .map_err(|e| format!("Failed to list cached models: {}", e))?;
+
     Ok(models)
 }
 
@@ -36,11 +36,14 @@ pub fn get_downloaded_models<R: Runtime>(app: AppHandle<R>) -> Result<Vec<String
 #[tauri::command]
 pub fn delete_model<R: Runtime>(model: &str, app: AppHandle<R>) -> Result<(), String> {
     let model_dir = get_cache_dir(app)?;
-    
+
     let deleted = transcription_engine::delete_cached_model(&model_dir, model);
     if deleted {
         Ok(())
     } else {
-        Err(format!("Failed to delete model '{}' (model may not exist)", model))
+        Err(format!(
+            "Failed to delete model '{}' (model may not exist)",
+            model
+        ))
     }
 }

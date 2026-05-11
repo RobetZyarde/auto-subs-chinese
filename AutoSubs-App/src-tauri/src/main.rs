@@ -3,36 +3,37 @@
 
 use reqwest::Client;
 use serde_json::json;
-use std::time::Duration;
-use tauri::{Manager, RunEvent};
-use tauri::Emitter; // for app.emit
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
 use std::sync::Arc;
-use tokio::sync::Notify;
-use tauri_plugin_updater::UpdaterExt;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
+use std::time::Duration;
+use tauri::Emitter; // for app.emit
+use tauri::{Manager, RunEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_updater::UpdaterExt;
+use tokio::sync::Notify;
 
 // Import plugins
+use tauri_plugin_clipboard_manager::init as clipboard_plugin;
 use tauri_plugin_fs::init as fs_plugin;
 use tauri_plugin_http::init as http_plugin;
-use tauri_plugin_process::init as process_plugin;
-use tauri_plugin_shell::init as shell_plugin;
-use tauri_plugin_shell::ShellExt; // for app.shell()
-use tauri_plugin_store::Builder as StoreBuilder;
-use tauri_plugin_clipboard_manager::init as clipboard_plugin;
 use tauri_plugin_opener::init as opener_plugin;
+use tauri_plugin_process::init as process_plugin;
+use tauri_plugin_shell::ShellExt; // for app.shell()
+use tauri_plugin_shell::init as shell_plugin;
 use tauri_plugin_single_instance::init as single_instance_plugin;
+use tauri_plugin_store::Builder as StoreBuilder;
 use tokio::process::Command as TokioCommand;
 
-mod audio_preprocess;
-mod models;
-mod transcription_api;
-mod transcript_types;
-mod logging;
-mod resolve_bridge;
 mod adobe_bridge;
+mod audio_preprocess;
+mod logging;
+mod models;
+mod python_env;
+mod resolve_bridge;
 #[cfg(target_os = "macos")]
 mod traffic_lights;
+mod transcript_types;
+mod transcription_api;
 
 // Include integration-like tests that need crate visibility
 #[cfg(test)]
@@ -44,11 +45,16 @@ static EXITING: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "linux")]
 fn is_newer_version(latest: &str, current: &str) -> bool {
     let parse = |s: &str| -> Option<(u32, u32, u32)> {
-        let parts: Vec<u32> = s.trim_start_matches('v')
+        let parts: Vec<u32> = s
+            .trim_start_matches('v')
             .split('.')
             .filter_map(|p| p.parse().ok())
             .collect();
-        if parts.len() >= 3 { Some((parts[0], parts[1], parts[2])) } else { None }
+        if parts.len() >= 3 {
+            Some((parts[0], parts[1], parts[2]))
+        } else {
+            None
+        }
     };
     matches!((parse(latest), parse(current)), (Some(l), Some(c)) if l > c)
 }
@@ -284,6 +290,9 @@ fn main() {
             transcription_api::reformat_subtitles,
             models::get_downloaded_models,
             models::delete_model,
+            python_env::check_python_env,
+            python_env::ensure_python_env,
+            python_env::install_cuda_pytorch,
             logging::get_backend_logs,
             logging::clear_backend_logs,
             logging::get_log_dir,

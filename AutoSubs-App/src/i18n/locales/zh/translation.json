@@ -46,6 +46,21 @@
     "generateSubtitles": "生成字幕",
     "open": "打开"
   },
+  "pythonEnv": {
+    "title": "Python 环境设置",
+    "description": "Qwen3-ASR 需要安装 qwen-asr 包的 Python 环境。将自动安装。",
+    "ready": "环境已就绪",
+    "readyDesc": "qwen-asr 已安装并可使用。",
+    "willInstall": "将安装：",
+    "venv": "Python 虚拟环境",
+    "qwenAsr": "qwen-asr 包",
+    "pytorch": "PyTorch（默认 CPU，之后可选 GPU）",
+    "error": "安装失败",
+    "pleaseWait": "首次安装可能需要几分钟...",
+    "retry": "重试安装",
+    "install": "立即安装",
+    "installing": "安装中..."
+  },
   "update": {
     "restartResolveServer": {
       "title": "更新已安装",

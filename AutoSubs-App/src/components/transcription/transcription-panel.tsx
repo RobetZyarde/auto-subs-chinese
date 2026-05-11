@@ -73,6 +73,7 @@ import { useResolve } from "@/contexts/ResolveContext";
 import { useAdobe } from "@/contexts/AdobeContext";
 import { useIntegration } from "@/contexts/IntegrationContext";
 import { useErrorDialog } from "@/contexts/ErrorDialogContext";
+import { PythonEnvDialog } from "@/components/dialogs/python-env-dialog";
 import { ResolveApiError } from "@/api/resolve-api";
 import { languages, translateLanguages } from "@/lib/languages";
 import {
@@ -1197,6 +1198,7 @@ export function TranscriptionPanel({
   const [showSubSlate, setShowSubSlate] = React.useState(false);
   const isSmallScreen = useMediaQuery("(max-width: 640px)");
   const progressContainerRef = React.useRef<HTMLDivElement>(null);
+  const [showPythonEnvDialog, setShowPythonEnvDialog] = React.useState(false);
 
   const handleSelectedFileChange = React.useCallback((file: string | null) => {
     setFileInput(file);
@@ -1321,6 +1323,22 @@ export function TranscriptionPanel({
     if (settings.audioInputMode === "file" && !fileInput) {
       console.error("No file selected");
       return;
+    }
+
+    // Check Python environment for Qwen3-ASR model
+    const selectedModel = modelsState[settings.model];
+    if (selectedModel?.value === "qwen3-asr") {
+      try {
+        const pythonStatus = await invoke<string>("check_python_env");
+        if (pythonStatus !== "ready") {
+          setShowPythonEnvDialog(true);
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to check Python environment:", err);
+        setShowPythonEnvDialog(true);
+        return;
+      }
     }
 
     setIsProcessing(true);
@@ -1504,6 +1522,16 @@ export function TranscriptionPanel({
           updateSetting("subSlateMilestoneShown", true);
         }}
         milestone="10 transcriptions complete"
+      />
+
+      <PythonEnvDialog
+        open={showPythonEnvDialog}
+        onOpenChange={setShowPythonEnvDialog}
+        onComplete={() => {
+          setShowPythonEnvDialog(false);
+          // Retry transcription after Python env is ready
+          handleStartTranscription();
+        }}
       />
     </>
   );

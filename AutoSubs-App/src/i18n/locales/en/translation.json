@@ -46,6 +46,21 @@
     "generateSubtitles": "Generate Subtitles",
     "open": "Open"
   },
+  "pythonEnv": {
+    "title": "Python Environment Setup",
+    "description": "Qwen3-ASR requires a Python environment with the qwen-asr package. This will be installed automatically.",
+    "ready": "Environment Ready",
+    "readyDesc": "qwen-asr is installed and ready to use.",
+    "willInstall": "What will be installed:",
+    "venv": "Python virtual environment",
+    "qwenAsr": "qwen-asr package",
+    "pytorch": "PyTorch (CPU by default, GPU option available after)",
+    "error": "Installation Failed",
+    "pleaseWait": "This may take a few minutes on first install...",
+    "retry": "Retry Installation",
+    "install": "Install Now",
+    "installing": "Installing..."
+  },
   "update": {
     "restartResolveServer": {
       "title": "Update installed",

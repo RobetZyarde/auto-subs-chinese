@@ -33,7 +33,7 @@ use std::time::{Duration, SystemTime};
 
 use once_cell::sync::Lazy;
 use tauri::{AppHandle, Manager, Runtime};
-use tracing_subscriber::{fmt, layer::SubscriberExt, Registry, EnvFilter};
+use tracing_subscriber::{EnvFilter, Registry, fmt, layer::SubscriberExt};
 
 // Keep the non-blocking worker guard alive for the lifetime of the app
 static FILE_GUARD: Lazy<Mutex<Option<tracing_appender::non_blocking::WorkerGuard>>> =
@@ -115,7 +115,9 @@ impl<'a> Write for MemoryWriter<'a> {
         self.buf.extend_from_slice(data);
         Ok(data.len())
     }
-    fn flush(&mut self) -> io::Result<()> { Ok(()) }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 impl<'a> Drop for MemoryWriter<'a> {
@@ -123,7 +125,9 @@ impl<'a> Drop for MemoryWriter<'a> {
         if let Ok(mut guard) = self.logs.write() {
             let s = String::from_utf8_lossy(&self.buf).to_string();
             let mut s = redact_paths(&s);
-            if s.ends_with('\n') { s.pop(); } // trim one trailing newline for consistency
+            if s.ends_with('\n') {
+                s.pop();
+            } // trim one trailing newline for consistency
             guard.push_back(s);
             while guard.len() > MAX_LOG_LINES {
                 guard.pop_front();
@@ -136,7 +140,10 @@ struct MemoryMakeWriter;
 impl<'a> fmt::MakeWriter<'a> for MemoryMakeWriter {
     type Writer = MemoryWriter<'a>;
     fn make_writer(&'a self) -> Self::Writer {
-        MemoryWriter { buf: Vec::new(), logs: &MEMORY_LOGS }
+        MemoryWriter {
+            buf: Vec::new(),
+            logs: &MEMORY_LOGS,
+        }
     }
 }
 
@@ -146,20 +153,30 @@ fn cleanup_old_logs(log_dir: &Path) {
     let retention = Duration::from_secs(LOG_RETENTION_DAYS * 24 * 60 * 60);
     let now = SystemTime::now();
 
-    let Ok(entries) = fs::read_dir(log_dir) else { return };
+    let Ok(entries) = fs::read_dir(log_dir) else {
+        return;
+    };
     for entry in entries.filter_map(|e| e.ok()) {
         let path = entry.path();
         if !path.is_file() {
             continue;
         }
-        let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
         // Only clean up autosubs log files, not the active log or exported logs
         if !name.starts_with("autosubs.log") || name == "autosubs.log" {
             continue;
         }
-        let Ok(metadata) = entry.metadata() else { continue };
-        let Ok(modified) = metadata.modified() else { continue };
-        let Ok(age) = now.duration_since(modified) else { continue };
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        let Ok(modified) = metadata.modified() else {
+            continue;
+        };
+        let Ok(age) = now.duration_since(modified) else {
+            continue;
+        };
         if age > retention {
             let _ = fs::remove_file(&path);
         }
@@ -188,7 +205,9 @@ pub fn init_logging<R: Runtime>(app: &AppHandle<R>) {
     // Prevent double init
     static INIT_ONCE: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
     if let Ok(mut inited) = INIT_ONCE.lock() {
-        if *inited { return; }
+        if *inited {
+            return;
+        }
         *inited = true;
     }
 
@@ -228,18 +247,17 @@ pub fn init_logging<R: Runtime>(app: &AppHandle<R>) {
         .with_level(true)
         .compact();
 
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| {
-            EnvFilter::new("info")
-                .add_directive("hyper=warn".parse().unwrap())
-                .add_directive("hyper_util=warn".parse().unwrap())
-                .add_directive("reqwest=warn".parse().unwrap())
-                .add_directive("tauri=info".parse().unwrap())
-                .add_directive("autosubs=debug".parse().unwrap())
-                .add_directive("transcription_engine=debug".parse().unwrap())
-                .add_directive("whisper_rs=warn".parse().unwrap())
-                .add_directive("ort=warn".parse().unwrap())
-        });
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::new("info")
+            .add_directive("hyper=warn".parse().unwrap())
+            .add_directive("hyper_util=warn".parse().unwrap())
+            .add_directive("reqwest=warn".parse().unwrap())
+            .add_directive("tauri=info".parse().unwrap())
+            .add_directive("autosubs=debug".parse().unwrap())
+            .add_directive("transcription_engine=debug".parse().unwrap())
+            .add_directive("whisper_rs=warn".parse().unwrap())
+            .add_directive("ort=warn".parse().unwrap())
+    });
 
     let subscriber = Registry::default()
         .with(filter)
@@ -268,7 +286,9 @@ pub fn get_backend_logs() -> String {
 
 #[tauri::command]
 pub fn clear_backend_logs() {
-    if let Ok(mut guard) = MEMORY_LOGS.write() { guard.clear(); }
+    if let Ok(mut guard) = MEMORY_LOGS.write() {
+        guard.clear();
+    }
 }
 
 #[tauri::command]

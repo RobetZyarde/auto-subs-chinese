@@ -26,7 +26,136 @@
 						["endFrame"] = 80,
 					}
 				},
-				InputKeys = {
+				-- Preset management functions
+				Presets = {
+					-- Built-in presets
+					BuiltIn = {
+						["Minimal"] = {
+							FadeEnabled = 1,
+							PopInEnabled = 0,
+							SlideUpEnabled = 0,
+							AnimationLength = 0.2,
+							AnimationMode = 2,
+							EasingCurve = 1,
+						},
+						["Smooth"] = {
+							FadeEnabled = 1,
+							PopInEnabled = 0,
+							SlideUpEnabled = 0,
+							AnimationLength = 0.35,
+							AnimationMode = 2,
+							EasingCurve = 3,
+						},
+						["Pop"] = {
+							FadeEnabled = 1,
+							PopInEnabled = 1,
+							SlideUpEnabled = 0,
+							AnimationLength = 0.3,
+							AnimationMode = 2,
+							EasingCurve = 4,
+						},
+						["Slide"] = {
+							FadeEnabled = 1,
+							PopInEnabled = 0,
+							SlideUpEnabled = 1,
+							AnimationLength = 0.4,
+							AnimationMode = 2,
+							EasingCurve = 3,
+						},
+						["Cinematic"] = {
+							FadeEnabled = 1,
+							PopInEnabled = 0,
+							SlideUpEnabled = 1,
+							AnimationLength = 0.5,
+							AnimationMode = 2,
+							EasingCurve = 3,
+						},
+					},
+					-- Get all preset names (built-in + custom)
+					GetNames = [[
+						return function(tool)
+							local names = {}
+							-- Add built-in presets
+							for name, _ in pairs(tool:GetData("Presets").BuiltIn) do
+								table.insert(names, name)
+							end
+							-- Add custom presets
+							local customPresets = tool:GetData("CustomPresets") or {}
+							for name, _ in pairs(customPresets) do
+								table.insert(names, name)
+							end
+							table.sort(names)
+							return names
+						end
+					]],
+					-- Load a preset by name
+					Load = [[
+						return function(comp, tool, presetName)
+							local presets = tool:GetData("Presets")
+							local preset = presets.BuiltIn[presetName]
+							
+							-- Check custom presets if not found in built-in
+							if not preset then
+								local customPresets = tool:GetData("CustomPresets") or {}
+								preset = customPresets[presetName]
+							end
+							
+							if not preset then
+								print("Preset not found: " .. presetName)
+								return false
+							end
+							
+							-- Apply preset values
+							for key, value in pairs(preset) do
+								tool:SetInput(key, value)
+							end
+							
+							-- Update animations
+							loadstring(tool:GetData("SetAnimations"))()(comp, tool)
+							
+							print("Loaded preset: " .. presetName)
+							return true
+						end
+					]],
+					-- Save current settings as a custom preset
+					Save = [[
+						return function(tool, presetName)
+							local customPresets = tool:GetData("CustomPresets") or {}
+							
+							-- Get current animation settings
+							customPresets[presetName] = {
+								FadeEnabled = tool:GetInput("FadeEnabled"),
+								PopInEnabled = tool:GetInput("PopInEnabled"),
+								SlideUpEnabled = tool:GetInput("SlideUpEnabled"),
+								AnimationLength = tool:GetInput("AnimationLength"),
+								AnimationMode = tool:GetInput("AnimationMode"),
+								EasingCurve = tool:GetInput("EasingCurve"),
+							}
+							
+							tool:SetData("CustomPresets", customPresets)
+							print("Saved preset: " .. presetName)
+							return true
+						end
+					]],
+					-- Delete a custom preset
+					Delete = [[
+						return function(tool, presetName)
+							local customPresets = tool:GetData("CustomPresets") or {}
+							
+							if customPresets[presetName] then
+								customPresets[presetName] = nil
+								tool:SetData("CustomPresets", customPresets)
+								print("Deleted preset: " .. presetName)
+								return true
+							end
+							
+							print("Cannot delete built-in preset: " .. presetName)
+							return false
+						end
+					]],
+				},
+				-- Initialize custom presets storage
+				CustomPresets = {},
 					"Font",
 					"Style",
 					"TextSize",
@@ -81,6 +210,48 @@
 					end
 				]],
 				Animations = {
+					-- Easing curve functions
+					-- Each returns LH (left handle) offset for Bezier keyframes
+					EasingCurves = {
+						-- Linear: no easing, constant speed
+						Linear = function(t) return t end,
+						-- Ease In: slow start, fast end
+						EaseIn = function(t)
+							return t * t
+						end,
+						-- Ease Out: fast start, slow end
+						EaseOut = function(t)
+							return 1 - (1 - t) * (1 - t)
+						end,
+						-- Ease In Out: slow start and end, fast middle
+						EaseInOut = function(t)
+							if t < 0.5 then
+								return 2 * t * t
+							else
+								return 1 - (-2 * t + 2)^2 / 2
+							end
+						end,
+						-- Bounce: slight overshoot then settle
+						Bounce = function(t)
+							if t < 0.5 then
+								return 4 * t * t * t
+							else
+								return 1 - (-2 * t + 2)^3 / 2
+							end
+						end,
+					},
+					-- Get LH offset for a given easing type and duration
+					GetEasingLH = function(easingType, duration)
+						local curves = {
+							Linear = {0, 0},
+							EaseIn = {-0.5, 0},
+							EaseOut = {0, -0.5},
+							EaseInOut = {-0.3, -0.3},
+							Bounce = {-0.6, -0.2},
+						}
+						local curve = curves[easingType] or curves.EaseIn
+						return {curve[1] * duration, curve[2]}
+					end,
 					-- Helper: Remove XYPath modifiers from Offset inputs
 					RemoveOffsetModifiers = [[
 						return function(follower)
@@ -99,20 +270,30 @@
 							end
 						end
 					]],
-					-- Fade: Connect Opacity to stretcher with smooth ease-in
+					-- Fade: Connect Opacity to stretcher with configurable easing
 					ApplyFade = [[
-						return function(follower, animStretcher, animSpline, animInEnd, animOutStart, mode)
+						return function(follower, animStretcher, animSpline, animInEnd, animOutStart, mode, easingType)
 							follower.Opacity1 = animStretcher.Result
 							follower.Opacity2 = animStretcher.Result
 							follower.Opacity3 = animStretcher.Result
 							follower.Opacity4 = animStretcher.Result
+							
+							-- Get easing LH values
+							local easingLH = {
+								Linear = {0, 0},
+								EaseIn = {-animInEnd * 0.4, 0},
+								EaseOut = {0, -animInEnd * 0.4},
+								EaseInOut = {-animInEnd * 0.3, -animInEnd * 0.3},
+								Bounce = {-animInEnd * 0.6, -animInEnd * 0.2},
+							}
+							local lh = easingLH[easingType] or easingLH.EaseIn
 							
 							local keyframes
 							if mode == 0 then
 								-- In only
 								keyframes = {
 									[0] = { 0 },
-									[animInEnd] = { 1, LH = { -animInEnd, 0 } },
+									[animInEnd] = { 1, LH = lh },
 									[100] = { 1 },
 								}
 							elseif mode == 1 then
@@ -120,22 +301,22 @@
 								keyframes = {
 									[0] = { 1 },
 									[animOutStart] = { 1 },
-									[100] = { 0 },
+									[100] = { 0, LH = lh },
 								}
 							else
 								-- Both (default)
 								keyframes = {
 									[0] = { 0 },
-									[animInEnd] = { 1, LH = { -animInEnd, 0 } },
+									[animInEnd] = { 1, LH = lh },
 									[animOutStart] = { 1 },
-									[100] = { 0 },
+									[100] = { 0, LH = lh },
 								}
 							end
 							
 							animSpline:SetKeyFrames(keyframes, true)
-							print("Applied Fade animation (mode: " .. mode .. ")")
+							print("Applied Fade animation (mode: " .. mode .. ", easing: " .. easingType .. ")")
 						end
-					]],
+					]],,
 					ResetFade = [[
 						return function(follower)
 							follower.Opacity1 = nil
@@ -148,15 +329,25 @@
 							follower:SetInput("Opacity4", 1)
 						end
 					]],
-					-- PopIn: Add KeyStretcher modifiers to WordSizeX/Y with smooth ease-in
+					-- PopIn: Add KeyStretcher modifiers to WordSizeX/Y with configurable easing
 					ApplyPopIn = [[
-						return function(follower, animInEnd, animOutStart, animationLevel, mode)
+						return function(follower, animInEnd, animOutStart, animationLevel, mode, easingType)
+							-- Get easing LH values
+							local easingLH = {
+								Linear = {0, 0},
+								EaseIn = {-animInEnd * 0.4, 0},
+								EaseOut = {0, -animInEnd * 0.4},
+								EaseInOut = {-animInEnd * 0.3, -animInEnd * 0.3},
+								Bounce = {-animInEnd * 0.6, -animInEnd * 0.2},
+							}
+							local lh = easingLH[easingType] or easingLH.EaseIn
+							
 							local sizeKeyframes
 							if mode == 0 then
 								-- In only
 								sizeKeyframes = {
 									[0] = { 0.8 },
-									[animInEnd] = { 1, LH = { -animInEnd, 0 } },
+									[animInEnd] = { 1, LH = lh },
 									[100] = { 1 },
 								}
 							elseif mode == 1 then
@@ -164,15 +355,15 @@
 								sizeKeyframes = {
 									[0] = { 1 },
 									[animOutStart] = { 1 },
-									[100] = { 0.8 },
+									[100] = { 0.8, LH = lh },
 								}
 							else
 								-- Both (default)
 								sizeKeyframes = {
 									[0] = { 0.8 },
-									[animInEnd] = { 1, LH = { -animInEnd, 0 } },
+									[animInEnd] = { 1, LH = lh },
 									[animOutStart] = { 1 },
-									[100] = { 0 },
+									[100] = { 0.8, LH = lh },
 								}
 							end
 							local function applyStretchedKeyframes(propName)
@@ -192,9 +383,9 @@
 							print(propX)
 							applyStretchedKeyframes(propX .. "SizeX")
 							applyStretchedKeyframes(propX .. "SizeY")
-							print("Applied PopIn animation (mode: " .. mode .. ")")
+							print("Applied PopIn animation (mode: " .. mode .. ", easing: " .. easingType .. ")")
 						end
-					]],
+					]],,
 					ResetPopIn = [[
 						return function(follower)
 							follower.LineSizeX = nil
@@ -207,15 +398,25 @@
 							follower:SetInput("WordSizeY", 1)
 						end
 					]],
-					-- SlideUp: Add XYPath + KeyStretcher to Offset Y with smooth ease-in
+					-- SlideUp: Add XYPath + KeyStretcher to Offset Y with configurable easing
 					ApplySlideUp = [[
-						return function(follower, animInEnd, animOutStart, mode)
+						return function(follower, animInEnd, animOutStart, mode, easingType)
+							-- Get easing LH values
+							local easingLH = {
+								Linear = {0, 0},
+								EaseIn = {-animInEnd * 0.4, 0},
+								EaseOut = {0, -animInEnd * 0.4},
+								EaseInOut = {-animInEnd * 0.3, -animInEnd * 0.3},
+								Bounce = {-animInEnd * 0.6, -animInEnd * 0.2},
+							}
+							local lh = easingLH[easingType] or easingLH.EaseIn
+							
 							local yKeyframes
 							if mode == 0 then
 								-- In only
 								yKeyframes = {
 									[0] = { -0.1 },
-									[animInEnd] = { 0, LH = { -animInEnd, 0 } },
+									[animInEnd] = { 0, LH = lh },
 									[100] = { 0 },
 								}
 							elseif mode == 1 then
@@ -223,15 +424,15 @@
 								yKeyframes = {
 									[0] = { 0 },
 									[animOutStart] = { 0 },
-									[100] = { -0.1 },
+									[100] = { -0.1, LH = lh },
 								}
 							else
 								-- Both (default)
 								yKeyframes = {
 									[0] = { -0.1 },
-									[animInEnd] = { 0, LH = { -animInEnd, 0 } },
+									[animInEnd] = { 0, LH = lh },
 									[animOutStart] = { 0 },
-									[100] = { -0.1 },
+									[100] = { -0.1, LH = lh },
 								}
 							end
 							for i = 1, 3 do
@@ -252,9 +453,9 @@
 									end
 								end
 							end
-							print("Applied SlideUp animation (mode: " .. mode .. ")")
+							print("Applied SlideUp animation (mode: " .. mode .. ", easing: " .. easingType .. ")")
 						end
-					]],
+					]],,
 				},
 				SetAnimations = [[
 					return function(comp, tool)
@@ -265,6 +466,11 @@
 						local slideUpEnabled = tool:GetInput("SlideUpEnabled") == 1
 						local animationLevel = tool:GetInput("AnimationLevel")
 						local animationMode = tool:GetInput("AnimationMode") or 2
+						local easingType = tool:GetInput("EasingCurve") or "EaseIn"
+
+						-- Map easing index to name
+						local easingNames = {[0]="Linear", "EaseIn", "EaseOut", "EaseInOut", "Bounce"}
+						easingType = easingNames[easingType] or "EaseIn"
 
 						local follower = comp:FindTool("Follower1")
 						local animStretcher = comp:FindTool("AnimationKeyframeStretcher")
@@ -286,7 +492,7 @@
 						-- Apply fade animation
 						if fadeEnabled or slideUpEnabled or popInEnabled then
 							local applyFade = loadstring(anims.ApplyFade)()
-							applyFade(follower, animStretcher, animSpline, animInEnd, animOutStart, animationMode)
+							applyFade(follower, animStretcher, animSpline, animInEnd, animOutStart, animationMode, easingType)
 						else
 							follower.Opacity1 = animStretcher.Result
 							follower.Opacity2 = animStretcher.Result
@@ -301,13 +507,13 @@
 						-- Apply pop-in animation
 						if popInEnabled then
 							local applyPopIn = loadstring(anims.ApplyPopIn)()
-							applyPopIn(follower, animInEnd, animOutStart, animationLevel, animationMode)
+							applyPopIn(follower, animInEnd, animOutStart, animationLevel, animationMode, easingType)
 						end
 
 						-- Apply slide-up animation
 						if slideUpEnabled then
 							local applySlideUp = loadstring(anims.ApplySlideUp)()
-							applySlideUp(follower, animInEnd, animOutStart, animationMode)
+							applySlideUp(follower, animInEnd, animOutStart, animationMode, easingType)
 						end
 
 						-- Set stretcher time ranges
@@ -321,7 +527,7 @@
 						}, true)
 						orderSpline:SetInput("StretchEnd", animOutStart)
 					end
-				]],
+				]],,
 				ApplyAnimationLevel = [[
 					return function(comp, tool)
 						-- Get current spline settings to be modified
@@ -384,9 +590,26 @@
 				]],
 				UpdateTextContent = [[
 					return function(comp, tool, text)
+						-- UTF-8 aware character count that handles multi-byte sequences correctly
+						-- Counts actual Unicode code points, not bytes
 						local function utf8len(s)
-							local _, count = s:gsub("[^\128-\191]", "")
-							return count
+							if not s or s == "" then return 0 end
+							local len = 0
+							local i = 1
+							while i <= #s do
+								local c = s:byte(i)
+								if c < 0x80 then
+									i = i + 1
+								elseif c < 0xE0 then
+									i = i + 2
+								elseif c < 0xF0 then
+									i = i + 3
+								else
+									i = i + 4
+								end
+								len = len + 1
+							end
+							return len
 						end
 
 						-- Split text into words
@@ -452,9 +675,17 @@
 						-- Get timeline item that contains this composition
 						local getTimelineItem = loadstring(tool:GetData("GetTimelineItem"))()
 						local item = getTimelineItem(comp)
+						if not item then
+							print("AutoSubs Warning: Could not find timeline item. Ensure the composition is applied to a timeline clip.")
+							return
+						end
 
 						-- Get follower delay spline
 						local spline = comp:FindTool(tool:GetData("DelaySpline"))
+						if not spline then
+							print("AutoSubs Warning: Could not find delay spline tool.")
+							return
+						end
 
 						-- Remove all existing word markers
 						while item:DeleteMarkerByCustomData("AutoSubs") do end
@@ -482,9 +713,17 @@
 						-- Get timeline item that contains this composition
 						local getTimelineItem = loadstring(tool:GetData("GetTimelineItem"))()
 						local item = getTimelineItem(comp)
+						if not item then
+							print("AutoSubs Warning: Could not find timeline item. Ensure the composition is applied to a timeline clip.")
+							return
+						end
 
 						-- Get follower delay spline
 						local spline = comp:FindTool(tool:GetData("DelaySpline"))
+						if not spline then
+							print("AutoSubs Warning: Could not find delay spline tool.")
+							return
+						end
 
 						-- Get comp offset
 						local offset = comp:GetAttrs("COMPN_RenderStart")
@@ -508,15 +747,35 @@
 							table.insert(words, word)
 						end
 						
-						-- UTF-8 aware character count
+						-- UTF-8 aware character count that handles multi-byte sequences correctly
+						-- Counts actual Unicode code points, not bytes
 						local function utf8len(s)
-							local _, count = s:gsub("[^\128-\191]", "")
-							return count
+							if not s or s == "" then return 0 end
+							local len = 0
+							local i = 1
+							while i <= #s do
+								local c = s:byte(i)
+								if c < 0x80 then
+									i = i + 1
+								elseif c < 0xE0 then
+									i = i + 2
+								elseif c < 0xF0 then
+									i = i + 3
+								else
+									i = i + 4
+								end
+								len = len + 1
+							end
+							return len
 						end
 
 						-- Build intermediate word timing format
 						local wordTiming = {}
 						local count = math.min(#markerFrames, #words)
+						if count == 0 then
+							print("AutoSubs Warning: No markers found. Please add markers to the timeline first.")
+							return
+						end
 						local charIndex = 0
 						
 						for i = 1, count do
@@ -543,6 +802,12 @@
 							})
 
 							charIndex = charIndex + length
+						end
+						
+						-- Validate marker-word count mismatch
+						if #markerFrames ~= #words then
+							print("AutoSubs Warning: " .. #markerFrames .. " markers found but " .. #words .. " words in text. " ..
+								(#markerFrames < #words and "Some words will not have timing." or "Extra markers will be ignored."))
 						end
 						
 						-- Apply word timing (update spline, store data, refresh highlight)
@@ -987,6 +1252,24 @@
 							ICD_Center = 0.5,
 							LINKS_Name = "Duration (seconds)"
 						},
+						EasingCurve = {
+							LINKS_Name = "Easing Curve",
+							INP_Integer = true,
+							INPID_InputControl = "ComboControl",
+							INP_SplineType = "Default",
+							INP_MaxScale = 1,
+							INP_Default = 1,
+							LINKID_DataType = "Number",
+							INP_MinScale = 0,
+							INP_External = false,
+							INP_Passive = true,
+							INP_MinAllowed = 0,
+							{ CCS_AddString = "Linear" },
+							{ CCS_AddString = "Ease In" },
+							{ CCS_AddString = "Ease Out" },
+							{ CCS_AddString = "Ease In Out" },
+							{ CCS_AddString = "Bounce" },
+						},
 						UpdateAnimationButton = {
 							LINKS_Name = "Update Animation",
 							LINKID_DataType = "Number",
@@ -996,6 +1279,70 @@
 							INP_Passive = true,
 							BTNCS_Execute = [[
 								loadstring(tool:GetData("SetAnimations"))()(comp, tool)
+							]],
+						},
+						PresetLabel = {
+							LINKS_Name = "Presets",
+							INP_Integer = false,
+							LBLC_DropDownButton = true,
+							LBLC_NumInputs = 4,
+							INP_SplineType = "Default",
+							INP_Default = 1,
+							LINKID_DataType = "Number",
+							INP_Passive = true,
+							INPID_InputControl = "LabelControl",
+						},
+						PresetSelector = {
+							LINKS_Name = "Load Preset",
+							INP_Integer = true,
+							INPID_InputControl = "ComboControl",
+							INP_SplineType = "Default",
+							INP_MaxScale = 1,
+							INP_Default = 0,
+							LINKID_DataType = "Number",
+							INP_MinScale = 0,
+							INP_External = false,
+							INP_Passive = true,
+							INP_MinAllowed = 0,
+							{ CCS_AddString = "Minimal" },
+							{ CCS_AddString = "Smooth" },
+							{ CCS_AddString = "Pop" },
+							{ CCS_AddString = "Slide" },
+							{ CCS_AddString = "Cinematic" },
+							INPS_ExecuteOnChange = [[
+								local presetNames = {[0]="Minimal", "Smooth", "Pop", "Slide", "Cinematic"}
+								local presetName = presetNames[tool:GetInput("PresetSelector")]
+								if presetName then
+									loadstring(tool:GetData("Presets").Load)()(comp, tool, presetName)
+								end
+							]],
+						},
+						SavePresetName = {
+							TEC_ReadOnly = false,
+							INPID_InputControl = "TextEditControl",
+							TEC_Lines = 1,
+							LINKID_DataType = "Text",
+							TEC_Wrap = false,
+							INP_External = false,
+							IC_NoLabel = false,
+							INP_Passive = true,
+							IC_Visible = true,
+							LINKS_Name = "Preset Name",
+						},
+						SavePresetButton = {
+							LINKS_Name = "Save as Preset",
+							LINKID_DataType = "Number",
+							IC_NoLabel = false,
+							INPID_InputControl = "ButtonControl",
+							IC_Visible = true,
+							INP_Passive = true,
+							BTNCS_Execute = [[
+								local name = tool:GetInput("SavePresetName")
+								if name and name ~= "" then
+									loadstring(tool:GetData("Presets").Save)()(tool, name)
+								else
+									print("Please enter a preset name")
+								end
 							]],
 						},
 						HighlightLabel = {
@@ -1725,6 +2072,33 @@
 				UpdateAnimationButton = InstanceInput {
 					SourceOp = "Template",
 					Source = "UpdateAnimationButton",
+					Page = "Text",
+				},
+				EasingCurve = InstanceInput {
+					SourceOp = "Template",
+					Source = "EasingCurve",
+					Page = "Text",
+					Default = 1,
+				},
+				PresetLabel = InstanceInput {
+					SourceOp = "Template",
+					Source = "PresetLabel",
+					Page = "Text",
+				},
+				PresetSelector = InstanceInput {
+					SourceOp = "Template",
+					Source = "PresetSelector",
+					Page = "Text",
+					Default = 0,
+				},
+				SavePresetName = InstanceInput {
+					SourceOp = "Template",
+					Source = "SavePresetName",
+					Page = "Text",
+				},
+				SavePresetButton = InstanceInput {
+					SourceOp = "Template",
+					Source = "SavePresetButton",
 					Page = "Text",
 				},
 				HighlightLabel = InstanceInput {

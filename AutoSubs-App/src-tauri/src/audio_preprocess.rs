@@ -1,4 +1,4 @@
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Runtime};
@@ -41,21 +41,21 @@ pub async fn normalize<R: Runtime>(
             "-hide_banner".into(),
             "-loglevel".into(),
             "error".into(),
-            "-vn".into(),      // No video
-            "-sn".into(),      // No subtitles
-            "-dn".into(),      // No data streams
+            "-vn".into(), // No video
+            "-sn".into(), // No subtitles
+            "-dn".into(), // No data streams
             "-i".into(),
             input_lossy,
             "-ar".into(),
-            "16000".into(),    // Sample rate: 16kHz
+            "16000".into(), // Sample rate: 16kHz
             "-ac".into(),
-            "1".into(),        // Channels: mono
+            "1".into(), // Channels: mono
             "-c:a".into(),
             "pcm_s16le".into(), // Codec: 16-bit PCM
             "-map_metadata".into(),
-            "-1".into(),       // Strip metadata
+            "-1".into(), // Strip metadata
             "-f".into(),
-            "wav".into(),      // Format: WAV
+            "wav".into(), // Format: WAV
             "-nostats".into(),
         ];
 
@@ -76,14 +76,33 @@ pub async fn normalize<R: Runtime>(
                 Ok(o) => (o.status.success(), o.status.code(), o.stdout, o.stderr),
                 Err(_) => {
                     tracing::warn!("ffmpeg sidecar unavailable, falling back to system ffmpeg");
-                    let sys = TokioCommand::new("ffmpeg").args(args.clone()).output().await?;
-                    (sys.status.success(), sys.status.code(), sys.stdout, sys.stderr)
+                    let sys = TokioCommand::new("ffmpeg")
+                        .args(args.clone())
+                        .output()
+                        .await?;
+                    (
+                        sys.status.success(),
+                        sys.status.code(),
+                        sys.stdout,
+                        sys.stderr,
+                    )
                 }
             },
             Err(e) => {
-                tracing::warn!("ffmpeg sidecar init error: {}. Falling back to system ffmpeg", e);
-                let sys = TokioCommand::new("ffmpeg").args(args.clone()).output().await?;
-                (sys.status.success(), sys.status.code(), sys.stdout, sys.stderr)
+                tracing::warn!(
+                    "ffmpeg sidecar init error: {}. Falling back to system ffmpeg",
+                    e
+                );
+                let sys = TokioCommand::new("ffmpeg")
+                    .args(args.clone())
+                    .output()
+                    .await?;
+                (
+                    sys.status.success(),
+                    sys.status.code(),
+                    sys.stdout,
+                    sys.stderr,
+                )
             }
         };
 
@@ -113,7 +132,10 @@ pub async fn normalize<R: Runtime>(
         // Check file size
         let out_meta = fs::metadata(&output)?;
         if out_meta.len() <= 44 {
-            tracing::warn!("Output WAV file is suspiciously small (header-only): {:?}", output);
+            tracing::warn!(
+                "Output WAV file is suspiciously small (header-only): {:?}",
+                output
+            );
         }
 
         tracing::info!("audio normalization: success -> {}", output.display());
