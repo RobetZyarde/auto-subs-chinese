@@ -33,7 +33,7 @@ pub struct PythonInstallProgress {
 }
 
 /// Get the path to the managed Python virtual environment.
-pub fn get_venv_dir(app: &AppHandle) -> PathBuf {
+pub fn get_venv_dir<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
     let data_dir = app.path().app_data_dir().unwrap_or_else(|_| {
         // Fallback to LOCALAPPDATA
         let local = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".to_string());
@@ -43,7 +43,7 @@ pub fn get_venv_dir(app: &AppHandle) -> PathBuf {
 }
 
 /// Get the path to the Python executable in the managed venv.
-pub fn get_venv_python(app: &AppHandle) -> PathBuf {
+pub fn get_venv_python<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
     let venv = get_venv_dir(app);
     if cfg!(target_os = "windows") {
         venv.join("Scripts").join("python.exe")
@@ -53,7 +53,7 @@ pub fn get_venv_python(app: &AppHandle) -> PathBuf {
 }
 
 /// Get the path to the pip executable in the managed venv.
-fn get_venv_pip(app: &AppHandle) -> PathBuf {
+fn get_venv_pip<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
     let venv = get_venv_dir(app);
     if cfg!(target_os = "windows") {
         venv.join("Scripts").join("pip.exe")
@@ -63,7 +63,7 @@ fn get_venv_pip(app: &AppHandle) -> PathBuf {
 }
 
 /// Check if the managed Python environment exists and has qwen-asr installed.
-pub async fn check_env_status(app: &AppHandle) -> PythonEnvStatus {
+pub async fn check_env_status<R: Runtime>(app: &AppHandle<R>) -> PythonEnvStatus {
     let python = get_venv_python(app);
     if !python.exists() {
         return PythonEnvStatus::NotReady;
@@ -144,26 +144,13 @@ pub async fn ensure_python_env<R: Runtime>(app: AppHandle<R>) -> Result<(), Stri
     ensure_python_env_impl(app).await.map_err(|e| e.to_string())
 }
 
-/// Install CUDA PyTorch (Tauri command).
-#[tauri::command]
-pub async fn install_cuda_pytorch<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
-    install_cuda_pytorch_impl(app)
-        .await
-        .map_err(|e| e.to_string())
-}
+
 
 /// Internal implementation for ensure_python_env.
 async fn ensure_python_env_impl<R: Runtime>(app: AppHandle<R>) -> Result<()> {
     ensure_python_env_inner(app).await
 }
 
-/// Internal implementation for install_cuda_pytorch.
-async fn install_cuda_pytorch_impl<R: Runtime>(app: AppHandle<R>) -> Result<()> {
-    install_cuda_pytorch_inner(app).await
-}
-
-/// Ensure the Python environment is set up with qwen-asr installed.
-/// This is the main entry point called from the frontend.
 async fn ensure_python_env_inner<R: Runtime>(app: AppHandle<R>) -> Result<()> {
     let venv_dir = get_venv_dir(&app);
     let python_path = get_venv_python(&app);
@@ -290,7 +277,18 @@ async fn ensure_python_env_inner<R: Runtime>(app: AppHandle<R>) -> Result<()> {
 }
 
 /// Install CUDA-enabled PyTorch for GPU acceleration.
-pub async fn install_cuda_pytorch<R: Runtime>(app: AppHandle<R>) -> Result<()> {
+#[tauri::command]
+pub async fn install_cuda_pytorch<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    install_cuda_pytorch_impl(app).await.map_err(|e| e.to_string())
+}
+
+/// Internal implementation for install_cuda_pytorch.
+async fn install_cuda_pytorch_impl<R: Runtime>(app: AppHandle<R>) -> Result<()> {
+    install_cuda_pytorch_inner(app).await
+}
+
+/// Install CUDA PyTorch inner implementation.
+async fn install_cuda_pytorch_inner<R: Runtime>(app: AppHandle<R>) -> Result<()> {
     let pip_path = get_venv_pip(&app);
 
     emit_progress(&app, "installing_cuda", 10, "Uninstalling CPU PyTorch...");
