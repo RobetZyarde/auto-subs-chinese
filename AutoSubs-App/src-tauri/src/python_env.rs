@@ -11,7 +11,7 @@ use tokio::process::Command;
 
 /// Status of the Python environment.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelState")]
+#[serde(rename_all = "camelCase")]
 pub enum PythonEnvStatus {
     /// Environment is ready with qwen-asr installed.
     Ready,
