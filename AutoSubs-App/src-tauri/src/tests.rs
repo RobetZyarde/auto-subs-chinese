@@ -17,6 +17,10 @@ mod tests {
 
         // Use a portable test asset path (avoid absolute machine paths)
         let wav = format!("{}/tests/data/test-audio.wav", env!("CARGO_MANIFEST_DIR"));
+        if !std::path::Path::new(&wav).exists() {
+            eprintln!("skipping transcription smoke test: missing local fixture {wav}");
+            return;
+        }
 
         let options = FrontendTranscribeOptions {
             audio_path: wav,
@@ -65,6 +69,10 @@ mod tests {
         let handle = app.handle().clone();
 
         let wav = format!("{}/tests/data/jfk.wav", env!("CARGO_MANIFEST_DIR"));
+        if !std::path::Path::new(&wav).exists() {
+            eprintln!("skipping VAD transcription test: missing local fixture {wav}");
+            return;
+        }
 
         let options = FrontendTranscribeOptions {
             audio_path: wav,

@@ -1,6 +1,43 @@
 # AutoSubs Chinese
 
-这个仓库基于 AutoSubs 做了本地化与 `Qwen3-ASR` 集成，目标是让中文转录、字幕时间戳和本地桌面打包流程更适合当前工作流。
+这个仓库基于 [tmoroney/auto-subs](https://github.com/tmoroney/auto-subs) 改造而来，跟进原项目的桌面端、DaVinci Resolve、Premiere Pro / After Effects 集成，同时保留当前 fork 的中文本地化、Windows 构建流程和 `Qwen3-ASR` 集成。
+
+- Transcribes speech in many languages, with optional translation
+- Identifies and labels multiple speakers automatically
+- Exports to SRT, plain text, DaVinci Resolve, Premiere Pro, or After Effects
+- Works standalone, with DaVinci Resolve, or with Adobe apps through the bundled CEP extension
+- Adds local Qwen3-ASR support for Chinese transcription workflows
+
+---
+
+Generate Subtitles with Speaker Labels | Animated Captions
+:-------------------------:|:-------------------------:
+<img width="800" alt="Transcription Page" src="https://github.com/user-attachments/assets/fbdba848-46d5-451c-b671-06bf3237b08c"> | <img width="800" alt="Advanced Settings" src="https://github.com/user-attachments/assets/3a707940-7f2d-4052-990c-58cd913c185c">
+
+---
+
+## Integrations
+
+```mermaid
+flowchart TD
+    app["AutoSubs Desktop App<br/>Local AI transcription"]
+    file["Standalone Files<br/>Audio / video input"]
+    resolve["DaVinci Resolve<br/>Lua script integration"]
+    adobe["Adobe Bridge + Extension<br/>WebSocket :8185"]
+    premiere["Premiere Pro<br/>Sequence audio + SRT captions"]
+    aftereffects["After Effects<br/>SRT to text layers"]
+
+    file --> app
+    app <--> resolve
+    app <--> adobe
+    adobe --> premiere
+    adobe --> aftereffects
+```
+
+AutoSubs can run as a standalone subtitle generator, connect directly to DaVinci Resolve, or communicate with Adobe Premiere Pro and After Effects through the bundled CEP extension.
+
+> [!WARNING]
+> AutoSubs will not work with the Mac App Store version of DaVinci Resolve. Re-install from the [official website](https://www.blackmagicdesign.com/products/davinciresolve/) if needed.
 
 ## 安装教程
 
@@ -113,6 +150,13 @@ npm run build:win
 ```text
 src-tauri\target\release\autosubs.exe
 ```
+
+## Adobe Premiere Pro / After Effects Mode
+
+1. Launch AutoSubs and open the bundled AutoSubs CEP extension in Premiere Pro or After Effects.
+2. Select the Adobe integration from AutoSubs.
+3. Export timeline audio for transcription or import generated subtitles back into the host app.
+4. In Premiere Pro, subtitles are imported as caption tracks; in After Effects, SRT entries are created as text layers.
 
 ## Qwen 使用教程
 

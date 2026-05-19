@@ -1,8 +1,95 @@
 # AutoSubs App
 
-这个目录是桌面应用本体，包含前端、Tauri 桥接和 Rust 后端。
+A cross-platform desktop app for generating subtitles with speaker diarization, translation, DaVinci Resolve integration, and Adobe Premiere Pro / After Effects integration via the bundled CEP extension, powered by AI transcription models running locally on your machine.
 
-如果你只是想使用当前仓库，优先看根目录 `README.md`。这里保留同样的精简说明，方便直接在 `AutoSubs-App` 目录下开发和构建。
+这个目录是桌面应用本体，包含前端、Tauri 桥接、Rust 后端和当前 fork 的 Qwen3-ASR 集成。若只想使用当前仓库，优先看根目录 `README.md`；本文件保留应用目录内开发和构建说明。
+
+```mermaid
+graph TB
+    subgraph Frontend ["Frontend (React + TypeScript)"]
+        UI[UI Components]
+        CTX[State Contexts<br><i>Transcript, Models, Progress,<br>Settings, Integrations</i>]
+        UI <--> CTX
+    end
+
+    subgraph Tauri ["Tauri Bridge"]
+        IPC[IPC Commands + Events]
+    end
+
+    subgraph Backend ["Rust Backend"]
+        API[Tauri Command Handlers]
+        AP[Audio Preprocessor]
+        API --> AP
+    end
+
+    subgraph Engine ["Transcription Engine Crate"]
+        direction TB
+        EM[Engine Manager]
+        EM --> W[Whisper]
+        EM --> P[Parakeet]
+        EM --> M[Moonshine]
+        EM --> Q[Qwen3-ASR]
+        EM --> D[Pyannote Diarization]
+        EM --> FMT[Formatter<br><i>line breaking, timing, CPS</i>]
+        EM --> TR[Translator]
+    end
+
+    subgraph External ["External"]
+        FF[FFmpeg Sidecar]
+        HF[HuggingFace Hub<br><i>model downloads</i>]
+        PY[Python qwen-asr sidecar]
+    end
+
+    subgraph Resolve ["DaVinci Resolve Integration (Optional)"]
+        LUA[AutoSubs.lua Script]
+    end
+
+    subgraph Adobe ["Adobe Integration (Optional)"]
+        WS[Adobe Bridge + Extension<br><i>WebSocket :8185</i>]
+        PR[Premiere Pro]
+        AE[After Effects]
+        WS --> PR
+        WS --> AE
+    end
+
+    Frontend <--> Tauri
+    Tauri <--> Backend
+    Backend --> Engine
+    AP --> FF
+    Q --> PY
+    Engine --> HF
+    LUA <-.-> Tauri
+    Backend <--> WS
+```
+
+**How a transcription works end-to-end:**
+
+1. User selects a file and clicks Transcribe
+2. Rust backend preprocesses audio via FFmpeg
+3. Transcription engine runs the chosen local AI model
+4. Optionally runs Pyannote diarization and translation
+5. Formatter applies line-breaking, timing constraints, and language-specific rules
+6. Results stream back to the UI in real time; user edits and exports
+
+## Key Directories
+
+| Directory | Purpose |
+|---|---|
+| `src/` | React frontend: components, contexts, hooks, utilities |
+| `src/components/` | UI organized by feature |
+| `src/contexts/` | Global state management |
+| `src-tauri/src/` | Rust backend: Tauri commands, audio preprocessing, logging |
+| `src-tauri/crates/transcription-engine/` | Core engine: transcription, diarization, formatting, translation |
+| `src-tauri/crates/transcription-engine/src/engines/` | Model-specific implementations |
+| `src-tauri/resources/` | DaVinci Resolve Lua script, Adobe CEP extension resources, subtitle templates, Qwen sidecar |
+
+## Model Cache Location
+
+AI transcription models are downloaded to the app's cache directory. The location varies by platform:
+
+- **macOS**: `~/Library/Caches/com.autosubs/models`
+- **Linux**: `~/.cache/com.autosubs/models` or `$XDG_CACHE_HOME/com.autosubs/models`
+- **Windows**: `%LOCALAPPDATA%\com.autosubs\models`
 
 ## 安装教程
 
