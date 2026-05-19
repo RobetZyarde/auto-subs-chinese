@@ -18,14 +18,13 @@ use tauri_plugin_fs::init as fs_plugin;
 use tauri_plugin_http::init as http_plugin;
 use tauri_plugin_opener::init as opener_plugin;
 use tauri_plugin_process::init as process_plugin;
-use tauri_plugin_shell::ShellExt; // for app.shell()
 use tauri_plugin_shell::init as shell_plugin;
 use tauri_plugin_single_instance::init as single_instance_plugin;
 use tauri_plugin_store::Builder as StoreBuilder;
-use tokio::process::Command as TokioCommand;
 
 mod adobe_bridge;
 mod audio_preprocess;
+mod ffmpeg;
 mod logging;
 mod models;
 mod python_env;
@@ -132,46 +131,20 @@ fn main() {
                     let mut ffmpeg_ok = false;
                     let mut ffmpeg_version = String::new();
 
-                    // ffmpeg -version (sidecar first, then system fallback)
-                    match app_handle.shell().sidecar("ffmpeg") {
-                        Ok(cmd) => {
-                            match cmd.args(["-version"]).output().await {
-                                Ok(out) if out.status.success() => {
-                                    ffmpeg_ok = true;
-                                    let stdout = String::from_utf8_lossy(&out.stdout);
-                                    ffmpeg_version = stdout.lines().next().unwrap_or("").to_string();
-                                    tracing::info!("ffmpeg check (sidecar): ok=true, version=\"{}\"", ffmpeg_version);
-                                }
-                                Ok(out) => {
-                                    let stderr = String::from_utf8_lossy(&out.stderr);
-                                    tracing::warn!("ffmpeg sidecar -version exited non-zero. stderr: {}", stderr);
-                                    // fallback to system
-                                    if let Ok(sys) = TokioCommand::new("ffmpeg").arg("-version").output().await {
-                                        ffmpeg_ok = sys.status.success();
-                                        let stdout = String::from_utf8_lossy(&sys.stdout);
-                                        ffmpeg_version = stdout.lines().next().unwrap_or("").to_string();
-                                        tracing::info!("ffmpeg check (system): ok={}, version=\"{}\"", ffmpeg_ok, ffmpeg_version);
-                                    }
-                                }
-                                Err(e) => {
-                                    tracing::warn!("ffmpeg sidecar execution failed: {:?}", e);
-                                    if let Ok(sys) = TokioCommand::new("ffmpeg").arg("-version").output().await {
-                                        ffmpeg_ok = sys.status.success();
-                                        let stdout = String::from_utf8_lossy(&sys.stdout);
-                                        ffmpeg_version = stdout.lines().next().unwrap_or("").to_string();
-                                        tracing::info!("ffmpeg check (system): ok={}, version=\"{}\"", ffmpeg_ok, ffmpeg_version);
-                                    }
-                                }
-                            }
+                    match crate::ffmpeg::check_ffmpeg_version(&app_handle).await {
+                        Ok(out) => {
+                            ffmpeg_ok = out.success;
+                            let stdout = String::from_utf8_lossy(&out.stdout);
+                            ffmpeg_version = stdout.lines().next().unwrap_or("").to_string();
+                            tracing::info!(
+                                "ffmpeg check ({}): ok={}, version=\"{}\"",
+                                out.source,
+                                ffmpeg_ok,
+                                ffmpeg_version
+                            );
                         }
                         Err(e) => {
-                            tracing::warn!("ffmpeg sidecar not found/failed to init: {:?}", e);
-                            if let Ok(sys) = TokioCommand::new("ffmpeg").arg("-version").output().await {
-                                ffmpeg_ok = sys.status.success();
-                                let stdout = String::from_utf8_lossy(&sys.stdout);
-                                ffmpeg_version = stdout.lines().next().unwrap_or("").to_string();
-                                tracing::info!("ffmpeg check (system): ok={}, version=\"{}\"", ffmpeg_ok, ffmpeg_version);
-                            }
+                            tracing::warn!("ffmpeg check failed: {}", e);
                         }
                     }
 

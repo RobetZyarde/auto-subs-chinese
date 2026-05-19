@@ -184,21 +184,15 @@ fn cleanup_old_logs(log_dir: &Path) {
 }
 
 fn ensure_dir(path: &Path) -> io::Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    Ok(())
+    fs::create_dir_all(path)
 }
 
 fn resolve_log_dir<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
     let pr = app.path();
-    let mut dir = pr
-        .app_log_dir()
+    pr.app_log_dir()
         .or_else(|_| pr.app_data_dir())
         .or_else(|_| pr.app_cache_dir())
-        .unwrap_or_else(|_| std::env::temp_dir());
-    dir.push("logs");
-    dir
+        .unwrap_or_else(|_| std::env::temp_dir().join("autosubs-logs"))
 }
 
 pub fn init_logging<R: Runtime>(app: &AppHandle<R>) {

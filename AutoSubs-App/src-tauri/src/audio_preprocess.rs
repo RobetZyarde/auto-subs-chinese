@@ -2,8 +2,6 @@ use eyre::{Result, bail};
 use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Runtime};
-use tauri_plugin_shell::ShellExt;
-use tokio::process::Command as TokioCommand;
 
 /// Converts audio/video files to mono 16kHz 16-bit PCM WAV using FFmpeg.
 /// This is the only preprocessing step needed before passing audio to whisper-diarize-rs.
@@ -31,7 +29,6 @@ pub async fn normalize<R: Runtime>(
             output.display()
         );
 
-        let sidecar_command = app.shell().sidecar("ffmpeg");
         let input_lossy = input.to_string_lossy().into_owned();
         let output_lossy = output.to_string_lossy().into_owned();
 
@@ -70,56 +67,29 @@ pub async fn normalize<R: Runtime>(
 
         tracing::debug!("Running ffmpeg with args: {:?}", args);
 
-        // Execute FFmpeg (try sidecar first, fallback to system ffmpeg)
-        let (success, code, stdout, stderr) = match sidecar_command {
-            Ok(cmd) => match cmd.args(args.clone()).output().await {
-                Ok(o) => (o.status.success(), o.status.code(), o.stdout, o.stderr),
-                Err(_) => {
-                    tracing::warn!("ffmpeg sidecar unavailable, falling back to system ffmpeg");
-                    let sys = TokioCommand::new("ffmpeg")
-                        .args(args.clone())
-                        .output()
-                        .await?;
-                    (
-                        sys.status.success(),
-                        sys.status.code(),
-                        sys.stdout,
-                        sys.stderr,
-                    )
-                }
-            },
-            Err(e) => {
-                tracing::warn!(
-                    "ffmpeg sidecar init error: {}. Falling back to system ffmpeg",
-                    e
-                );
-                let sys = TokioCommand::new("ffmpeg")
-                    .args(args.clone())
-                    .output()
-                    .await?;
-                (
-                    sys.status.success(),
-                    sys.status.code(),
-                    sys.stdout,
-                    sys.stderr,
-                )
-            }
-        };
+        let ffmpeg_output = crate::ffmpeg::run_ffmpeg(app, &args).await?;
+        tracing::debug!("ffmpeg source: {}", ffmpeg_output.source);
 
         // Log FFmpeg output for diagnostics
-        if !stdout.is_empty() {
-            tracing::debug!("ffmpeg stdout: {}", String::from_utf8_lossy(&stdout));
+        if !ffmpeg_output.stdout.is_empty() {
+            tracing::debug!(
+                "ffmpeg stdout: {}",
+                String::from_utf8_lossy(&ffmpeg_output.stdout)
+            );
         }
-        if !stderr.is_empty() {
-            tracing::debug!("ffmpeg stderr: {}", String::from_utf8_lossy(&stderr));
+        if !ffmpeg_output.stderr.is_empty() {
+            tracing::debug!(
+                "ffmpeg stderr: {}",
+                String::from_utf8_lossy(&ffmpeg_output.stderr)
+            );
         }
 
         // Check for errors
-        if !success {
-            let error_message = String::from_utf8_lossy(&stderr);
+        if !ffmpeg_output.success {
+            let error_message = String::from_utf8_lossy(&ffmpeg_output.stderr);
             bail!(
                 "ffmpeg failed with exit code: {:?}\nStderr: {}",
-                code,
+                ffmpeg_output.code,
                 error_message
             );
         }
