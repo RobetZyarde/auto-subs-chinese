@@ -378,6 +378,10 @@
     "translate": "Translating to {{language}}",
     "normaliseAudio": "Normalising audio",
     "preparingAudio": "Preparing audio...",
+    "qwenPreparing": "Preparing Qwen3-ASR...",
+    "qwenLoadingModel": "Loading Qwen3-ASR model",
+    "qwenInferencing": "Qwen3-ASR is inferencing. Long audio can take several minutes.",
+    "qwenPostProcessing": "Preparing Qwen3-ASR subtitle results",
     "processing": "Processing",
     "export": "Export"
   },

@@ -7,9 +7,12 @@ use crate::types::{
 use eyre::{Context, Result, bail, eyre};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command;
 
 const QWEN3_MODEL_NAME: &str = "qwen3-asr";
+const QWEN_PROGRESS_PREFIX: &str = "AUTOSUBS_QWEN_PROGRESS ";
 
 #[derive(Debug, Deserialize)]
 struct Qwen3Word {
@@ -37,6 +40,12 @@ struct Qwen3Output {
     language: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct QwenProgressEvent {
+    progress: i32,
+    label: String,
+}
+
 pub fn is_qwen3asr_model(model_name: &str) -> bool {
     model_name.eq_ignore_ascii_case(QWEN3_MODEL_NAME)
 }
@@ -58,9 +67,7 @@ pub async fn transcribe_qwen3asr(
         }
     }
 
-    if let Some(cb) = progress_callback {
-        cb(0, ProgressType::Transcribe, "progressSteps.transcribe");
-    }
+    emit_qwen_progress(progress_callback, 0, "progressSteps.qwenPreparing");
 
     let python = find_python()?;
     let script = find_sidecar_script()?;
@@ -75,7 +82,9 @@ pub async fn transcribe_qwen3asr(
         .arg(device)
         .env("HF_HOME", cache_dir)
         .env("HF_HUB_CACHE", cache_dir)
-        .env("TRANSFORMERS_CACHE", cache_dir);
+        .env("TRANSFORMERS_CACHE", cache_dir)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
     if let Some(context) = options
         .advanced
@@ -94,12 +103,48 @@ pub async fn transcribe_qwen3asr(
         audio_path.display()
     );
 
-    let output = cmd.output().await.with_context(|| {
+    let mut child = cmd.spawn().with_context(|| {
         format!(
             "Failed to start Qwen3-ASR sidecar with {}",
             python.display()
         )
     })?;
+
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| eyre!("Failed to capture Qwen3-ASR stdout"))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| eyre!("Failed to capture Qwen3-ASR stderr"))?;
+
+    let mut diagnostics: Vec<String> = Vec::new();
+    let mut stderr_lines = BufReader::new(stderr).lines();
+    let stdout_task = tokio::spawn(async move {
+        let mut stdout_bytes = Vec::new();
+        stdout
+            .read_to_end(&mut stdout_bytes)
+            .await
+            .context("Failed to read Qwen3-ASR stdout")?;
+        Ok::<Vec<u8>, eyre::Report>(stdout_bytes)
+    });
+
+    while let Some(line) = stderr_lines
+        .next_line()
+        .await
+        .context("Failed to read Qwen3-ASR stderr")?
+    {
+        handle_qwen_stderr_line(&line, progress_callback, &mut diagnostics);
+    }
+
+    let status = child
+        .wait()
+        .await
+        .context("Failed to wait for Qwen3-ASR sidecar")?;
+    let stdout_bytes = stdout_task
+        .await
+        .context("Qwen3-ASR stdout reader task failed")??;
 
     if let Some(is_cancelled) = abort_callback.as_deref() {
         if is_cancelled() {
@@ -107,16 +152,15 @@ pub async fn transcribe_qwen3asr(
         }
     }
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
+    if !status.success() {
+        let stderr = diagnostics.join("\n");
         bail!(
             "Qwen3-ASR failed. Install Python 3.12 and `qwen-asr` first (`pip install -U qwen-asr`). stderr: {}",
             stderr.trim()
         );
     }
 
-    let stdout =
-        String::from_utf8(output.stdout).context("Qwen3-ASR stdout was not valid UTF-8")?;
+    let stdout = String::from_utf8(stdout_bytes).context("Qwen3-ASR stdout was not valid UTF-8")?;
     let qwen_output: Qwen3Output = serde_json::from_str(stdout.trim())
         .with_context(|| format!("Failed to parse Qwen3-ASR JSON output: {}", stdout.trim()))?;
 
@@ -154,11 +198,34 @@ pub async fn transcribe_qwen3asr(
         segments.push(autosubs_segment);
     }
 
-    if let Some(cb) = progress_callback {
-        cb(100, ProgressType::Transcribe, "progressSteps.transcribe");
-    }
+    emit_qwen_progress(progress_callback, 100, "progressSteps.transcribe");
 
     Ok((segments, qwen_output.language))
+}
+
+fn emit_qwen_progress(progress_callback: Option<&LabeledProgressFn>, progress: i32, label: &str) {
+    if let Some(cb) = progress_callback {
+        cb(progress, ProgressType::Transcribe, label);
+    }
+}
+
+fn parse_qwen_progress_event(line: &str) -> Option<QwenProgressEvent> {
+    let payload = line.strip_prefix(QWEN_PROGRESS_PREFIX)?;
+    serde_json::from_str(payload).ok()
+}
+
+fn handle_qwen_stderr_line(
+    line: &str,
+    progress_callback: Option<&LabeledProgressFn>,
+    diagnostics: &mut Vec<String>,
+) {
+    if let Some(event) = parse_qwen_progress_event(line) {
+        tracing::info!("Qwen3-ASR progress: {}% {}", event.progress, event.label);
+        emit_qwen_progress(progress_callback, event.progress.clamp(0, 99), &event.label);
+    } else {
+        tracing::info!("Qwen3-ASR sidecar: {}", line);
+        diagnostics.push(line.to_string());
+    }
 }
 
 fn qwen_device_arg(use_gpu: Option<bool>, gpu_device: Option<i32>) -> String {

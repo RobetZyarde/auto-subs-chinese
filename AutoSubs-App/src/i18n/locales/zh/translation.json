@@ -376,6 +376,10 @@
     "translate": "正在翻译为 {{language}}",
     "normaliseAudio": "正在标准化音频",
     "preparingAudio": "正在准备音频...",
+    "qwenPreparing": "正在准备 Qwen3-ASR...",
+    "qwenLoadingModel": "正在加载 Qwen3-ASR 模型",
+    "qwenInferencing": "Qwen3-ASR 正在推理，长音频可能需要几分钟",
+    "qwenPostProcessing": "正在整理 Qwen3-ASR 字幕结果",
     "processing": "正在处理",
     "export": "导出"
   },

@@ -60,6 +60,7 @@ QWEN_TO_LANGUAGE.update({"chinese": "zh", "cantonese": "yue", "english": "en"})
 CJK_LANGUAGES = {"Chinese", "Cantonese", "Japanese", "Korean"}
 SENTENCE_ENDINGS = set("。！？.!?\n")
 SEGMENT_GAP_SECONDS = 0.45
+PROGRESS_PREFIX = "AUTOSUBS_QWEN_PROGRESS "
 
 
 @dataclass
@@ -67,6 +68,11 @@ class TimestampItem:
     text: str
     start: float
     end: float
+
+
+def emit_progress(progress: int, label: str) -> None:
+    payload = {"progress": progress, "label": label}
+    print(f"{PROGRESS_PREFIX}{json.dumps(payload, ensure_ascii=False)}", file=sys.stderr, flush=True)
 
 
 def audio_duration_seconds(audio_path: str) -> float:
@@ -254,6 +260,8 @@ def build_segments(
 
 
 def transcribe(args: argparse.Namespace) -> dict[str, Any]:
+    emit_progress(5, "progressSteps.qwenPreparing")
+
     import torch
     from qwen_asr import Qwen3ASRModel
 
@@ -273,7 +281,10 @@ def transcribe(args: argparse.Namespace) -> dict[str, Any]:
         model_kwargs["forced_aligner"] = ALIGNER_MODEL
         model_kwargs["forced_aligner_kwargs"] = {"dtype": dtype, "device_map": device_map}
 
+    emit_progress(15, "progressSteps.qwenLoadingModel")
     model = Qwen3ASRModel.from_pretrained(ASR_MODEL, **model_kwargs)
+
+    emit_progress(35, "progressSteps.qwenInferencing")
     results = model.transcribe(
         audio=audio_path,
         context=args.context or None,
@@ -282,6 +293,7 @@ def transcribe(args: argparse.Namespace) -> dict[str, Any]:
     )
     result = results[0] if isinstance(results, (list, tuple)) else results
 
+    emit_progress(85, "progressSteps.qwenPostProcessing")
     result_text = str(get_field(result, "text") or "")
     result_language = get_field(result, "language")
     timestamps = extract_timestamps(get_field(result, "time_stamps", "timestamps"))
