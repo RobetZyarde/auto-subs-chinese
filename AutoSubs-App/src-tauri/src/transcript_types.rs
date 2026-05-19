@@ -68,6 +68,7 @@ pub struct Transcript {
     pub speakers: Vec<Speaker>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JsonSegment {
     id: usize,
@@ -85,6 +86,7 @@ pub struct JsonSegment {
     words: Vec<JsonWordTimestamp>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JsonWordTimestamp {
     word: String,

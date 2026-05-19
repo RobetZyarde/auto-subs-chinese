@@ -1,7 +1,6 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use reqwest::Client;
 use serde_json::json;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
@@ -362,12 +361,12 @@ fn main() {
                         let app_handle = app.clone();
                         tauri::async_runtime::spawn(async move {
                             // short timeout to avoid hanging on exit
-                            let client = Client::builder()
+                            let client = reqwest::Client::builder()
                                 .no_proxy()
                                 .tcp_nodelay(true)
                                 .timeout(Duration::from_millis(750))
                                 .build()
-                                .unwrap_or_else(|_| Client::new());
+                                .unwrap_or_else(|_| reqwest::Client::new());
 
                             let url = "http://127.0.0.1:56002/";
                             let _ = client

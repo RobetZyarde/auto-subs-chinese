@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "watch": "tsc && vite build --watch true",
-    "build": "rimraf dist/* && tsc -p \"tsconfig-build.json\" && vite build --watch false && node scripts/copy-to-resources.js",
-    "zxp": "rimraf dist/* && tsc -p \"tsconfig-build.json\" && cross-env ZXP_PACKAGE=true vite build --watch false",
-    "zip": "rimraf dist/* && tsc -p \"tsconfig-build.json\" && cross-env ZIP_PACKAGE=true vite build --watch false",
+    "watch": "tsc && vite build --watch true --logLevel error",
+    "build": "rimraf dist/* && tsc -p \"tsconfig-build.json\" && vite build --watch false --logLevel error && node scripts/copy-to-resources.js",
+    "build:verbose": "rimraf dist/* && tsc -p \"tsconfig-build.json\" && vite build --watch false && node scripts/copy-to-resources.js",
+    "zxp": "rimraf dist/* && tsc -p \"tsconfig-build.json\" && cross-env ZXP_PACKAGE=true vite build --watch false --logLevel error",
+    "zip": "rimraf dist/* && tsc -p \"tsconfig-build.json\" && cross-env ZIP_PACKAGE=true vite build --watch false --logLevel error",
     "serve": "cross-env SERVE_PANEL=true vite preview",
     "symlink": "cross-env BOLT_ACTION=symlink vite",
     "delsymlink": "cross-env BOLT_ACTION=delsymlink vite"
