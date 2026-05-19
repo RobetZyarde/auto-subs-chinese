@@ -1,7 +1,7 @@
-use std::path::PathBuf;
+use crate::formatting::{PostProcessConfig, TextCase, TextDensity, process_segments};
+use crate::types::{LabeledProgressFn, NewSegmentFn, Segment, SpeechSegment};
 use eyre::eyre;
-use crate::types::{SpeechSegment, LabeledProgressFn, NewSegmentFn, Segment};
-use crate::formatting::{process_segments, PostProcessConfig, TextCase, TextDensity};
+use std::path::PathBuf;
 
 /// Frontend-requested content formatting applied after structural line-wrapping.
 #[derive(Clone, Debug, Default)]
@@ -19,12 +19,12 @@ use crate::engines::qwen3asr::is_qwen3asr_model;
 
 #[derive(Clone, Debug)]
 pub struct EngineConfig {
-    pub cache_dir: PathBuf, // Cache directory for downloaded models
+    pub cache_dir: PathBuf,              // Cache directory for downloaded models
     pub enable_dtw: Option<bool>, // Enable DTW for better word timestamps - this will disable flash attention
     pub enable_flash_attn: Option<bool>, // Enable flash attention for faster inference (works best for larger models)
-    pub use_gpu: Option<bool>, // Enable GPU acceleration
-    pub gpu_device: Option<i32>, // GPU device id, default 0
-    pub vad_model_path: Option<String>, // Path to Voice Activity Detection (VAD) model
+    pub use_gpu: Option<bool>,           // Enable GPU acceleration
+    pub gpu_device: Option<i32>,         // GPU device id, default 0
+    pub vad_model_path: Option<String>,  // Path to Voice Activity Detection (VAD) model
     pub diarize_segment_model_path: Option<String>, // Optional path to diarization segmentation model; if None, it will be downloaded
     pub diarize_embedding_model_path: Option<String>, // Optional path to diarization embedding model; if None, it will be downloaded
 }
@@ -96,21 +96,18 @@ impl Engine {
 
         // Ensure/download the appropriate model
         let _model_path = if is_moonshine {
-            self
-                .models
+            self.models
                 .ensure_moonshine_model(&options.model, cb.progress, cb.is_cancelled.as_deref())
                 .await?
         } else if is_parakeet {
-            self
-                .models
+            self.models
                 .ensure_parakeet_v3_model(cb.progress, cb.is_cancelled.as_deref())
                 .await?
         } else if is_qwen3asr {
             std::fs::create_dir_all(&self.cfg.cache_dir)?;
             self.cfg.cache_dir.clone()
         } else {
-            self
-                .models
+            self.models
                 .ensure_whisper_model(&options.model, cb.progress, cb.is_cancelled.as_deref())
                 .await?
         };
@@ -127,15 +124,28 @@ impl Engine {
             let emb_url = "https://huggingface.co/altunenes/speaker-diarization-community-1-onnx/blob/main/embedding_model.onnx";
 
             // Ensure/download diarization models if not provided
-            let (seg_path, emb_path) = match (&self.cfg.diarize_segment_model_path, &self.cfg.diarize_embedding_model_path) {
+            let (seg_path, emb_path) = match (
+                &self.cfg.diarize_segment_model_path,
+                &self.cfg.diarize_embedding_model_path,
+            ) {
                 (Some(seg), Some(emb)) => (PathBuf::from(seg), PathBuf::from(emb)),
-                _ => self
-                    .models
-                    .ensure_diarize_models(seg_url, emb_url, cb.progress, cb.is_cancelled.as_deref())
-                    .await?,
+                _ => {
+                    self.models
+                        .ensure_diarize_models(
+                            seg_url,
+                            emb_url,
+                            cb.progress,
+                            cb.is_cancelled.as_deref(),
+                        )
+                        .await?
+                }
             };
 
-            let threshold = options.advanced.as_ref().and_then(|a| a.diarize_threshold).unwrap_or(0.5);
+            let threshold = options
+                .advanced
+                .as_ref()
+                .and_then(|a| a.diarize_threshold)
+                .unwrap_or(0.5);
             let diarize_options = diarize::DiarizeOptions {
                 segment_model_path: seg_path,
                 embedding_model_path: emb_path,
@@ -167,8 +177,7 @@ impl Engine {
             let vad_model_path: PathBuf = if let Some(ref p) = self.cfg.vad_model_path {
                 PathBuf::from(p)
             } else {
-                self
-                    .models
+                self.models
                     .ensure_vad_model(cb.progress, cb.is_cancelled.as_deref())
                     .await?
             };
@@ -177,8 +186,7 @@ impl Engine {
             let vad_model_path_str = vad_model_path.to_string_lossy().to_string();
             speech_segments = crate::vad::get_segments(&vad_model_path_str, &original_samples)
                 .map_err(|e| eyre!("{:?}", e))?;
-        }
-        else {
+        } else {
             speech_segments = vec![SpeechSegment {
                 start: 0.0,
                 end: original_samples.len() as f64 / 16000.0,
@@ -198,7 +206,11 @@ impl Engine {
         );
 
         if let Some(progress_callback) = cb.progress {
-            progress_callback(0, crate::ProgressType::Transcribe, "workspace.empty.loadingModel");
+            progress_callback(
+                0,
+                crate::ProgressType::Transcribe,
+                "workspace.empty.loadingModel",
+            );
         }
 
         let transcribe_start = std::time::Instant::now();
@@ -275,13 +287,19 @@ impl Engine {
 
         // `whisper_to_english` only applies to Whisper models (they can do built-in translate-to-English).
         // If a non-Whisper model is used, we should not suppress the normal post-translation step.
-        let suppress_post_translation = !is_parakeet && !is_moonshine && !is_qwen3asr && whisper_to_en;
+        let suppress_post_translation =
+            !is_parakeet && !is_moonshine && !is_qwen3asr && whisper_to_en;
 
         if !suppress_post_translation {
             if let Some(to_lang) = translate_to.as_deref() {
-                crate::translate::translate_segments(segments.as_mut_slice(), effective_lang, to_lang, cb.progress)
-                    .await
-                    .map_err(|e| eyre!("{}", e))?;
+                crate::translate::translate_segments(
+                    segments.as_mut_slice(),
+                    effective_lang,
+                    to_lang,
+                    cb.progress,
+                )
+                .await
+                .map_err(|e| eyre!("{}", e))?;
             }
         }
 
@@ -296,7 +314,9 @@ impl Engine {
                 }
             }
         }
-        if let Some(ml) = max_lines { pp_cfg.max_lines = ml; }
+        if let Some(ml) = max_lines {
+            pp_cfg.max_lines = ml;
+        }
         if let Some(cf) = content_formatting {
             pp_cfg.text_case = cf.text_case;
             pp_cfg.remove_punctuation = cf.remove_punctuation;

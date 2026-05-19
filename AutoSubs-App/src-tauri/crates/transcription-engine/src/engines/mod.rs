@@ -11,7 +11,7 @@ pub mod parakeet;
 pub mod qwen3asr;
 
 // Re-export commonly used items
-pub use whisper::{create_context, run_transcription_pipeline, SHOULD_CANCEL};
+pub use whisper::{SHOULD_CANCEL, create_context, run_transcription_pipeline};
 
 pub use moonshine::transcribe_moonshine;
 pub use parakeet::transcribe_parakeet;

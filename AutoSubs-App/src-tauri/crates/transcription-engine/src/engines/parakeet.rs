@@ -3,7 +3,10 @@
 //! This module wraps the transcribe-rs Parakeet engine to provide
 //! NVIDIA NeMo Parakeet speech-to-text capabilities.
 
-use crate::types::{SpeechSegment, Segment, WordTimestamp, TranscribeOptions, LabeledProgressFn, NewSegmentFn, ProgressType};
+use crate::types::{
+    LabeledProgressFn, NewSegmentFn, ProgressType, Segment, SpeechSegment, TranscribeOptions,
+    WordTimestamp,
+};
 use eyre::{Result, eyre};
 use std::path::Path;
 use transcribe_rs::onnx::{
@@ -54,13 +57,15 @@ pub async fn transcribe_parakeet(
 
     for (i, speech_segment) in speech_segments.iter().enumerate() {
         // Convert i16 samples to f32 for Parakeet
-        let samples: Vec<f32> = speech_segment.samples
+        let samples: Vec<f32> = speech_segment
+            .samples
             .iter()
             .map(|&s| s as f32 / 32768.0)
             .collect();
 
         // Transcribe this segment
-        let result = model.transcribe_with(&samples, &inference_params)
+        let result = model
+            .transcribe_with(&samples, &inference_params)
             .map_err(|e| eyre!("Parakeet transcription failed: {}", e))?;
 
         // Base offset for this chunk
@@ -105,14 +110,15 @@ pub async fn transcribe_parakeet(
                 }
             }
 
-            let (seg_start, seg_end) = if let (Some(first), Some(last)) = (words.first(), words.last()) {
-                (first.start, last.end)
-            } else {
-                (
-                    base_offset,
-                    base_offset + (speech_segment.end - speech_segment.start),
-                )
-            };
+            let (seg_start, seg_end) =
+                if let (Some(first), Some(last)) = (words.first(), words.last()) {
+                    (first.start, last.end)
+                } else {
+                    (
+                        base_offset,
+                        base_offset + (speech_segment.end - speech_segment.start),
+                    )
+                };
 
             // Prevent overlaps with previous segment
             if let Some(last) = segments.last_mut() {
@@ -146,11 +152,18 @@ pub async fn transcribe_parakeet(
         // Emit progress update
         if let Some(progress_callback) = progress_callback {
             let progress = ((i + 1) as f64 / total_segments as f64 * 100.0) as i32;
-            progress_callback(progress, ProgressType::Transcribe, "progressSteps.transcribe");
+            progress_callback(
+                progress,
+                ProgressType::Transcribe,
+                "progressSteps.transcribe",
+            );
         }
     }
 
-    tracing::debug!("Parakeet transcription complete: {} segments", segments.len());
+    tracing::debug!(
+        "Parakeet transcription complete: {} segments",
+        segments.len()
+    );
 
     Ok((segments, None))
 }

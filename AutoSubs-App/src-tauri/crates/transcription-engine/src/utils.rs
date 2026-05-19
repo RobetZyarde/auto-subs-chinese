@@ -16,9 +16,9 @@ pub fn calculate_dtw_mem_size(num_samples: usize) -> usize {
     // Dynamic band: narrow for short audio, wider for long audio.
     // Keeps quality while bounding memory.
     let band_frames = match num_frames {
-        0..=15_000 => 96,    // ≤150 s
+        0..=15_000 => 96,       // ≤150 s
         15_001..=45_000 => 128, // 150–450 s
-        _ => 160,            // >450 s
+        _ => 160,               // >450 s
     };
 
     // Core DP working set (float costs) plus an int32 backtrack-ish buffer
@@ -27,20 +27,17 @@ pub fn calculate_dtw_mem_size(num_samples: usize) -> usize {
         .saturating_mul(LANES)
         .saturating_mul(BYTES_F32);
 
-    let bt_bytes = num_frames
-        .saturating_mul(BYTES_I32); // rough backtrack/indices budget
+    let bt_bytes = num_frames.saturating_mul(BYTES_I32); // rough backtrack/indices budget
 
     // Fixed baseline for internal scratch
     const BASELINE_MB: usize = 24;
     let base_bytes = BASELINE_MB * 1024 * 1024;
 
     // Total and clamps
-    let total = base_bytes
-        .saturating_add(dp_bytes)
-        .saturating_add(bt_bytes);
+    let total = base_bytes.saturating_add(dp_bytes).saturating_add(bt_bytes);
 
-    let min_bytes = 24 * 1024 * 1024;   // 24 MB floor
-    let max_bytes = 768 * 1024 * 1024;  // 768 MB ceiling
+    let min_bytes = 24 * 1024 * 1024; // 24 MB floor
+    let max_bytes = 768 * 1024 * 1024; // 768 MB ceiling
     let clamped = total.clamp(min_bytes, max_bytes);
 
     // Align up to 8 MB so we never round *down* below requirement
@@ -61,22 +58,32 @@ pub fn cs_to_s(cs: i64) -> f64 {
 /// Generate approximate per-word timestamps by interpolating across [start, end]
 /// proportional to word lengths. Used when real word-level timestamps are unavailable
 /// (e.g. translation output, Moonshine).
-pub fn interpolate_word_timestamps(line: &str, start: f64, end: f64) -> Vec<crate::types::WordTimestamp> {
+pub fn interpolate_word_timestamps(
+    line: &str,
+    start: f64,
+    end: f64,
+) -> Vec<crate::types::WordTimestamp> {
     let dur = (end - start).max(0.0);
-    if dur <= 0.0 { return Vec::new(); }
+    if dur <= 0.0 {
+        return Vec::new();
+    }
 
     let tokens: Vec<&str> = line
         .split_whitespace()
         .filter(|t| !t.trim_matches('\0').trim().is_empty())
         .collect();
-    if tokens.is_empty() { return Vec::new(); }
+    if tokens.is_empty() {
+        return Vec::new();
+    }
 
     let weights: Vec<usize> = tokens
         .iter()
         .map(|t| t.chars().filter(|c| c.is_alphanumeric()).count().max(1))
         .collect();
     let total_w: usize = weights.iter().sum();
-    if total_w == 0 { return Vec::new(); }
+    if total_w == 0 {
+        return Vec::new();
+    }
 
     let mut out = Vec::with_capacity(tokens.len());
     let mut acc = 0usize;
@@ -89,8 +96,17 @@ pub fn interpolate_word_timestamps(line: &str, start: f64, end: f64) -> Vec<crat
         };
         acc += weights[i];
         // Prefix non-first words with a space so formatting.rs can detect word boundaries
-        let text = if i == 0 { (*tok).to_string() } else { format!(" {}", tok) };
-        out.push(crate::types::WordTimestamp { text, start: t0, end: t1, probability: None });
+        let text = if i == 0 {
+            (*tok).to_string()
+        } else {
+            format!(" {}", tok)
+        };
+        out.push(crate::types::WordTimestamp {
+            text,
+            start: t0,
+            end: t1,
+            probability: None,
+        });
     }
     out
 }
@@ -98,13 +114,14 @@ pub fn interpolate_word_timestamps(line: &str, start: f64, end: f64) -> Vec<crat
 /// List of supported target language codes for Google Translate (unofficial endpoint).
 pub fn get_translate_languages() -> Vec<&'static str> {
     vec![
-        "af", "sq", "am", "ar", "hy", "az", "eu", "be", "bn", "bs", "bg", "ca", "ceb", "ny", "zh", "zh-TW",
-        "co", "hr", "cs", "da", "nl", "en", "eo", "et", "tl", "fi", "fr", "fy", "gl", "ka", "de", "el", "gu",
-        "ht", "ha", "haw", "he", "hi", "hmn", "hu", "is", "ig", "id", "ga", "it", "ja", "jv", "kn", "kk", "km",
-        "rw", "ko", "ku", "ky", "lo", "la", "lv", "lt", "lb", "mk", "mg", "ms", "ml", "mt", "mi", "mr", "mn",
-        "my", "ne", "no", "or", "ps", "fa", "pl", "pt", "pa", "ro", "ru", "sm", "gd", "sr", "st", "sn", "sd",
-        "si", "sk", "sl", "so", "es", "su", "sw", "sv", "tg", "ta", "te", "th", "tr", "uk", "ur", "ug", "uz",
-        "vi", "cy", "xh", "yi", "yo", "zu",
+        "af", "sq", "am", "ar", "hy", "az", "eu", "be", "bn", "bs", "bg", "ca", "ceb", "ny", "zh",
+        "zh-TW", "co", "hr", "cs", "da", "nl", "en", "eo", "et", "tl", "fi", "fr", "fy", "gl",
+        "ka", "de", "el", "gu", "ht", "ha", "haw", "he", "hi", "hmn", "hu", "is", "ig", "id", "ga",
+        "it", "ja", "jv", "kn", "kk", "km", "rw", "ko", "ku", "ky", "lo", "la", "lv", "lt", "lb",
+        "mk", "mg", "ms", "ml", "mt", "mi", "mr", "mn", "my", "ne", "no", "or", "ps", "fa", "pl",
+        "pt", "pa", "ro", "ru", "sm", "gd", "sr", "st", "sn", "sd", "si", "sk", "sl", "so", "es",
+        "su", "sw", "sv", "tg", "ta", "te", "th", "tr", "uk", "ur", "ug", "uz", "vi", "cy", "xh",
+        "yi", "yo", "zu",
     ]
 }
 
@@ -112,14 +129,14 @@ pub fn get_translate_languages() -> Vec<&'static str> {
 pub fn get_whisper_languages() -> Vec<&'static str> {
     vec![
         // Auto detection
-        "auto",
-        // Core set
-        "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl", "ar", "sv", "it", "id",
-        "hi", "fi", "vi", "he", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no", "th", "ur", "hr", "bg",
-        "lt", "la", "mi", "ml", "cy", "sk", "te", "fa", "lv", "bn", "sr", "az", "sl", "kn", "et", "mk", "br",
-        "eu", "is", "hy", "ne", "mn", "bs", "kk", "sq", "sw", "gl", "mr", "pa", "si", "km", "sn", "yo", "so",
-        "af", "oc", "ka", "be", "tg", "sd", "gu", "am", "yi", "lo", "uz", "fo", "ht", "ps", "tk", "nn", "mt",
-        "sa", "lb", "my", "bo", "tl", "mg", "as", "tt", "haw", "ln", "ha", "ba", "jw", "su", "yue",
+        "auto", // Core set
+        "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl", "ar", "sv",
+        "it", "id", "hi", "fi", "vi", "he", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no",
+        "th", "ur", "hr", "bg", "lt", "la", "mi", "ml", "cy", "sk", "te", "fa", "lv", "bn", "sr",
+        "az", "sl", "kn", "et", "mk", "br", "eu", "is", "hy", "ne", "mn", "bs", "kk", "sq", "sw",
+        "gl", "mr", "pa", "si", "km", "sn", "yo", "so", "af", "oc", "ka", "be", "tg", "sd", "gu",
+        "am", "yi", "lo", "uz", "fo", "ht", "ps", "tk", "nn", "mt", "sa", "lb", "my", "bo", "tl",
+        "mg", "as", "tt", "haw", "ln", "ha", "ba", "jw", "su", "yue",
     ]
 }
 

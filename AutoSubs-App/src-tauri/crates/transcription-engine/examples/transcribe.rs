@@ -1,5 +1,8 @@
 use eyre::{Result, eyre};
-use transcription_engine::{Callbacks, ContentFormatting, Engine, EngineConfig, ProgressType, Segment, TextCase, TranscribeOptions};
+use transcription_engine::{
+    Callbacks, ContentFormatting, Engine, EngineConfig, ProgressType, Segment, TextCase,
+    TranscribeOptions,
+};
 
 struct CliArgs {
     audio_path: String,
@@ -23,14 +26,20 @@ fn print_usage(program: &str) {
     eprintln!("  --whisper-to-english           Use Whisper translation-to-English mode");
     eprintln!("  --diarize                      Enable speaker labeling");
     eprintln!("  --no-vad                       Disable voice activity detection");
-    eprintln!("  --max-speakers <n>             Limit detected speakers when diarization is enabled");
-    eprintln!("  --output <path>                Write JSON output to this path (default: segments.json)");
+    eprintln!(
+        "  --max-speakers <n>             Limit detected speakers when diarization is enabled"
+    );
+    eprintln!(
+        "  --output <path>                Write JSON output to this path (default: segments.json)"
+    );
     eprintln!("  --no-gpu                       Disable GPU acceleration");
 }
 
 fn parse_args() -> Result<CliArgs> {
     let mut args = std::env::args().skip(1);
-    let program = std::env::args().next().unwrap_or_else(|| "cargo run --example transcribe --".into());
+    let program = std::env::args()
+        .next()
+        .unwrap_or_else(|| "cargo run --example transcribe --".into());
 
     let mut audio_path: Option<String> = None;
     let mut model = "tiny".to_string();
@@ -46,13 +55,21 @@ fn parse_args() -> Result<CliArgs> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--model" => {
-                model = args.next().ok_or_else(|| eyre!("missing value for --model"))?;
+                model = args
+                    .next()
+                    .ok_or_else(|| eyre!("missing value for --model"))?;
             }
             "--lang" => {
-                lang = Some(args.next().ok_or_else(|| eyre!("missing value for --lang"))?);
+                lang = Some(
+                    args.next()
+                        .ok_or_else(|| eyre!("missing value for --lang"))?,
+                );
             }
             "--translate-to" => {
-                translate_to = Some(args.next().ok_or_else(|| eyre!("missing value for --translate-to"))?);
+                translate_to = Some(
+                    args.next()
+                        .ok_or_else(|| eyre!("missing value for --translate-to"))?,
+                );
             }
             "--whisper-to-english" => {
                 whisper_to_english = true;
@@ -64,11 +81,15 @@ fn parse_args() -> Result<CliArgs> {
                 vad = Some(false);
             }
             "--max-speakers" => {
-                let raw = args.next().ok_or_else(|| eyre!("missing value for --max-speakers"))?;
+                let raw = args
+                    .next()
+                    .ok_or_else(|| eyre!("missing value for --max-speakers"))?;
                 max_speakers = Some(raw.parse()?);
             }
             "--output" => {
-                output_path = args.next().ok_or_else(|| eyre!("missing value for --output"))?;
+                output_path = args
+                    .next()
+                    .ok_or_else(|| eyre!("missing value for --output"))?;
             }
             "--no-gpu" => {
                 use_gpu = Some(false);
@@ -165,10 +186,22 @@ async fn main() -> Result<()> {
 
     let mut engine = Engine::new(config);
     let (segments, _, language) = engine
-        .transcribe_audio(&args.audio_path, options, None, None, None, Some(content_formatting), Some(callbacks))
+        .transcribe_audio(
+            &args.audio_path,
+            options,
+            None,
+            None,
+            None,
+            Some(content_formatting),
+            Some(callbacks),
+        )
         .await?;
 
-    println!("\nTranscribed {} segments (language: {})", segments.len(), language);
+    println!(
+        "\nTranscribed {} segments (language: {})",
+        segments.len(),
+        language
+    );
 
     let json = serde_json::to_string_pretty(&segments)?;
     std::fs::write(&args.output_path, json.as_bytes())?;

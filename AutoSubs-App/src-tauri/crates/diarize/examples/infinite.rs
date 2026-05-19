@@ -13,9 +13,7 @@ fn process_segment(
     embedding_manager: &mut EmbeddingManager,
     search_threshold: f32,
 ) -> Result<(), eyre::Report> {
-    let embedding_result: Vec<f32> = embedding_extractor
-        .compute(&segment.samples)
-        .unwrap();
+    let embedding_result: Vec<f32> = embedding_extractor.compute(&segment.samples).unwrap();
 
     let speaker = embedding_manager
         .search_speaker(embedding_result.clone(), search_threshold)

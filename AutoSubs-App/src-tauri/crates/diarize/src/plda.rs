@@ -33,27 +33,32 @@ impl PLDA {
         lda_dimension: usize,
     ) -> Result<Self> {
         // Load xvec_transform.npz
-        let mut xvec_npz = ndarray_npy::NpzReader::new(std::fs::File::open(xvec_transform_path.as_ref())?)?;
+        let mut xvec_npz =
+            ndarray_npy::NpzReader::new(std::fs::File::open(xvec_transform_path.as_ref())?)?;
 
-
-        let xvec_mean: Array1<f64> = xvec_npz.by_name("mean1.npy")
+        let xvec_mean: Array1<f64> = xvec_npz
+            .by_name("mean1.npy")
             .context("Failed to read mean1.npy from xvec_transform.npz")?;
 
         // Read lda as
-        let xvec_lda_f32: Array2<f32> = xvec_npz.by_name("lda.npy")
+        let xvec_lda_f32: Array2<f32> = xvec_npz
+            .by_name("lda.npy")
             .context("Failed to read lda.npy from xvec_transform.npz")?;
         let xvec_transform = xvec_lda_f32.mapv(|x| x as f64);
 
         // Load plda.npz
         let mut plda_npz = ndarray_npy::NpzReader::new(std::fs::File::open(plda_path.as_ref())?)?;
 
-        let plda_mean: Array1<f64> = plda_npz.by_name("mu.npy")
+        let plda_mean: Array1<f64> = plda_npz
+            .by_name("mu.npy")
             .context("Failed to read mu.npy from plda.npz")?;
 
-        let plda_transform: Array2<f64> = plda_npz.by_name("tr.npy")
+        let plda_transform: Array2<f64> = plda_npz
+            .by_name("tr.npy")
             .context("Failed to read tr.npy from plda.npz")?;
 
-        let plda_psi: Array1<f64> = plda_npz.by_name("psi.npy")
+        let plda_psi: Array1<f64> = plda_npz
+            .by_name("psi.npy")
             .context("Failed to read psi.npy from plda.npz")?;
 
         Ok(Self {
@@ -86,7 +91,9 @@ impl PLDA {
         let transformed = self.plda_transform.dot(&centered);
 
         // Return only the first lda_dimension elements
-        transformed.slice(ndarray::s![..self.lda_dimension]).to_owned()
+        transformed
+            .slice(ndarray::s![..self.lda_dimension])
+            .to_owned()
     }
 
     /// Transform embedding through both x-vector and PLDA transformations

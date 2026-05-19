@@ -14,13 +14,27 @@ fn main() {
 
         // Query the active macOS SDK path and version via xcrun.
         let sdk_path = std::process::Command::new("xcrun")
-            .args(["--sdk", "macosx", "--show-sdk-path"]).output()
+            .args(["--sdk", "macosx", "--show-sdk-path"])
+            .output()
             .ok()
-            .and_then(|o| if o.status.success() { Some(String::from_utf8_lossy(&o.stdout).trim().to_string()) } else { None });
+            .and_then(|o| {
+                if o.status.success() {
+                    Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+                } else {
+                    None
+                }
+            });
         let sdk_ver = std::process::Command::new("xcrun")
-            .args(["--sdk", "macosx", "--show-sdk-version"]).output()
+            .args(["--sdk", "macosx", "--show-sdk-version"])
+            .output()
             .ok()
-            .and_then(|o| if o.status.success() { Some(String::from_utf8_lossy(&o.stdout).trim().to_string()) } else { None })
+            .and_then(|o| {
+                if o.status.success() {
+                    Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+                } else {
+                    None
+                }
+            })
             .unwrap_or_else(|| "15.5".to_string());
 
         if let Some(sdk) = sdk_path {
@@ -42,7 +56,10 @@ fn main() {
         // Trim a trailing .0 to accommodate values like 13.3.0 vs 13.3.
         let min_ver_driver = min_ver.trim_end_matches('.').trim_end_matches('0');
         if !min_ver_driver.is_empty() {
-            println!("cargo:rustc-link-arg=-mmacosx-version-min={}", min_ver_driver);
+            println!(
+                "cargo:rustc-link-arg=-mmacosx-version-min={}",
+                min_ver_driver
+            );
         }
 
         // Ensure compiler-rt builtins are available at link time. Newer SDKs expect
@@ -58,7 +75,13 @@ fn main() {
                     .args(["-f", "clang"])
                     .output()
                     .ok()
-                    .and_then(|o| if o.status.success() { Some(String::from_utf8_lossy(&o.stdout).trim().to_string()) } else { None })
+                    .and_then(|o| {
+                        if o.status.success() {
+                            Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+                        } else {
+                            None
+                        }
+                    })
             })
             .unwrap_or_else(|| "clang".to_string());
 
@@ -68,7 +91,13 @@ fn main() {
             .arg("-print-resource-dir")
             .output()
             .ok()
-            .and_then(|o| if o.status.success() { Some(String::from_utf8_lossy(&o.stdout).trim().to_string()) } else { None });
+            .and_then(|o| {
+                if o.status.success() {
+                    Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+                } else {
+                    None
+                }
+            });
         if let Some(res) = clang_res_dir {
             println!("cargo:warning=Clang resource dir: {}", res);
             let darwin_lib = format!("{}/lib/darwin", res);
@@ -83,10 +112,16 @@ fn main() {
                 println!("cargo:rustc-link-arg=-Wl,-force_load,{}", crt);
                 println!("cargo:warning=Linking compiler-rt archive: {}", crt);
             } else {
-                println!("cargo:warning=compiler-rt archive not found at {} (skipping explicit link)", crt);
+                println!(
+                    "cargo:warning=compiler-rt archive not found at {} (skipping explicit link)",
+                    crt
+                );
             }
         } else {
-            println!("cargo:warning=Failed to query clang resource dir via {} -print-resource-dir", clang_path);
+            println!(
+                "cargo:warning=Failed to query clang resource dir via {} -print-resource-dir",
+                clang_path
+            );
         }
 
         // Safe duplicates: ensure required frameworks and C++ are linked at the final step.

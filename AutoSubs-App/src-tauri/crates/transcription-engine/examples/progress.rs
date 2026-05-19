@@ -24,7 +24,9 @@ fn print_usage(program: &str) {
 
 fn parse_args() -> Result<CliArgs> {
     let mut args = std::env::args().skip(1);
-    let program = std::env::args().next().unwrap_or_else(|| "cargo run --example progress --".into());
+    let program = std::env::args()
+        .next()
+        .unwrap_or_else(|| "cargo run --example progress --".into());
 
     let mut audio_path: Option<String> = None;
     let mut model = "tiny.en".to_string();
@@ -34,10 +36,15 @@ fn parse_args() -> Result<CliArgs> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--model" => {
-                model = args.next().ok_or_else(|| eyre!("missing value for --model"))?;
+                model = args
+                    .next()
+                    .ok_or_else(|| eyre!("missing value for --model"))?;
             }
             "--translate-to" => {
-                translate_to = Some(args.next().ok_or_else(|| eyre!("missing value for --translate-to"))?);
+                translate_to = Some(
+                    args.next()
+                        .ok_or_else(|| eyre!("missing value for --translate-to"))?,
+                );
             }
             "--diarize" => {
                 diarize = true;
@@ -116,14 +123,38 @@ async fn main() -> Result<()> {
 
     let mut engine = Engine::new(EngineConfig::default());
     let (segments, _formatted_segments, language) = engine
-        .transcribe_audio(&args.audio_path, options, None, None, None, None, Some(callbacks))
+        .transcribe_audio(
+            &args.audio_path,
+            options,
+            None,
+            None,
+            None,
+            None,
+            Some(callbacks),
+        )
         .await?;
 
-    println!("\nTranscribed {} segments (language: {})", segments.len(), language);
-    println!("Download progress updates: {}", DOWNLOAD_COUNT.load(Ordering::Relaxed));
-    println!("Diarize progress updates: {}", DIARIZE_COUNT.load(Ordering::Relaxed));
-    println!("Transcribe progress updates: {}", TRANSCRIBE_COUNT.load(Ordering::Relaxed));
-    println!("Translate progress updates: {}", TRANSLATE_COUNT.load(Ordering::Relaxed));
+    println!(
+        "\nTranscribed {} segments (language: {})",
+        segments.len(),
+        language
+    );
+    println!(
+        "Download progress updates: {}",
+        DOWNLOAD_COUNT.load(Ordering::Relaxed)
+    );
+    println!(
+        "Diarize progress updates: {}",
+        DIARIZE_COUNT.load(Ordering::Relaxed)
+    );
+    println!(
+        "Transcribe progress updates: {}",
+        TRANSCRIBE_COUNT.load(Ordering::Relaxed)
+    );
+    println!(
+        "Translate progress updates: {}",
+        TRANSLATE_COUNT.load(Ordering::Relaxed)
+    );
 
     Ok(())
 }

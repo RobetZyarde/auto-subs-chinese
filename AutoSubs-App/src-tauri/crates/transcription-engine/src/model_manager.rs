@@ -1,7 +1,8 @@
 use crate::types::{LabeledProgressFn, ProgressType};
-use eyre::{bail, eyre, Context, Result};
-use hf_hub::api::sync::ApiBuilder;
+use eyre::{Context, Result, bail, eyre};
 use hf_hub::api::Progress as HubProgress;
+use hf_hub::api::sync::ApiBuilder;
+use once_cell::sync::Lazy;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -9,7 +10,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use tokio_util::sync::CancellationToken;
-use once_cell::sync::Lazy;
 
 const DIARIZE_MODEL_ID: &str = "speaker-diarize";
 const DIARIZE_REPO_ID: &str = "altunenes/speaker-diarization-community-1-onnx";
@@ -19,7 +19,8 @@ const QWEN3_ASR_REPO_ID: &str = "Qwen/Qwen3-ASR-1.7B";
 const QWEN3_ALIGNER_REPO_ID: &str = "Qwen/Qwen3-ForcedAligner-0.6B";
 
 // Global download state to ensure only one download runs at a time
-static ACTIVE_DOWNLOAD: Lazy<Mutex<Option<Arc<CancellationToken>>>> = Lazy::new(|| Mutex::new(None));
+static ACTIVE_DOWNLOAD: Lazy<Mutex<Option<Arc<CancellationToken>>>> =
+    Lazy::new(|| Mutex::new(None));
 
 // Generation counter to invalidate old progress callbacks
 static DOWNLOAD_GENERATION: AtomicU64 = AtomicU64::new(0);
@@ -71,17 +72,17 @@ impl<'a> DownloadProgress<'a> {
                 return true;
             }
         }
-        
+
         // Cancelled by newer download
         if self.cancel_token.is_cancelled() {
             return true;
         }
-        
+
         // Superseded by newer generation
         if self.generation != DOWNLOAD_GENERATION.load(Ordering::Relaxed) {
             return true;
         }
-        
+
         false
     }
 
@@ -89,7 +90,7 @@ impl<'a> DownloadProgress<'a> {
         if self.should_stop() {
             return;
         }
-        
+
         if let (Some(cb), total) = (self.progress_cb, self.total) {
             let pct = if total == 0 {
                 self.offset
@@ -99,7 +100,7 @@ impl<'a> DownloadProgress<'a> {
             cb(pct as i32, ProgressType::Download, self.label);
         }
     }
-    
+
     /// Handle cancellation: cancel token and run cleanup
     fn handle_cancellation(&self) {
         self.cancel_token.cancel();
@@ -150,7 +151,6 @@ impl ModelManager {
         }
         Ok(dir)
     }
-
 
     // ---- Public API ----
     pub async fn ensure_whisper_model(
@@ -217,7 +217,9 @@ impl ModelManager {
                         if let Ok(entries) = fs::read_dir(&base) {
                             for entry in entries.flatten() {
                                 let snap = entry.path();
-                                if !snap.is_dir() { continue; }
+                                if !snap.is_dir() {
+                                    continue;
+                                }
                                 let extracted_path = snap.join(extracted_name);
                                 if extracted_path.exists() {
                                     // Do NOT emit progress here to avoid starting progress
@@ -249,13 +251,17 @@ impl ModelManager {
                             "Warning: CoreML encoder download failed ({}). Proceeding without CoreML encoder.",
                             e
                         );
-                        if let Some(cb) = progress { cb(100, ProgressType::Download, "progressSteps.download"); }
+                        if let Some(cb) = progress {
+                            cb(100, ProgressType::Download, "progressSteps.download");
+                        }
                         return Ok(model_path);
                     }
                 };
 
                 // Progress at 90% (download done, start extracting)
-                if let Some(cb) = progress { cb(90, ProgressType::Download, "progressSteps.download"); }
+                if let Some(cb) = progress {
+                    cb(90, ProgressType::Download, "progressSteps.download");
+                }
 
                 // Extract to same directory as the cached zip
                 let extract_dir = coreml_zip_path
@@ -265,10 +271,10 @@ impl ModelManager {
                 let extracted_path = extract_dir.join(extracted_name);
 
                 if !extracted_path.exists() {
-                    let file = fs::File::open(&coreml_zip_path)
-                        .context("Failed to open CoreML zip")?;
-                    let mut archive = zip::ZipArchive::new(file)
-                        .context("Failed to read CoreML zip archive")?;
+                    let file =
+                        fs::File::open(&coreml_zip_path).context("Failed to open CoreML zip")?;
+                    let mut archive =
+                        zip::ZipArchive::new(file).context("Failed to read CoreML zip archive")?;
 
                     let total = archive.len() as u64;
                     let mut count = 0u64;
@@ -281,7 +287,9 @@ impl ModelManager {
                         if (&*file.name()).ends_with('/') {
                             fs::create_dir_all(&outpath).ok();
                         } else {
-                            if let Some(p) = outpath.parent() { fs::create_dir_all(p).ok(); }
+                            if let Some(p) = outpath.parent() {
+                                fs::create_dir_all(p).ok();
+                            }
                             let mut outfile = fs::File::create(&outpath)
                                 .context("Failed to create extracted file")?;
                             std::io::copy(&mut file, &mut outfile)
@@ -299,13 +307,14 @@ impl ModelManager {
                 }
 
                 // Final completion
-                if let Some(cb) = progress { cb(100, ProgressType::Download, "progressSteps.download"); }
+                if let Some(cb) = progress {
+                    cb(100, ProgressType::Download, "progressSteps.download");
+                }
             }
         }
 
         Ok(model_path)
     }
-
 
     pub async fn ensure_parakeet_v3_model(
         &self,
@@ -331,7 +340,9 @@ impl ModelManager {
         ];
 
         // Fast path: find a snapshot dir that already contains all required files.
-        if let Some(snapshot_dir) = self.find_cached_snapshot_with_files(repo_id, &required_files)? {
+        if let Some(snapshot_dir) =
+            self.find_cached_snapshot_with_files(repo_id, &required_files)?
+        {
             let mut ok = true;
             for f in required_files {
                 let p = snapshot_dir.join(f);
@@ -367,12 +378,15 @@ impl ModelManager {
         }
 
         // After downloading, locate a snapshot that contains everything.
-        if let Some(snapshot_dir) = self.find_cached_snapshot_with_files(repo_id, &required_files)? {
+        if let Some(snapshot_dir) =
+            self.find_cached_snapshot_with_files(repo_id, &required_files)?
+        {
             // Validate again to be safe.
             for f in required_files {
                 let p = snapshot_dir.join(f);
-                validate_model_file(&p)
-                    .with_context(|| format!("Model validation failed for '{}' from '{}'", f, repo_id))?;
+                validate_model_file(&p).with_context(|| {
+                    format!("Model validation failed for '{}' from '{}'", f, repo_id)
+                })?;
             }
             if let Some(cb) = progress {
                 cb(100, ProgressType::Download, "progressSteps.download");
@@ -458,7 +472,11 @@ impl ModelManager {
             let scale = (1.0 / total) * 100.0;
 
             if let Some(cb) = progress {
-                cb(offset as i32, ProgressType::Download, "progressSteps.download");
+                cb(
+                    offset as i32,
+                    ProgressType::Download,
+                    "progressSteps.download",
+                );
             }
 
             let url = if *filename == "tokenizer.json" {
@@ -472,11 +490,19 @@ impl ModelManager {
                 )
             };
             download_to(&dest, &url).await?;
-            validate_model_file(&dest)
-                .with_context(|| format!("Model validation failed for '{}' from Moonshine {}", filename, folder))?;
+            validate_model_file(&dest).with_context(|| {
+                format!(
+                    "Model validation failed for '{}' from Moonshine {}",
+                    filename, folder
+                )
+            })?;
 
             if let Some(cb) = progress {
-                cb((offset + scale) as i32, ProgressType::Download, "progressSteps.download");
+                cb(
+                    (offset + scale) as i32,
+                    ProgressType::Download,
+                    "progressSteps.download",
+                );
             }
         }
 
@@ -494,17 +520,16 @@ impl ModelManager {
         progress: Option<&LabeledProgressFn>,
         is_cancelled: Option<&(dyn Fn() -> bool + Send + Sync)>,
     ) -> Result<PathBuf> {
-        self
-            .ensure_hub_model(
-                "ggml-org/whisper-vad",
-                "ggml-silero-v5.1.2.bin",
-                progress,
-                is_cancelled,
-                0.0,
-                100.0,
-                "progressSteps.download",
-            )
-            .await
+        self.ensure_hub_model(
+            "ggml-org/whisper-vad",
+            "ggml-silero-v5.1.2.bin",
+            progress,
+            is_cancelled,
+            0.0,
+            100.0,
+            "progressSteps.download",
+        )
+        .await
     }
 
     pub async fn ensure_diarize_models(
@@ -514,70 +539,84 @@ impl ModelManager {
         progress: Option<&LabeledProgressFn>,
         is_cancelled: Option<&(dyn Fn() -> bool + Send + Sync)>,
     ) -> Result<(PathBuf, PathBuf)> {
-        if let Some(is_cancelled) = is_cancelled { if is_cancelled() { bail!("Cancelled"); } }
+        if let Some(is_cancelled) = is_cancelled {
+            if is_cancelled() {
+                bail!("Cancelled");
+            }
+        }
 
-        let had_cached_diarize_bundle = self.find_cached_snapshot_with_files(
-            DIARIZE_REPO_ID,
-            &DIARIZE_REQUIRED_FILES,
-        ).unwrap_or(None).is_some();
+        let had_cached_diarize_bundle = self
+            .find_cached_snapshot_with_files(DIARIZE_REPO_ID, &DIARIZE_REQUIRED_FILES)
+            .unwrap_or(None)
+            .is_some();
 
         let seg_path = if let Some((repo_id, filename)) = parse_hf_blob_url(seg_url) {
-            self
-                .ensure_hub_model(
-                    &repo_id,
-                    &filename,
-                    progress,
-                    is_cancelled,
-                    0.0,
-                    50.0,
-                    "progressSteps.download",
-                )
-                .await?
+            self.ensure_hub_model(
+                &repo_id,
+                &filename,
+                progress,
+                is_cancelled,
+                0.0,
+                50.0,
+                "progressSteps.download",
+            )
+            .await?
         } else {
             let model_dir = self.model_cache_dir()?;
             let seg_name = url_filename(seg_url).ok_or_else(|| eyre!("Invalid seg_url"))?;
             let seg_path = model_dir.join(&seg_name);
             if !seg_path.exists() {
-                if let Some(cb) = progress { cb(5, ProgressType::Download, "progressSteps.download"); }
+                if let Some(cb) = progress {
+                    cb(5, ProgressType::Download, "progressSteps.download");
+                }
                 download_to(&seg_path, seg_url).await?;
             }
             seg_path
         };
 
-        if let Some(is_cancelled) = is_cancelled { if is_cancelled() { bail!("Cancelled"); } }
+        if let Some(is_cancelled) = is_cancelled {
+            if is_cancelled() {
+                bail!("Cancelled");
+            }
+        }
 
         let emb_path = if let Some((repo_id, filename)) = parse_hf_blob_url(emb_url) {
-            self
-                .ensure_hub_model(
-                    &repo_id,
-                    &filename,
-                    progress,
-                    is_cancelled,
-                    50.0,
-                    50.0,
-                    "progressSteps.download",
-                )
-                .await?
+            self.ensure_hub_model(
+                &repo_id,
+                &filename,
+                progress,
+                is_cancelled,
+                50.0,
+                50.0,
+                "progressSteps.download",
+            )
+            .await?
         } else {
             let model_dir = self.model_cache_dir()?;
             let emb_name = url_filename(emb_url).ok_or_else(|| eyre!("Invalid emb_url"))?;
             let emb_path = model_dir.join(&emb_name);
             if !emb_path.exists() {
-                if let Some(cb) = progress { cb(55, ProgressType::Download, "progressSteps.download"); }
+                if let Some(cb) = progress {
+                    cb(55, ProgressType::Download, "progressSteps.download");
+                }
                 download_to(&emb_path, emb_url).await?;
             }
             emb_path
         };
 
         if !had_cached_diarize_bundle {
-            if let Some(cb) = progress { cb(100, ProgressType::Download, "progressSteps.download"); }
+            if let Some(cb) = progress {
+                cb(100, ProgressType::Download, "progressSteps.download");
+            }
         }
         Ok((seg_path, emb_path))
     }
 
     pub fn delete_whisper_model(&self, model: &str) -> Result<()> {
         let cache_dir = self.model_cache_dir()?;
-        if !cache_dir.exists() { return Ok(()); }
+        if !cache_dir.exists() {
+            return Ok(());
+        }
 
         let patterns = vec![
             format!("ggml-{}.bin", model),
@@ -628,8 +667,12 @@ impl ModelManager {
             bail!("Moonshine model '{}' not found in cache", model_name);
         }
 
-        fs::remove_dir_all(&model_dir)
-            .with_context(|| format!("Failed to delete Moonshine model directory: {}", model_dir.display()))?;
+        fs::remove_dir_all(&model_dir).with_context(|| {
+            format!(
+                "Failed to delete Moonshine model directory: {}",
+                model_dir.display()
+            )
+        })?;
         tracing::info!("Deleted Moonshine model: {}", model_dir.display());
         Ok(())
     }
@@ -643,21 +686,30 @@ impl ModelManager {
             bail!("Parakeet model not found in cache");
         }
 
-        fs::remove_dir_all(&parakeet_repo_dir)
-            .with_context(|| format!("Failed to delete Parakeet model directory: {}", parakeet_repo_dir.display()))?;
+        fs::remove_dir_all(&parakeet_repo_dir).with_context(|| {
+            format!(
+                "Failed to delete Parakeet model directory: {}",
+                parakeet_repo_dir.display()
+            )
+        })?;
         tracing::info!("Deleted Parakeet model: {}", parakeet_repo_dir.display());
         Ok(())
     }
 
     pub fn delete_diarize_model(&self) -> Result<()> {
         let cache_dir = self.model_cache_dir()?;
-        let diarize_repo_dir = cache_dir.join("models--altunenes--speaker-diarization-community-1-onnx");
+        let diarize_repo_dir =
+            cache_dir.join("models--altunenes--speaker-diarization-community-1-onnx");
         if !diarize_repo_dir.exists() {
             bail!("Diarization model not found in cache");
         }
 
-        fs::remove_dir_all(&diarize_repo_dir)
-            .with_context(|| format!("Failed to delete diarization model directory: {}", diarize_repo_dir.display()))?;
+        fs::remove_dir_all(&diarize_repo_dir).with_context(|| {
+            format!(
+                "Failed to delete diarization model directory: {}",
+                diarize_repo_dir.display()
+            )
+        })?;
         tracing::info!("Deleted diarization model: {}", diarize_repo_dir.display());
         Ok(())
     }
@@ -671,8 +723,12 @@ impl ModelManager {
             cache_dir.join("models--Qwen--Qwen3-ForcedAligner-0.6B"),
         ] {
             if repo_dir.exists() {
-                fs::remove_dir_all(&repo_dir)
-                    .with_context(|| format!("Failed to delete Qwen3 model directory: {}", repo_dir.display()))?;
+                fs::remove_dir_all(&repo_dir).with_context(|| {
+                    format!(
+                        "Failed to delete Qwen3 model directory: {}",
+                        repo_dir.display()
+                    )
+                })?;
                 deleted_any = true;
                 tracing::info!("Deleted Qwen3 model cache: {}", repo_dir.display());
             }
@@ -689,11 +745,15 @@ impl ModelManager {
     pub fn cleanup_orphaned_blobs(&self) -> Result<()> {
         let cache_root = self.model_cache_dir()?;
         let models_dir = cache_root.join("models--ggerganov--whisper.cpp");
-        if !models_dir.exists() { return Ok(()); }
+        if !models_dir.exists() {
+            return Ok(());
+        }
 
         let blobs_dir = models_dir.join("blobs");
         let snapshots_dir = models_dir.join("snapshots");
-        if !blobs_dir.exists() || !snapshots_dir.exists() { return Ok(()); }
+        if !blobs_dir.exists() || !snapshots_dir.exists() {
+            return Ok(());
+        }
 
         // Collect all blob files
         let mut blob_files: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -708,7 +768,8 @@ impl ModelManager {
         }
 
         // Collect all referenced blobs from symlinks
-        let mut referenced_blobs: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut referenced_blobs: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
         for entry in fs::read_dir(&snapshots_dir).context("Failed to read snapshots dir")? {
             let entry = entry?;
             let snap_path = entry.path();
@@ -748,7 +809,9 @@ impl ModelManager {
 
     pub fn cleanup_stale_locks(&self) -> Result<()> {
         let root = self.model_cache_dir()?;
-        if !root.exists() { return Ok(()); }
+        if !root.exists() {
+            return Ok(());
+        }
 
         let mut stack = vec![root];
         while let Some(dir) = stack.pop() {
@@ -761,9 +824,15 @@ impl ModelManager {
                 }
             };
             for entry in read {
-                let entry = match entry { Ok(e) => e, Err(_) => continue };
+                let entry = match entry {
+                    Ok(e) => e,
+                    Err(_) => continue,
+                };
                 let path = entry.path();
-                let md = match fs::symlink_metadata(&path) { Ok(m) => m, Err(_) => continue };
+                let md = match fs::symlink_metadata(&path) {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
                 let ft = md.file_type();
 
                 if ft.is_symlink() {
@@ -773,7 +842,11 @@ impl ModelManager {
                     let target_exists = fs::metadata(&path).is_ok();
                     if !target_exists {
                         if let Err(e) = fs::remove_file(&path) {
-                            tracing::warn!("Failed to remove dangling symlink {}: {}", path.display(), e);
+                            tracing::warn!(
+                                "Failed to remove dangling symlink {}: {}",
+                                path.display(),
+                                e
+                            );
                         }
                     }
                     continue;
@@ -785,7 +858,10 @@ impl ModelManager {
                 }
 
                 if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
-                    if name.ends_with(".lock") || name.ends_with(".incomplete") || name.ends_with(".part") {
+                    if name.ends_with(".lock")
+                        || name.ends_with(".incomplete")
+                        || name.ends_with(".part")
+                    {
                         if let Err(e) = fs::remove_file(&path) {
                             // Log but don't fail - some files might be in use
                             tracing::warn!("Failed to remove {}: {}", path.display(), e);
@@ -801,21 +877,31 @@ impl ModelManager {
     /// Returns a vector of model names (e.g., "tiny", "base", "small", "moonshine-tiny").
     pub fn list_cached_models(&self) -> Result<Vec<String>> {
         let cache_dir = self.model_cache_dir()?;
-        if !cache_dir.exists() { return Ok(vec![]); }
+        if !cache_dir.exists() {
+            return Ok(vec![]);
+        }
 
         let mut models = std::collections::HashSet::new();
 
         // Look in the Whisper repository directory
-        let whisper_repo_dir = cache_dir.join("models--ggerganov--whisper.cpp").join("snapshots");
+        let whisper_repo_dir = cache_dir
+            .join("models--ggerganov--whisper.cpp")
+            .join("snapshots");
         if whisper_repo_dir.exists() {
             // Iterate through snapshot directories
-            for snapshot_entry in fs::read_dir(&whisper_repo_dir).context("Failed to read snapshots dir")? {
+            for snapshot_entry in
+                fs::read_dir(&whisper_repo_dir).context("Failed to read snapshots dir")?
+            {
                 let snapshot_entry = snapshot_entry?;
                 let snapshot_path = snapshot_entry.path();
-                if !snapshot_path.is_dir() { continue; }
+                if !snapshot_path.is_dir() {
+                    continue;
+                }
 
                 // Look for ggml-{model}.bin files in this snapshot
-                for file_entry in fs::read_dir(&snapshot_path).context("Failed to read snapshot dir")? {
+                for file_entry in
+                    fs::read_dir(&snapshot_path).context("Failed to read snapshot dir")?
+                {
                     let file_entry = file_entry?;
                     let path = file_entry.path();
                     if path.is_file() {
@@ -837,11 +923,17 @@ impl ModelManager {
         // Look in the Moonshine cache directory
         let moonshine_dir = cache_dir.join("moonshine");
         if moonshine_dir.exists() {
-            let required_files = ["encoder_model.onnx", "decoder_model_merged.onnx", "tokenizer.json"];
+            let required_files = [
+                "encoder_model.onnx",
+                "decoder_model_merged.onnx",
+                "tokenizer.json",
+            ];
             for entry in fs::read_dir(&moonshine_dir).context("Failed to read moonshine dir")? {
                 let entry = entry?;
                 let path = entry.path();
-                if !path.is_dir() { continue; }
+                if !path.is_dir() {
+                    continue;
+                }
                 // Check that all required model files exist in this folder
                 let all_present = required_files.iter().all(|f| path.join(f).exists());
                 if all_present {
@@ -854,27 +946,34 @@ impl ModelManager {
         }
 
         // Look in the Parakeet cache directory (hf-hub structure)
-        if self.find_cached_snapshot_with_files(
-            "istupakov/parakeet-tdt-0.6b-v3-onnx",
-            &["encoder-model.int8.onnx", "decoder_joint-model.int8.onnx"],
-        ).unwrap_or(None).is_some() {
+        if self
+            .find_cached_snapshot_with_files(
+                "istupakov/parakeet-tdt-0.6b-v3-onnx",
+                &["encoder-model.int8.onnx", "decoder_joint-model.int8.onnx"],
+            )
+            .unwrap_or(None)
+            .is_some()
+        {
             models.insert("parakeet".to_string());
         }
 
-        if self.find_cached_snapshot_with_files(
-            DIARIZE_REPO_ID,
-            &DIARIZE_REQUIRED_FILES,
-        ).unwrap_or(None).is_some() {
+        if self
+            .find_cached_snapshot_with_files(DIARIZE_REPO_ID, &DIARIZE_REQUIRED_FILES)
+            .unwrap_or(None)
+            .is_some()
+        {
             models.insert(DIARIZE_MODEL_ID.to_string());
         }
 
-        if self.find_cached_snapshot_with_files(
-            QWEN3_ASR_REPO_ID,
-            &["config.json"],
-        ).unwrap_or(None).is_some() || self.find_cached_snapshot_with_files(
-            QWEN3_ALIGNER_REPO_ID,
-            &["config.json"],
-        ).unwrap_or(None).is_some() {
+        if self
+            .find_cached_snapshot_with_files(QWEN3_ASR_REPO_ID, &["config.json"])
+            .unwrap_or(None)
+            .is_some()
+            || self
+                .find_cached_snapshot_with_files(QWEN3_ALIGNER_REPO_ID, &["config.json"])
+                .unwrap_or(None)
+                .is_some()
+        {
             models.insert(QWEN3_ASR_MODEL_ID.to_string());
         }
 
@@ -904,13 +1003,13 @@ impl ModelManager {
     /// Setup for a new download: cancel previous download and create new token
     fn setup_new_download(&self) -> Result<Arc<CancellationToken>> {
         let mut active = ACTIVE_DOWNLOAD.lock().unwrap();
-        
+
         // Cancel and cleanup previous download if it exists
         if let Some(old_token) = active.take() {
             old_token.cancel();
             self.cleanup_stale_locks().ok();
         }
-        
+
         // Create new token for this download
         let new_token = Arc::new(CancellationToken::new());
         *active = Some(new_token.clone());
@@ -918,7 +1017,7 @@ impl ModelManager {
     }
 
     /// Downloads a model file from HuggingFace Hub with caching and progress support.
-    /// 
+    ///
     /// This function ensures only one download runs at a time by:
     /// 1. Cancelling any previous download
     /// 2. Cleaning up partial files from cancelled downloads
@@ -935,10 +1034,10 @@ impl ModelManager {
     ) -> Result<PathBuf> {
         // Setup: Cancel old download, create new token, cleanup partial files
         let cancel_token = self.setup_new_download()?;
-        
+
         // Increment generation counter to invalidate any stale callbacks
         DOWNLOAD_GENERATION.fetch_add(1, Ordering::Relaxed);
-        
+
         // Early cancellation
         if let Some(is_cancelled) = is_cancelled {
             if is_cancelled() {
@@ -968,7 +1067,9 @@ impl ModelManager {
                 Err(e) => {
                     tracing::warn!(
                         "Cached '{}' from '{}' is invalid ({}); removing before re-download",
-                        filename, repo_id, e
+                        filename,
+                        repo_id,
+                        e
                     );
                     let _ = remove_snapshot_file_and_blob(&cached);
                     self.cleanup_stale_locks().ok();
@@ -999,26 +1100,33 @@ impl ModelManager {
             scale,
             Some(Box::new({
                 let this = self;
-                move || { this.cleanup_stale_locks().ok(); }
+                move || {
+                    this.cleanup_stale_locks().ok();
+                }
             })),
             label,
             cancel_token.clone(),
         );
 
         let download_result = repo.download_with_progress(filename, prog);
-        
+
         // Check if this download was cancelled while it was running
         if cancel_token.is_cancelled() {
             bail!("Download cancelled");
         }
-        
+
         // Only propagate error if download wasn't cancelled. Include the underlying hf-hub error
         // message in the wrapper so users/triagers can see the real cause (TLS, lock acquisition,
         // file rename, DNS, etc.) instead of just the generic wrapper.
         let path = match download_result {
             Ok(p) => p,
             Err(e) => {
-                bail!("Failed to download '{}' from '{}': {}", filename, repo_id, e);
+                bail!(
+                    "Failed to download '{}' from '{}': {}",
+                    filename,
+                    repo_id,
+                    e
+                );
             }
         };
 
@@ -1031,19 +1139,40 @@ impl ModelManager {
             let _ = remove_snapshot_file_and_blob(&path);
             self.cleanup_stale_locks().ok();
 
-            let prog2 = DownloadProgress::new(progress, is_cancelled, offset, scale, None, label, cancel_token.clone());
+            let prog2 = DownloadProgress::new(
+                progress,
+                is_cancelled,
+                offset,
+                scale,
+                None,
+                label,
+                cancel_token.clone(),
+            );
             let path2 = match repo.download_with_progress(filename, prog2) {
                 Ok(p) => p,
-                Err(e) => bail!("Failed to re-download '{}' from '{}': {}", filename, repo_id, e),
+                Err(e) => bail!(
+                    "Failed to re-download '{}' from '{}': {}",
+                    filename,
+                    repo_id,
+                    e
+                ),
             };
-            validate_model_file(&path2)
-                .with_context(|| format!("Model validation failed for '{}' from '{}'", filename, repo_id))?;
+            validate_model_file(&path2).with_context(|| {
+                format!(
+                    "Model validation failed for '{}' from '{}'",
+                    filename, repo_id
+                )
+            })?;
 
-            if let Some(cb) = progress { cb((offset + scale) as i32, ProgressType::Download, label); }
+            if let Some(cb) = progress {
+                cb((offset + scale) as i32, ProgressType::Download, label);
+            }
             return Ok(path2);
         }
 
-        if let Some(cb) = progress { cb((offset + scale) as i32, ProgressType::Download, label); }
+        if let Some(cb) = progress {
+            cb((offset + scale) as i32, ProgressType::Download, label);
+        }
         Ok(path)
     }
 
@@ -1058,8 +1187,12 @@ impl ModelManager {
         if owner.is_empty() || repo.is_empty() {
             return Ok(None);
         }
-        let base = cache_root.join(format!("models--{}--{}", owner, repo)).join("snapshots");
-        if !base.exists() { return Ok(None); }
+        let base = cache_root
+            .join(format!("models--{}--{}", owner, repo))
+            .join("snapshots");
+        if !base.exists() {
+            return Ok(None);
+        }
 
         // IMPORTANT: snapshots are revision-hash directories and fs::read_dir order is arbitrary.
         // If we return the first match, we can accidentally use an older model even after a newer
@@ -1099,7 +1232,11 @@ impl ModelManager {
         Ok(None)
     }
 
-    fn find_cached_snapshot_with_files(&self, repo_id: &str, filenames: &[&str]) -> Result<Option<PathBuf>> {
+    fn find_cached_snapshot_with_files(
+        &self,
+        repo_id: &str,
+        filenames: &[&str],
+    ) -> Result<Option<PathBuf>> {
         let cache_root = self.model_cache_dir()?;
         let mut parts = repo_id.splitn(2, '/');
         let owner = parts.next().unwrap_or("");
@@ -1108,7 +1245,9 @@ impl ModelManager {
             return Ok(None);
         }
 
-        let base = cache_root.join(format!("models--{}--{}", owner, repo)).join("snapshots");
+        let base = cache_root
+            .join(format!("models--{}--{}", owner, repo))
+            .join("snapshots");
         if !base.exists() {
             return Ok(None);
         }
@@ -1147,8 +1286,14 @@ fn resolve_symlink_target(path: &Path) -> Result<PathBuf> {
     let metadata = fs::symlink_metadata(path).context("symlink_metadata failed")?;
     if metadata.file_type().is_symlink() {
         let target = fs::read_link(path).context("read_link failed")?;
-        let base = path.parent().ok_or_else(|| eyre!("Failed to get parent directory"))?;
-        Ok(if target.is_absolute() { target } else { base.join(target) })
+        let base = path
+            .parent()
+            .ok_or_else(|| eyre!("Failed to get parent directory"))?;
+        Ok(if target.is_absolute() {
+            target
+        } else {
+            base.join(target)
+        })
     } else {
         Ok(path.to_path_buf())
     }
@@ -1179,7 +1324,11 @@ fn validate_model_file(path: &Path) -> Result<()> {
         }
     };
     if md.len() < min_bytes {
-        bail!("Model blob seems too small ({} bytes): {}", md.len(), blob_path.display());
+        bail!(
+            "Model blob seems too small ({} bytes): {}",
+            md.len(),
+            blob_path.display()
+        );
     }
     let mut f = fs::File::open(&blob_path).context("open failed")?;
     let mut buf = [0u8; 16];
@@ -1194,7 +1343,10 @@ fn validate_model_file(path: &Path) -> Result<()> {
         if buf[..4] != GGUF_MAGIC {
             bail!(
                 "Model file does not start with GGUF magic bytes (got {:02x} {:02x} {:02x} {:02x}): {}",
-                buf[0], buf[1], buf[2], buf[3],
+                buf[0],
+                buf[1],
+                buf[2],
+                buf[3],
                 blob_path.display()
             );
         }
@@ -1208,13 +1360,23 @@ fn validate_model_file(path: &Path) -> Result<()> {
 }
 
 fn remove_snapshot_file_and_blob(path: &Path) -> Result<()> {
-    if !path.exists() { return Ok(()); }
+    if !path.exists() {
+        return Ok(());
+    }
     let metadata = fs::symlink_metadata(path).context("symlink_metadata failed")?;
     if metadata.file_type().is_symlink() {
         let target_path = fs::read_link(path).context("read_link failed")?;
-        let base = path.parent().ok_or_else(|| eyre!("Failed to get parent directory"))?;
-        let blob_path = if target_path.is_absolute() { target_path } else { base.join(target_path) };
-        if blob_path.exists() { let _ = fs::remove_file(&blob_path); }
+        let base = path
+            .parent()
+            .ok_or_else(|| eyre!("Failed to get parent directory"))?;
+        let blob_path = if target_path.is_absolute() {
+            target_path
+        } else {
+            base.join(target_path)
+        };
+        if blob_path.exists() {
+            let _ = fs::remove_file(&blob_path);
+        }
         let _ = fs::remove_file(path);
     } else if metadata.is_dir() {
         let _ = fs::remove_dir_all(path);
@@ -1246,7 +1408,9 @@ fn parse_hf_blob_url(url: &str) -> Option<(String, String)> {
 }
 
 async fn download_to(dest_path: &Path, url: &str) -> Result<()> {
-    if let Some(parent) = dest_path.parent() { fs::create_dir_all(parent).ok(); }
+    if let Some(parent) = dest_path.parent() {
+        fs::create_dir_all(parent).ok();
+    }
     let resp = reqwest::get(url).await.context("Failed to GET url")?;
     if !resp.status().is_success() {
         bail!("Failed to download '{}': status {}", url, resp.status());

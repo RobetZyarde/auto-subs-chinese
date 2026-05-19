@@ -1,5 +1,5 @@
-use eyre::Result;
 use diarize::raw::{EmbeddingExtractor, EmbeddingManager};
+use eyre::Result;
 use std::path::Path;
 
 #[derive(Debug, PartialEq)]
@@ -38,26 +38,27 @@ fn example_audio_segments_and_speakers_match_baseline() -> Result<()> {
     )?;
     let mut manager = EmbeddingManager::new(max_speakers);
 
-    let actual = diarize::raw::get_segments(&samples, sample_rate, "segmentation-community-1.onnx")?
-        .map(|segment| {
-            let segment = segment?;
-            let embedding = extractor.compute(&segment.samples)?;
-            let speaker = if manager.get_all_speakers().len() == max_speakers {
-                manager.get_best_speaker_match(embedding)?.to_string()
-            } else {
-                manager
-                    .search_speaker(embedding, 0.5)
-                    .map(|speaker| speaker.to_string())
-                    .unwrap_or_else(|| "?".to_string())
-            };
+    let actual =
+        diarize::raw::get_segments(&samples, sample_rate, "segmentation-community-1.onnx")?
+            .map(|segment| {
+                let segment = segment?;
+                let embedding = extractor.compute(&segment.samples)?;
+                let speaker = if manager.get_all_speakers().len() == max_speakers {
+                    manager.get_best_speaker_match(embedding)?.to_string()
+                } else {
+                    manager
+                        .search_speaker(embedding, 0.5)
+                        .map(|speaker| speaker.to_string())
+                        .unwrap_or_else(|| "?".to_string())
+                };
 
-            Ok(DiarizedSegment {
-                start: format!("{:.2}", segment.start),
-                end: format!("{:.2}", segment.end),
-                speaker,
+                Ok(DiarizedSegment {
+                    start: format!("{:.2}", segment.start),
+                    end: format!("{:.2}", segment.end),
+                    speaker,
+                })
             })
-        })
-        .collect::<Result<Vec<_>>>()?;
+            .collect::<Result<Vec<_>>>()?;
 
     let expected = vec![
         DiarizedSegment {

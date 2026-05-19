@@ -155,8 +155,6 @@ pub async fn ensure_python_env<R: Runtime>(app: AppHandle<R>) -> Result<(), Stri
     ensure_python_env_impl(app).await.map_err(|e| e.to_string())
 }
 
-
-
 /// Internal implementation for ensure_python_env.
 async fn ensure_python_env_impl<R: Runtime>(app: AppHandle<R>) -> Result<()> {
     ensure_python_env_inner(app).await
@@ -290,7 +288,9 @@ async fn ensure_python_env_inner<R: Runtime>(app: AppHandle<R>) -> Result<()> {
 /// Install CUDA-enabled PyTorch for GPU acceleration.
 #[tauri::command]
 pub async fn install_cuda_pytorch<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
-    install_cuda_pytorch_impl(app).await.map_err(|e| e.to_string())
+    install_cuda_pytorch_impl(app)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Internal implementation for install_cuda_pytorch.

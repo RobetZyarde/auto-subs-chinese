@@ -10,8 +10,8 @@ pub enum ProgressType {
 }
 
 // Shared callback types
-pub type LabeledProgressFn = dyn Fn(i32, ProgressType, &str) + Send + Sync;     // progress with type and label
-pub type NewSegmentFn = dyn Fn(&Segment) + Send + Sync;           // new segment notifications
+pub type LabeledProgressFn = dyn Fn(i32, ProgressType, &str) + Send + Sync; // progress with type and label
+pub type NewSegmentFn = dyn Fn(&Segment) + Send + Sync; // new segment notifications
 
 #[derive(Clone, Debug, Default)]
 pub struct AdvancedTranscribe {

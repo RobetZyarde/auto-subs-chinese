@@ -1,20 +1,20 @@
 pub mod audio;
 pub mod engine;
 pub mod engines;
-pub mod model_manager;
-pub mod vad;
-pub mod types;
-pub mod translate;
-pub mod utils;
 pub mod formatting;
+pub mod model_manager;
+pub mod translate;
+pub mod types;
+pub mod utils;
+pub mod vad;
 
 // Re-exports (crate users only need these)
-pub use engine::{Engine, EngineConfig, Callbacks, ContentFormatting};
-pub use vad::get_segments;
-pub use types::{TranscribeOptions, Segment, WordTimestamp, ProgressType};
+pub use engine::{Callbacks, ContentFormatting, Engine, EngineConfig};
+pub use formatting::{PostProcessConfig, TextCase, TextDensity, process_segments};
 pub use model_manager::ModelManager;
+pub use types::{ProgressType, Segment, TranscribeOptions, WordTimestamp};
 pub use utils::{get_translate_languages, get_whisper_languages};
-pub use formatting::{PostProcessConfig, process_segments, TextCase, TextDensity};
+pub use vad::get_segments;
 
 /// Install whisper.cpp logging hooks so output is routed through Rust's tracing system
 /// instead of raw stderr, allowing filters to suppress chatty internal logs.

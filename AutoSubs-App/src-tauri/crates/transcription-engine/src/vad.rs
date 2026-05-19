@@ -1,12 +1,9 @@
-use whisper_rs::{WhisperVadContext, WhisperVadContextParams, WhisperVadParams};
 use crate::types::SpeechSegment;
 use eyre::Result;
+use whisper_rs::{WhisperVadContext, WhisperVadContextParams, WhisperVadParams};
 
 /// Detect speech segments with Silero VAD via whisper-rs. Input `int_samples` must be mono i16 at 16_000 Hz.
-pub fn get_segments(
-    vad_model: &str,
-    int_samples: &[i16],
-) -> Result<Vec<SpeechSegment>> {
+pub fn get_segments(vad_model: &str, int_samples: &[i16]) -> Result<Vec<SpeechSegment>> {
     // Convert entire integer buffer to f32 for VAD processing
     let mut samples = vec![0.0f32; int_samples.len()];
     whisper_rs::convert_integer_to_float_audio(&int_samples, &mut samples)?;
@@ -40,7 +37,12 @@ pub fn get_segments(
                 Vec::new()
             };
 
-            SpeechSegment { start: start_sec, end: end_sec, samples: seg_samples, speaker_id: None }
+            SpeechSegment {
+                start: start_sec,
+                end: end_sec,
+                samples: seg_samples,
+                speaker_id: None,
+            }
         })
         .filter(|seg| seg.end > seg.start && !seg.samples.is_empty())
         .collect();

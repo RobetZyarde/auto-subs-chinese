@@ -17,8 +17,9 @@ fn main() {
     let mut manager = EmbeddingManager::new(max_speakers);
 
     // Use the new segmentation-community-1 model
-    let segments = diarize::raw::get_segments(&samples, sample_rate, "segmentation-community-1.onnx")
-        .expect("Failed to get segments");
+    let segments =
+        diarize::raw::get_segments(&samples, sample_rate, "segmentation-community-1.onnx")
+            .expect("Failed to get segments");
 
     for segment in segments {
         match segment {

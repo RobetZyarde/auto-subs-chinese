@@ -1,5 +1,5 @@
-use eyre::{Result, bail, WrapErr};
-use hound::{WavReader, SampleFormat, WavSpec, WavWriter};
+use eyre::{Result, WrapErr, bail};
+use hound::{SampleFormat, WavReader, WavSpec, WavWriter};
 
 pub fn read_wav(path: &str) -> Result<Vec<i16>> {
     tracing::debug!("wav reader read from {:?}", path);
@@ -20,7 +20,10 @@ pub fn read_wav(path: &str) -> Result<Vec<i16>> {
         bail!("expected 16 bits per sample");
     }
 
-    reader.into_samples::<i16>().map(|x| x.context("sample")).collect()
+    reader
+        .into_samples::<i16>()
+        .map(|x| x.context("sample"))
+        .collect()
 }
 
 pub fn write_wav(path: &str, samples: &[i16]) -> Result<()> {
@@ -32,7 +35,9 @@ pub fn write_wav(path: &str, samples: &[i16]) -> Result<()> {
     };
     let mut writer = WavWriter::create(path, spec).context("failed to create file")?;
     for &sample in samples {
-        writer.write_sample(sample).context("failed to write sample")?;
+        writer
+            .write_sample(sample)
+            .context("failed to write sample")?;
     }
     Ok(())
 }

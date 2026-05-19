@@ -21,7 +21,9 @@ fn print_usage(program: &str) {
 
 fn parse_args() -> Result<CliArgs> {
     let mut args = std::env::args().skip(1);
-    let program = std::env::args().next().unwrap_or_else(|| "cargo run --example cache --".into());
+    let program = std::env::args()
+        .next()
+        .unwrap_or_else(|| "cargo run --example cache --".into());
 
     let mut cache_dir = PathBuf::from("./cache");
     let mut command: Option<Command> = None;
@@ -29,13 +31,18 @@ fn parse_args() -> Result<CliArgs> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--cache-dir" => {
-                cache_dir = PathBuf::from(args.next().ok_or_else(|| eyre!("missing value for --cache-dir"))?);
+                cache_dir = PathBuf::from(
+                    args.next()
+                        .ok_or_else(|| eyre!("missing value for --cache-dir"))?,
+                );
             }
             "list" => {
                 command = Some(Command::List);
             }
             "delete" => {
-                let model = args.next().ok_or_else(|| eyre!("missing model name for delete"))?;
+                let model = args
+                    .next()
+                    .ok_or_else(|| eyre!("missing model name for delete"))?;
                 command = Some(Command::Delete { model });
             }
             "-h" | "--help" => {
@@ -64,7 +71,10 @@ fn main() -> Result<()> {
 
     match args.command {
         Command::List => {
-            println!("Checking cached Whisper models in: {}", args.cache_dir.display());
+            println!(
+                "Checking cached Whisper models in: {}",
+                args.cache_dir.display()
+            );
             let models = list_cached_models(&args.cache_dir)?;
             if models.is_empty() {
                 println!("No cached Whisper models found.");
@@ -76,7 +86,10 @@ fn main() -> Result<()> {
             }
         }
         Command::Delete { model } => {
-            println!("Deleting cached Whisper model '{model}' from {}", args.cache_dir.display());
+            println!(
+                "Deleting cached Whisper model '{model}' from {}",
+                args.cache_dir.display()
+            );
             let deleted = delete_cached_model(&args.cache_dir, &model);
             if deleted {
                 println!("Successfully deleted model: {model}");

@@ -58,7 +58,8 @@ pub fn segment_speech(
     sample_rate: u32,
     options: &DiarizeOptions,
 ) -> Result<Vec<SpeechSegment>> {
-    let diarize_segments = segment::get_segments(samples, sample_rate, &options.segment_model_path)?;
+    let diarize_segments =
+        segment::get_segments(samples, sample_rate, &options.segment_model_path)?;
     let mut speech_segments = Vec::new();
 
     for segment in diarize_segments {

@@ -19,7 +19,9 @@ fn print_usage(program: &str) {
 
 fn parse_args() -> Result<CliArgs> {
     let mut args = std::env::args().skip(1);
-    let program = std::env::args().next().unwrap_or_else(|| "cargo run --example translate --".into());
+    let program = std::env::args()
+        .next()
+        .unwrap_or_else(|| "cargo run --example translate --".into());
 
     let mut text: Option<String> = None;
     let mut from = "auto".to_string();
@@ -29,7 +31,9 @@ fn parse_args() -> Result<CliArgs> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--from" => {
-                from = args.next().ok_or_else(|| eyre!("missing value for --from"))?;
+                from = args
+                    .next()
+                    .ok_or_else(|| eyre!("missing value for --from"))?;
             }
             "--to" => {
                 to = args.next().ok_or_else(|| eyre!("missing value for --to"))?;
@@ -83,7 +87,10 @@ async fn main() -> Result<()> {
     let args = parse_args()?;
 
     if args.list_languages {
-        println!("Supported target languages: {:?}", get_translate_languages());
+        println!(
+            "Supported target languages: {:?}",
+            get_translate_languages()
+        );
         return Ok(());
     }
 

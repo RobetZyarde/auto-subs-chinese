@@ -1,4 +1,6 @@
-use crate::types::{SpeechSegment, Segment, TranscribeOptions, LabeledProgressFn, NewSegmentFn, ProgressType};
+use crate::types::{
+    LabeledProgressFn, NewSegmentFn, ProgressType, Segment, SpeechSegment, TranscribeOptions,
+};
 use eyre::{Result, eyre};
 use std::path::Path;
 use transcribe_rs::onnx::{
@@ -38,7 +40,9 @@ pub fn is_moonshine_model(model_name: &str) -> bool {
     model_name.to_lowercase().starts_with("moonshine-")
 }
 
-pub fn moonshine_variant_from_model_name(model_name: &str) -> Option<(MoonshineVariant, Option<&'static str>)> {
+pub fn moonshine_variant_from_model_name(
+    model_name: &str,
+) -> Option<(MoonshineVariant, Option<&'static str>)> {
     let m = model_name.to_lowercase();
     let suffix = m.strip_prefix("moonshine-")?;
 
@@ -72,7 +76,10 @@ pub async fn transcribe_moonshine(
     let mut model = MoonshineModel::load(model_path, variant, &Quantization::default())
         .map_err(|e| eyre!("Failed to load Moonshine model: {}", e))?;
 
-    let params = MoonshineParams { max_length: None, ..Default::default() };
+    let params = MoonshineParams {
+        max_length: None,
+        ..Default::default()
+    };
     let user_offset = options.offset.unwrap_or(0.0);
 
     let mut expanded: Vec<SpeechSegment> = Vec::new();
@@ -84,7 +91,8 @@ pub async fn transcribe_moonshine(
     let mut segments: Vec<Segment> = Vec::new();
 
     for (i, speech_segment) in expanded.iter().enumerate() {
-        let samples: Vec<f32> = speech_segment.samples
+        let samples: Vec<f32> = speech_segment
+            .samples
             .iter()
             .map(|&s| s as f32 / 32768.0)
             .collect();
@@ -97,7 +105,11 @@ pub async fn transcribe_moonshine(
         if text.is_empty() {
             if let Some(progress_callback) = progress_callback {
                 let progress = ((i + 1) as f64 / total_segments as f64 * 100.0) as i32;
-                progress_callback(progress, ProgressType::Transcribe, "progressSteps.transcribe");
+                progress_callback(
+                    progress,
+                    ProgressType::Transcribe,
+                    "progressSteps.transcribe",
+                );
             }
             continue;
         }
@@ -137,7 +149,11 @@ pub async fn transcribe_moonshine(
 
         if let Some(progress_callback) = progress_callback {
             let progress = ((i + 1) as f64 / total_segments as f64 * 100.0) as i32;
-            progress_callback(progress, ProgressType::Transcribe, "progressSteps.transcribe");
+            progress_callback(
+                progress,
+                ProgressType::Transcribe,
+                "progressSteps.transcribe",
+            );
         }
     }
 
