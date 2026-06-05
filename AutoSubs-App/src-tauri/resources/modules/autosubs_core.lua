@@ -777,7 +777,11 @@ function ExportAudio(outputDir, inputTracks, exportRange)
             })
         end
 
-        local outputFilename = renderSettings["OutputFilename"] or (exportName .. ".wav")
+        -- Do not read OutputFilename back from GetRenderJobList here. Resolve can
+        -- return a stale render-job entry when the queue already contains video
+        -- jobs, which makes AutoSubs report the previous MP4 as the exported
+        -- audio path. The current audio-only render is named by CustomName.
+        local outputFilename = exportName .. ".wav"
 
         audioInfo = {
             path = join_path(renderSettings["TargetDir"], outputFilename),
@@ -1167,7 +1171,8 @@ local function apply_subtitle_text(timelineItems, subtitles, speakers, speakersE
             local subtitle = subtitles[i]
             local subtitleText = subtitle["text"]
 
-            if timelineItem:GetFusionCompCount() > 0 then
+            local fusionCompCount = timelineItem:GetFusionCompCount() or 0
+            if fusionCompCount > 0 then
                 local comp = timelineItem:GetFusionCompByIndex(1)
                 local template = comp:FindTool("Template") or comp:FindToolByID("TextPlus")
                 if isAnimated then
@@ -1433,7 +1438,8 @@ function GeneratePreview(speaker, templateName, presetSettings, exportDir, langu
 
     local outputPath = nil
     local success, err = pcall(function()
-        if timelineItem:GetFusionCompCount() > 0 then
+        local fusionCompCount = timelineItem:GetFusionCompCount() or 0
+        if fusionCompCount > 0 then
             local comp = timelineItem:GetFusionCompByIndex(1)
             local tool = comp:FindToolByID("TextPlus")
             tool:SetInput("StyledText", "Subtitle Example Text")
