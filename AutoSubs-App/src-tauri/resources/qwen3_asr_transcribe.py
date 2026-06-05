@@ -8,7 +8,9 @@ from stdout. Diagnostics must go to stderr so stdout stays parseable.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
+import os
 import sys
 import wave
 from dataclasses import dataclass
@@ -61,6 +63,22 @@ CJK_LANGUAGES = {"Chinese", "Cantonese", "Japanese", "Korean"}
 SENTENCE_ENDINGS = set("。！？.!?\n")
 SEGMENT_GAP_SECONDS = 0.45
 PROGRESS_PREFIX = "AUTOSUBS_QWEN_PROGRESS "
+
+
+def should_use_flash_attention() -> bool:
+    """Enable FlashAttention-2 when it is installed, with an env override.
+
+    AUTOSUBS_QWEN_FLASH_ATTN=1 forces it on and lets Transformers report a
+    precise dependency/runtime error. AUTOSUBS_QWEN_FLASH_ATTN=0 disables it.
+    The default is opportunistic so the sidecar keeps working on Windows
+    environments that cannot install flash-attn yet.
+    """
+    value = os.environ.get("AUTOSUBS_QWEN_FLASH_ATTN", "auto").strip().lower()
+    if value in {"0", "false", "no", "off", "disabled"}:
+        return False
+    if value in {"1", "true", "yes", "on", "enabled"}:
+        return True
+    return importlib.util.find_spec("flash_attn") is not None
 
 
 @dataclass
@@ -277,6 +295,8 @@ def transcribe(args: argparse.Namespace) -> dict[str, Any]:
         "max_inference_batch_size": args.max_batch_size,
         "max_new_tokens": args.max_new_tokens,
     }
+    if use_cuda and should_use_flash_attention():
+        model_kwargs["attn_implementation"] = "flash_attention_2"
     if args.alignment:
         model_kwargs["forced_aligner"] = ALIGNER_MODEL
         model_kwargs["forced_aligner_kwargs"] = {"dtype": dtype, "device_map": device_map}
