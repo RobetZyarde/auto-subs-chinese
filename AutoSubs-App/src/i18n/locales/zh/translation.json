@@ -478,6 +478,7 @@
     "resolve": {
       "productName": "DaVinci Resolve",
       "description": "工作区脚本集成",
+      "resetLink": "重置 Resolve 连接",
       "tooltip": {
         "connected": "已连接",
         "canGetAudio": "您可以从时间线获取音频，并将字幕添加回时间线。",

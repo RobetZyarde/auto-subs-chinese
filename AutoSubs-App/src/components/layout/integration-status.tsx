@@ -1,4 +1,4 @@
-import { ChevronDown, Check, RotateCcw } from "lucide-react";
+import { ChevronDown, Check, RotateCcw, Unplug } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
 
 export function IntegrationStatus() {
   const { t } = useTranslation();
-  const { timelineInfo: resolveTimeline, refresh: refreshResolve } =
+  const { timelineInfo: resolveTimeline, refresh: refreshResolve, resetLink: resetResolveLink } =
     useResolve();
   const {
     premiereTimeline,
@@ -181,6 +181,17 @@ export function IntegrationStatus() {
             <RotateCcw className="size-4" />
             <span>{t("common.refresh", "Refresh connection")}</span>
           </DropdownMenuItem>
+          {selectedIntegration === "davinci" ? (
+            <DropdownMenuItem
+              onClick={() => {
+                void resetResolveLink();
+              }}
+              className="cursor-pointer"
+            >
+              <Unplug className="size-4" />
+              <span>{t("titlebar.resolve.resetLink", "Reset Resolve link")}</span>
+            </DropdownMenuItem>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

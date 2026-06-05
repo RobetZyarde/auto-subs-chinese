@@ -482,6 +482,7 @@
     "resolve": {
       "productName": "DaVinci Resolve",
       "description": "Workspace Scripts integration",
+      "resetLink": "Reset Resolve link",
       "tooltip": {
         "connected": "Connected",
         "canGetAudio": "Ready to add subtitles.",

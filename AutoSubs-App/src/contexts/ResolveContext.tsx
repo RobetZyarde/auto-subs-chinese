@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Template, TimelineInfo } from '@/types';
-import { getTimelineInfo, getTemplates, cancelExport, addSubtitlesToTimeline } from '@/api/resolve-api';
+import { getTimelineInfo, getTemplates, cancelExport, addSubtitlesToTimeline, closeResolveLink } from '@/api/resolve-api';
 import { useIntegration } from '@/contexts/IntegrationContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { validateExportedAudioFile } from '@/utils/file-utils';
@@ -16,6 +16,7 @@ interface ResolveContextType {
   exportProgress: number;
   cancelRequestedRef: React.MutableRefObject<boolean>;
   refresh: () => Promise<void>;
+  resetLink: () => Promise<void>;
   refreshTemplates: () => Promise<Template[]>;
   pushToTimeline: (filename?: string, selectedTemplate?: string, selectedOutputTrack?: string, presetSettings?: Record<string, unknown>) => Promise<void>;
   getSourceAudio: (audioInputMode: "file" | "timeline", fileInput: string | null, inputTracks: string[]) => Promise<{ path: string, offset: number } | null>;
@@ -27,11 +28,22 @@ interface ResolveContextType {
 
 
 const ResolveContext = createContext<ResolveContextType | null>(null);
+const EMPTY_TIMELINE_INFO: TimelineInfo = { name: "", timelineId: "", templates: [], inputTracks: [], outputTracks: [], projectName: "" };
+
+function isResolveUnavailable(errorMessage: string): boolean {
+  return (
+    errorMessage.includes('Connection refused') ||
+    errorMessage.includes('tcp connect error') ||
+    errorMessage.includes('No timeline detected') ||
+    errorMessage.includes('Resolve link unavailable') ||
+    errorMessage.includes('Resolve project link is stale')
+  );
+}
 
 export function ResolveProvider({ children }: { children: React.ReactNode }) {
   const { selectedIntegration } = useIntegration();
   const { settings } = useSettings();
-  const [timelineInfo, setTimelineInfo] = useState<TimelineInfo>({ name: "", timelineId: "", templates: [], inputTracks: [], outputTracks: [], projectName: "" });
+  const [timelineInfo, setTimelineInfo] = useState<TimelineInfo>(EMPTY_TIMELINE_INFO);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
@@ -41,7 +53,6 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportProgress, setExportProgress] = useState<number>(0);
   const cancelRequestedRef = useRef<boolean>(false);
-  const emptyTimelineInfo: TimelineInfo = { name: "", timelineId: "", templates: [], inputTracks: [], outputTracks: [], projectName: "" };
 
   const refresh = useCallback(async () => {
     try {
@@ -51,7 +62,7 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
       // Silently fail for connection errors to avoid console flooding
       // The calling context can handle UI updates if needed
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('Connection refused') || errorMessage.includes('tcp connect error')) {
+      if (isResolveUnavailable(errorMessage)) {
         // Connection refused - Resolve is not running, fail silently
         return;
       }
@@ -59,6 +70,21 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
   }, [templates]);
+
+  const resetLink = useCallback(async () => {
+    try {
+      await closeResolveLink();
+    } catch {
+      // Already disconnected is a valid reset outcome.
+    } finally {
+      setTimelineInfo(EMPTY_TIMELINE_INFO);
+      setTemplates([]);
+      setTemplatesLoading(false);
+      setTemplatesLoaded(false);
+      setIsExporting(false);
+      setExportProgress(0);
+    }
+  }, []);
 
   const refreshTemplates = useCallback(async () => {
     if (templatesLoaded) {
@@ -81,7 +107,7 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     if (selectedIntegration !== "davinci") {
-      setTimelineInfo(emptyTimelineInfo);
+      setTimelineInfo(EMPTY_TIMELINE_INFO);
       setTemplates([]);
       setTemplatesLoading(false);
       setTemplatesLoaded(false);
@@ -98,12 +124,8 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         if (cancelled) return;
         const errorMessage = error instanceof Error ? error.message : String(error);
-        if (
-          errorMessage.includes('Connection refused') ||
-          errorMessage.includes('tcp connect error') ||
-          errorMessage.includes('No timeline detected')
-        ) {
-          setTimelineInfo(emptyTimelineInfo);
+        if (isResolveUnavailable(errorMessage)) {
+          setTimelineInfo(EMPTY_TIMELINE_INFO);
         }
       } finally {
         inFlight = false;
@@ -292,6 +314,7 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
       exportProgress,
       cancelRequestedRef,
       refresh,
+      resetLink,
       refreshTemplates,
       pushToTimeline,
       getSourceAudio,

@@ -125,6 +125,7 @@ export async function jumpToTime(seconds: number) {
 
 export async function getTimelineInfo() {
   const data = await callResolve({ func: 'GetTimelineInfo' });
+  throwIfError(data, 'GetTimelineInfo');
   if (!data.timelineId) {
     throw new Error('No timeline detected in Resolve.');
   }
@@ -220,11 +221,15 @@ export async function closeResolveLink() {
 }
 
 export async function getExportProgress() {
-  return callResolve({ func: 'GetExportProgress' });
+  const data = await callResolve({ func: 'GetExportProgress' });
+  throwIfError(data, 'GetExportProgress');
+  return data;
 }
 
 export async function cancelExport() {
-  return callResolve({ func: 'CancelExport' });
+  const data = await callResolve({ func: 'CancelExport' });
+  throwIfError(data, 'CancelExport');
+  return data;
 }
 
 export async function getRenderJobStatus() {

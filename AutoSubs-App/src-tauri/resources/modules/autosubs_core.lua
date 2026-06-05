@@ -6,7 +6,10 @@ local ffi = ffi
 -- resolve is provided implicitly by the Resolve environment - no need to call Resolve() unless running in terminal
 local resolve = rawget(_G, "resolve")
 if resolve == nil and type(rawget(_G, "Resolve")) == "function" then
-    resolve = Resolve()
+    local okResolve, initialResolve = pcall(Resolve)
+    if okResolve then
+        resolve = initialResolve
+    end
 end
 
 local DEV_MODE = false
@@ -86,10 +89,12 @@ local resources_path
 local main_app
 local command_open
 
--- Load Resolve objects
-local projectManager = resolve:GetProjectManager()
-local project = projectManager:GetCurrentProject()
-local mediaPool = project:GetMediaPool()
+-- Resolve handles are refreshed at request time. Resolve can keep the Lua/HTTP
+-- server alive while its current project binding goes stale after project
+-- switches, restarts, or script reruns.
+local projectManager = nil
+local project = nil
+local mediaPool = nil
 
 local ANIMATED_CAPTION = "AutoSubs Caption"
 local defaultTemplateImportAttempted = false
@@ -137,6 +142,49 @@ end
 -- "something went wrong".
 local function make_error(short, detail)
     return { error = short, detail = tostring(detail or "") }
+end
+
+local function refresh_resolve_project_binding()
+    if resolve == nil and type(rawget(_G, "Resolve")) == "function" then
+        local okResolve, nextResolve = pcall(Resolve)
+        if okResolve then
+            resolve = nextResolve
+        end
+    end
+
+    if resolve == nil then
+        return nil, make_error("Resolve link unavailable",
+            "Resolve scripting object is nil. Run Workspace > Scripts > AutoSubs inside DaVinci Resolve.")
+    end
+
+    local managerOk, nextProjectManager = pcall(function()
+        return resolve:GetProjectManager()
+    end)
+    if not managerOk or nextProjectManager == nil then
+        return nil, make_error("Resolve project link is stale",
+            "resolve:GetProjectManager() failed or returned nil: " .. tostring(nextProjectManager))
+    end
+
+    local projectOk, nextProject = pcall(function()
+        return nextProjectManager:GetCurrentProject()
+    end)
+    if not projectOk or nextProject == nil then
+        return nil, make_error("Resolve project link is stale",
+            "projectManager:GetCurrentProject() failed or returned nil. The AutoSubs Lua/HTTP server is still connected, but the Resolve project binding must be refreshed by re-running Workspace > Scripts > AutoSubs.")
+    end
+
+    local mediaPoolOk, nextMediaPool = pcall(function()
+        return nextProject:GetMediaPool()
+    end)
+    if not mediaPoolOk or nextMediaPool == nil then
+        return nil, make_error("Resolve project link is stale",
+            "project:GetMediaPool() failed or returned nil: " .. tostring(nextMediaPool))
+    end
+
+    projectManager = nextProjectManager
+    project = nextProject
+    mediaPool = nextMediaPool
+    return true
 end
 
 -- Function to read a JSON file. Returns the decoded table on success, or
@@ -1660,15 +1708,30 @@ function StartServer()
     assert(server:set_option("nodelay", true, "tcp"))
     assert(server:set_option("reuseaddr", true))
 
-    -- Bind and listen
-    local success, err = pcall(function()
-        assert(server:bind(info))
-    end)
+    -- Bind and listen. If an older AutoSubs Lua server still owns the port,
+    -- ask it to exit and retry instead of leaving users stuck until reboot.
+    local bound = false
+    local lastBindErr = nil
+    for attempt = 1, 8 do
+        local success, err = pcall(function()
+            assert(server:bind(info))
+        end)
 
-    if not success then
+        if success then
+            bound = true
+            break
+        end
+
+        lastBindErr = err
+        print("[AutoSubs Server] Port " .. tostring(PORT) ..
+            " is busy; asking existing AutoSubs link to exit (attempt " .. tostring(attempt) .. "/8)")
         send_exit_via_socket()
-        sleep(0.5)
-        assert(server:bind(info))
+        sleep(math.min(0.25 * attempt, 1.5))
+    end
+
+    if not bound then
+        error("Failed to bind AutoSubs link server on port " .. tostring(PORT) ..
+            " after resetting the existing link: " .. tostring(lastBindErr))
     end
 
     assert(server:listen())
@@ -1751,6 +1814,15 @@ function StartServer()
                     -- success already defined above
                     success, err = pcall(function()
                         if data ~= nil then
+                            if data.func ~= "Ping" and data.func ~= "Exit" then
+                                local bindingOk, bindingErr = refresh_resolve_project_binding()
+                                if not bindingOk then
+                                    body = json.encode(bindingErr)
+                                    quitServer = true
+                                    return
+                                end
+                            end
+
                             if data.func == "GetTimelineInfo" then
                                 print("[AutoSubs Server] Retrieving Timeline Info...")
                                 local timelineInfo = GetTimelineInfo()
