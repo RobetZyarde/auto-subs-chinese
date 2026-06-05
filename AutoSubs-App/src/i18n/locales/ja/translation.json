@@ -6,12 +6,16 @@
     "subtitleStyleDescription": "字幕",
     "model": "モデル",
     "censor": {
+      "title": "不適切な言葉を検閲",
+      "wordCount": "{{count}} 語",
       "dialogDescription": "字幕で検閲する単語を追加してください。",
       "dialogTitle": "不適切な言葉を検閲",
       "empty": "検閲する単語がありません。",
       "inputPlaceholder": "検閲する単語を追加",
-      "title": "単語を検閲",
-      "wordCount": "{{count}} 語"
+      "lists": "単語リスト",
+      "customSection": "カスタム単語",
+      "customSectionDescription": "検閲する個別の単語を入力してください。",
+      "listWordCount": "{{count}} 語"
     },
     "common": {
       "auto": "自動",
@@ -48,13 +52,9 @@
       "customCharsDescription": "1行あたりの文字数",
       "customPromptButton": "プロンプト",
       "customPromptTitle": "語彙とコンテキスト",
-      "customPromptDescription": "Whisperが名前、ブランド、専門用語、略語、優先表記を認識しやすくします。",
-      "customPromptTermsTitle": "重要な用語",
-      "customPromptTermsPlaceholder": "名前、ブランド、略語、専門用語を入力...",
-      "customPromptTermsExample": "例: OpenAI, DaVinci Resolve, SubSlate, FFmpeg",
-      "customPromptContextTitle": "コンテキスト / スタイルメモ",
-      "customPromptContextPlaceholder": "短い話題や表記の希望を入力...",
-      "customPromptContextExample": "例: DaVinci Resolveのチュートリアルです。「Auto Subs」ではなく「AutoSubs」を優先してください。",
+      "customPromptDescription": "Whisperを導くための用語、名前、またはコンテキストを追加します。",
+      "customPromptPlaceholder": "例: OpenAI, DaVinci Resolve — Resolveでのサブタイトル編集チュートリアル。",
+      "customPromptLanguageWarning": "音声と同じ言語で書いてください — 異なる言語のプロンプトは誤った文字起こしを引き起こす可能性があります。",
       "customPromptWhisperOnly": "Whisperモデルでのみサポートされています。"
     },
     "language": {
@@ -115,6 +115,7 @@
   "completion": {
     "processingComplete": "処理完了",
     "subtitlesReady": "字幕の準備ができました！",
+    "noSpeechDetected": "音声が検出されませんでした。オーディオファイルが無音か、認識可能な音声が含まれていない可能性があります。",
     "viewSubtitles": "字幕を表示",
     "exportToFile": "ファイルに書き出し",
     "addToTimeline": "タイムラインに追加"
@@ -441,6 +442,13 @@
       "delete_title": "文字起こしを削除しますか？",
       "delete_description": "履歴から文字起こしが完全に削除されます。この操作は取り消せません。"
     },
+    "update": {
+      "downloading": "アップデートをダウンロード中",
+      "installing": "アップデートをインストール中",
+      "restarting": "AutoSubs を再起動中",
+      "installUpdateNow": "インストールして再起動",
+      "newVersionAvailable": "アップデートがあります"
+    },
     "resolve": {
       "productName": "DaVinci Resolve",
       "description": "ワークスペーススクリプト連携",
@@ -476,6 +484,17 @@
     }
   },
   "addToTimeline": {
+    "steps": {
+      "outputTrack": {
+        "title": "トラック"
+      },
+      "template": {
+        "title": "スタイル"
+      },
+      "speakers": {
+        "title": "話者"
+      }
+    },
     "conflict": {
       "hasConflicts": "このトラックには競合するクリップがあります。字幕が既存のコンテンツと重複する可能性があります。"
     },

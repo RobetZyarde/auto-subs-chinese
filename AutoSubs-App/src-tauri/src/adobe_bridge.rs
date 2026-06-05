@@ -15,6 +15,8 @@ const ADOBE_BRIDGE_ADDR: &str = "127.0.0.1:8185";
 pub struct AdobeConnection {
     pub id: u64,
     pub sender: mpsc::Sender<String>,
+    #[allow(dead_code)]
+    pub app_name: String,
 }
 
 pub struct AdobeState {
@@ -126,6 +128,7 @@ async fn handle_connection(
             AdobeConnection {
                 id: connection_id,
                 sender: tx,
+                app_name: detected_app.clone(),
             },
         );
     }

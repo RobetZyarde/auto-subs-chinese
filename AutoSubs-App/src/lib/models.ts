@@ -17,19 +17,23 @@ export const modelFilterOrders = {
     "moonshine-tiny-ko", "moonshine-tiny-uk", "moonshine-tiny-vi",
     "moonshine-base",
     // 2GB RAM
-    "moonshine-base-es", "parakeet",
+    "small.en", "small", "parakeet",
     // 4GB+ RAM
-    "qwen3-asr"
+    "qwen3-asr", "medium.en", "medium", "large-v3-turbo",
+    // 10GB RAM
+    "large-v3"
   ],
   accuracy: [
-    "qwen3-asr", "parakeet", "moonshine-tiny-vi", "moonshine-tiny-ar", "moonshine-tiny-zh",
-    "moonshine-tiny-ja", "moonshine-tiny-ko", "moonshine-base", "moonshine-base-es",
-    "moonshine-tiny-uk", "moonshine-tiny"
+    "qwen3-asr", "large-v3", "large-v3-turbo", "parakeet", "moonshine-tiny-vi",
+    "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja", "moonshine-tiny-ko",
+    "medium.en", "medium", "moonshine-base", "small.en", "small", "moonshine-tiny-uk",
+    "tiny", "tiny.en", "base", "base.en", "moonshine-tiny"
   ],
   recommended: [
-    "qwen3-asr", "parakeet", "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja",
-    "moonshine-tiny-ko", "moonshine-tiny-uk", "moonshine-tiny-vi", "moonshine-base",
-    "moonshine-base-es", "moonshine-tiny"
+    "qwen3-asr", "parakeet", "large-v3-turbo", "large-v3", "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja",
+    "moonshine-tiny-ko", "moonshine-tiny-uk", "moonshine-tiny-vi", "moonshine-base", "small.en", "small",
+    "medium", "medium.en",
+    "tiny", "tiny.en", "base", "base.en", "moonshine-tiny"
   ]
 };
 
@@ -177,20 +181,6 @@ export const models: Model[] = [
     languageSupport: { kind: "single_language", language: "en" },
     accuracy: 2,
     weight: 4,
-    isDownloaded: false,
-  },
-  {
-    value: "moonshine-base-es",
-    label: "models.moonshine_base_es.label",
-    description: "models.moonshine_base_es.description",
-    size: "350MB",
-    ram: "2GB",
-    image: "/owl.png",
-    details: "models.moonshine_base_es.details",
-    badge: "models.moonshine_base_es.badge",
-    languageSupport: { kind: "single_language", language: "es" },
-    accuracy: 2,
-    weight: 3,
     isDownloaded: false,
   },
 ];

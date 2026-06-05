@@ -6,12 +6,16 @@
     "subtitleStyleDescription": "자막",
     "model": "모델",
     "censor": {
+      "title": "민감한 단어 검열",
+      "wordCount": "{{count}}개 단어",
       "dialogDescription": "자막에서 검열할 단어를 추가하세요.",
       "dialogTitle": "민감한 단어 검열",
       "empty": "검열된 단어가 없습니다.",
       "inputPlaceholder": "검열할 단어 추가",
-      "title": "단어 검열",
-      "wordCount": "{{count}}개 단어"
+      "lists": "단어 목록",
+      "customSection": "사용자 정의 단어",
+      "customSectionDescription": "검열할 개별 단어를 입력하세요.",
+      "listWordCount": "{{count}}개 단어"
     },
     "common": {
       "auto": "자동",
@@ -51,13 +55,9 @@
       "customCharsDescription": "줄당 문자 수",
       "customPromptButton": "프롬프트",
       "customPromptTitle": "어휘 및 맥락",
-      "customPromptDescription": "Whisper가 이름, 브랜드, 전문 용어, 약어, 선호 표기를 더 잘 인식하도록 돕습니다.",
-      "customPromptTermsTitle": "주요 용어",
-      "customPromptTermsPlaceholder": "이름, 브랜드, 약어 또는 전문 용어 입력...",
-      "customPromptTermsExample": "예: OpenAI, DaVinci Resolve, SubSlate, FFmpeg",
-      "customPromptContextTitle": "맥락 / 스타일 메모",
-      "customPromptContextPlaceholder": "짧은 주제나 선호 표기 입력...",
-      "customPromptContextExample": "예: DaVinci Resolve 튜토리얼입니다. “Auto Subs”보다 “AutoSubs” 표기를 선호합니다.",
+      "customPromptDescription": "Whisper를 안내하기 위한 용어, 이름 또는 맥락을 추가하세요.",
+      "customPromptPlaceholder": "예: OpenAI, DaVinci Resolve — Resolve의 자막 편집 튜토리얼.",
+      "customPromptLanguageWarning": "오디오와 같은 언어로 작성하세요 — 다른 언어의 프롬프트는 잘못된 전사를 유발할 수 있습니다.",
       "customPromptWhisperOnly": "Whisper 모델에서만 지원됩니다."
     },
     "language": {
@@ -115,6 +115,7 @@
   "completion": {
     "processingComplete": "처리 완료",
     "subtitlesReady": "자막이 준비되었습니다!",
+    "noSpeechDetected": "음성이 감지되지 않았습니다. 오디오 파일이 무음이거나 인식 가능한 음성이 포함되어 있지 않을 수 있습니다.",
     "viewSubtitles": "자막 보기",
     "exportToFile": "파일로 내보내기",
     "addToTimeline": "타임라인에 추가"
@@ -441,6 +442,13 @@
       "delete_title": "전사 내용을 삭제할까요?",
       "delete_description": "기록에서 전사 내용이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
     },
+    "update": {
+      "downloading": "업데이트 다운로드 중",
+      "installing": "업데이트 설치 중",
+      "restarting": "AutoSubs 다시 시작 중",
+      "installUpdateNow": "설치 후 다시 시작",
+      "newVersionAvailable": "업데이트 사용 가능"
+    },
     "resolve": {
       "productName": "DaVinci Resolve",
       "description": "워크스페이스 스크립트 통합",
@@ -476,6 +484,17 @@
     }
   },
   "addToTimeline": {
+    "steps": {
+      "outputTrack": {
+        "title": "트랙"
+      },
+      "template": {
+        "title": "스타일"
+      },
+      "speakers": {
+        "title": "화자"
+      }
+    },
     "conflict": {
       "hasConflicts": "이 트랙에 충돌하는 클립이 있습니다. 자막이 기존 콘텐츠와 겹칠 수 있습니다."
     },

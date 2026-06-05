@@ -16,6 +16,7 @@ import { diarizeModel } from "@/lib/models";
 import SubSlateCard from "@/components/ui/SubSlateCard";
 import type { TranscriptionOptions } from "@/types";
 import type { SubtitleDocumentListItem } from "@/utils/file-utils";
+import { getActiveCensorWords } from "@/censor/merge";
 import { TranscriptionPanelView } from "./transcription-panel-view";
 import { describeError } from "./utils";
 
@@ -258,6 +259,7 @@ export function TranscriptionPanel({
     setExportProgress(0);
     setLabeledProgress(null);
     cancelRequestedRef.current = false;
+    setFileInput(null);
     if (settings.audioInputMode === "timeline") {
       await refreshAudioTracks();
     }
@@ -268,6 +270,7 @@ export function TranscriptionPanel({
     settings.audioInputMode,
     setExportProgress,
     setIsExporting,
+    setFileInput,
   ]);
 
   const handleStartTranscription = async () => {
@@ -343,7 +346,7 @@ export function TranscriptionPanel({
             : undefined,
         textCase: settings.textCase,
         removePunctuation: settings.removePunctuation,
-        censoredWords: settings.enableCensor ? settings.censoredWords : [],
+        censoredWords: settings.enableCensor ? getActiveCensorWords(settings) : [],
         customPrompt: settings.customPrompt.trim() || undefined,
       };
 

@@ -8,10 +8,13 @@ resolver = "2"
 
 [package]
 name = "autosubs"
-version = "3.5.5"
+version = "3.6.1"
 description = "Transcribe and diarize audio files"
 authors = ["Tom Moroney"]
 edition = "2024"
+
+[env]
+WHISPER_NO_VULKAN = "1"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -41,6 +44,7 @@ tauri-plugin-shell = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-cli = "2"
 
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 
@@ -72,6 +76,9 @@ tauri-plugin-updater = "2"
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.26"
 objc = "0.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winreg = "0.55"
 
 [features]
 default = ["mac-aarch"]

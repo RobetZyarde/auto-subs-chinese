@@ -113,13 +113,9 @@
       "customCharsDescription": "Caracteres por línea",
       "customPromptButton": "Prompt",
       "customPromptTitle": "Vocabulario y contexto",
-      "customPromptDescription": "Ayuda a Whisper a reconocer nombres, marcas, jerga, acrónimos y grafías preferidas.",
-      "customPromptTermsTitle": "Términos clave",
-      "customPromptTermsPlaceholder": "Añade nombres, marcas, acrónimos o jerga...",
-      "customPromptTermsExample": "Ejemplo: OpenAI, DaVinci Resolve, SubSlate, FFmpeg",
-      "customPromptContextTitle": "Contexto / nota de estilo",
-      "customPromptContextPlaceholder": "Añade un tema breve o una preferencia de escritura...",
-      "customPromptContextExample": "Ejemplo: Tutorial de DaVinci Resolve. Prefiere “AutoSubs”, no “Auto Subs”.",
+      "customPromptDescription": "Agrega términos, nombres o contexto para guiar a Whisper.",
+      "customPromptPlaceholder": "Ej.: OpenAI, DaVinci Resolve — tutorial de edición de subtítulos en Resolve.",
+      "customPromptLanguageWarning": "Escribe en el mismo idioma que tu audio — un prompt en otro idioma puede causar una transcripción incorrecta.",
       "customPromptWhisperOnly": "Solo es compatible con modelos Whisper."
     },
     "censor": {
@@ -128,7 +124,11 @@
       "dialogTitle": "Censurar palabras sensibles",
       "dialogDescription": "Añade palabras para censurarlas en los subtítulos.",
       "inputPlaceholder": "Añadir palabra a censurar",
-      "empty": "Aún no hay palabras censuradas."
+      "empty": "Aún no hay palabras censuradas.",
+      "lists": "Listas de palabras",
+      "customSection": "Palabras personalizadas",
+      "customSectionDescription": "Ingrese palabras individuales para censurar.",
+      "listWordCount": "{{count}} palabras"
     },
     "speakers": {
       "title": "Etiquetas de hablante",
@@ -349,6 +349,7 @@
   "completion": {
     "processingComplete": "Procesamiento completo",
     "subtitlesReady": "¡Tus subtítulos están listos!",
+    "noSpeechDetected": "No se detectó voz. El archivo de audio puede estar en silencio o no contener voz reconocible.",
     "viewSubtitles": "Ver subtítulos",
     "exportToFile": "Exportar a archivo",
     "addToTimeline": "Añadir a la línea de tiempo"
@@ -441,6 +442,13 @@
     "status": {
       "disconnected": "Desconectado"
     },
+    "update": {
+      "downloading": "Descargando actualización",
+      "installing": "Instalando actualización",
+      "restarting": "Reiniciando AutoSubs",
+      "installUpdateNow": "Instalar y reiniciar",
+      "newVersionAvailable": "Actualización disponible"
+    },
     "resolve": {
       "productName": "DaVinci Resolve",
       "description": "Integración de scripts del área de trabajo",
@@ -476,6 +484,17 @@
     "toggle": "Cambiar tema"
   },
   "addToTimeline": {
+    "steps": {
+      "outputTrack": {
+        "title": "Pista"
+      },
+      "template": {
+        "title": "Estilo"
+      },
+      "speakers": {
+        "title": "Hablantes"
+      }
+    },
     "title": "Añadir a la línea de tiempo",
     "ready": {
       "title": "Subtítulos listos",

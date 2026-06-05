@@ -130,6 +130,8 @@
       "customPromptButton": "Prompt",
       "customPromptTitle": "Vocabulary & Context",
       "customPromptDescription": "Helps ASR models recognize names, brands, jargon, acronyms, and preferred spellings. Works best as a short glossary of important terms.",
+      "customPromptPlaceholder": "E.g. OpenAI, DaVinci Resolve — tutorial about subtitle editing.",
+      "customPromptLanguageWarning": "Write in the same language as your audio — a prompt in a different language can cause incorrect transcription.",
       "customPromptTermsTitle": "Key Terms",
       "customPromptTermsPlaceholder": "Add names, brands, acronyms, or jargon...",
       "customPromptTermsExample": "Example: OpenAI, DaVinci Resolve, SubSlate, FFmpeg",
@@ -142,9 +144,15 @@
       "title": "Censor Words",
       "wordCount": "{{count}} words",
       "dialogTitle": "Censor Sensitive Words",
-      "dialogDescription": "Add words to be censored in the subtitles.",
+      "dialogDescription": "Toggle word lists or add custom words to censor in the subtitles.",
       "inputPlaceholder": "Add word to censor",
-      "empty": "No censored words yet."
+      "empty": "No censored words yet.",
+      "lists": "Word Lists",
+      "listBuiltIn": "Built-in",
+      "noLists": "No word lists available.",
+      "customSection": "Custom Words",
+      "customSectionDescription": "Enter individual words to censor.",
+      "listWordCount": "{{count}} words"
     },
     "speakers": {
       "title": "Speaker Labels",
@@ -367,6 +375,7 @@
   "completion": {
     "processingComplete": "Processing Complete",
     "subtitlesReady": "Your subtitles are ready to use!",
+    "noSpeechDetected": "No speech detected. The audio file may be silent or contain no recognizable speech.",
     "viewSubtitles": "View Subtitles",
     "exportToFile": "Export to File",
     "addToTimeline": "Add to Timeline"
@@ -463,6 +472,13 @@
     "status": {
       "disconnected": "Disconnected"
     },
+    "update": {
+      "downloading": "Downloading Update",
+      "installing": "Installing Update",
+      "restarting": "Restarting AutoSubs",
+      "installUpdateNow": "Install and Restart",
+      "newVersionAvailable": "Update Available"
+    },
     "resolve": {
       "productName": "DaVinci Resolve",
       "description": "Workspace Scripts integration",
@@ -498,6 +514,18 @@
     "toggle": "Toggle theme"
   },
   "addToTimeline": {
+    "steps": {
+      "outputTrack": {
+        "title": "Track"
+      },
+      "template": {
+        "title": "Style",
+        "connectTo": "Connect to {{integration}} to customise templates"
+      },
+      "speakers": {
+        "title": "Speakers"
+      }
+    },
     "title": "Add to Timeline",
     "ready": {
       "title": "Subtitles Ready",

@@ -14,6 +14,8 @@ Generate Subtitles with Speaker Labels | Animated Captions
 :-------------------------:|:-------------------------:
 <img width="800" alt="Transcription Page" src="https://github.com/user-attachments/assets/fbdba848-46d5-451c-b671-06bf3237b08c"> | <img width="800" alt="Advanced Settings" src="https://github.com/user-attachments/assets/3a707940-7f2d-4052-990c-58cd913c185c">
 
+<img width="600" alt="AutoSubs UI" src="https://github.com/user-attachments/assets/5a95ef0c-43c7-426c-9d7b-ed3af4974a5c" />
+
 ---
 
 ## Integrations
@@ -159,6 +161,29 @@ src-tauri\target\release\autosubs.exe
 4. In Premiere Pro, subtitles are imported as caption tracks; in After Effects, SRT entries are created as text layers.
 
 ## Qwen 使用教程
+
+## Command Line Interface
+
+Transcribe files straight from the terminal. Pass a file and AutoSubs runs without a window, prints the result, and exits; run it with no arguments to open the desktop app as usual.
+
+**1. Add `autosubs` to your PATH**:
+
+- **Linux**: the `.deb` / `.rpm` installs `/usr/bin/autosubs`.
+- **macOS / Windows**: in the app, go to **Settings -> Command line** and click **Install**. **Remove** reverses it.
+
+**2. Run it:**
+
+```bash
+autosubs interview.mp4 --model small
+autosubs interview.mp4 --model small --diarize --max-speakers 2
+autosubs interview.mp4 --model small -o subs.srt
+autosubs interview.mp4 --model small -f json
+autosubs --help
+```
+
+`--model` accepts AutoSubs models including Whisper sizes (`tiny` through `large-v3`), `parakeet`, `moonshine-*`, and this fork's `qwen3-asr`. Run `autosubs --list-models` for the full list.
+
+Output formats (`-f` / `--format`, or inferred from `-o`) include `text`, `srt`, `vtt`, and `json`. Result output goes to stdout; progress and errors go to stderr.
 
 ### 1. 在应用里选择模型
 

@@ -173,19 +173,37 @@ impl Engine {
                 cb.is_cancelled.as_deref(),
             )?;
         } else if !is_qwen3asr && matches!(options.enable_vad, Some(true)) {
-            // Use provided VAD model path if present; otherwise download via ModelManager
+            // Use provided VAD model path if present; otherwise download via ModelManager.
+            // These stages reuse ProgressType::Download, so the app-level progress logger
+            // (which logs once per ProgressType) stays silent here — hence the explicit
+            // info! markers below, so a stall in the VAD fetch or inference is visible.
             let vad_model_path: PathBuf = if let Some(ref p) = self.cfg.vad_model_path {
                 PathBuf::from(p)
             } else {
-                self.models
+                tracing::info!("VAD: ensuring Silero VAD model is available");
+                let p = self
+                    .models
                     .ensure_vad_model(cb.progress, cb.is_cancelled.as_deref())
-                    .await?
+                    .await?;
+                tracing::info!("VAD: model ready at {}", p.display());
+                p
             };
 
             // `vad::get_segments` expects a &str path; convert from PathBuf
             let vad_model_path_str = vad_model_path.to_string_lossy().to_string();
+            tracing::info!(
+                "VAD: running speech detection on {} samples ({:.2}s of audio)",
+                original_samples.len(),
+                original_samples.len() as f64 / 16000.0
+            );
+            let vad_start = std::time::Instant::now();
             speech_segments = crate::vad::get_segments(&vad_model_path_str, &original_samples)
                 .map_err(|e| eyre!("{:?}", e))?;
+            tracing::info!(
+                "VAD: detected {} speech segment(s) in {:.2}s",
+                speech_segments.len(),
+                vad_start.elapsed().as_secs_f64()
+            );
         } else {
             speech_segments = vec![SpeechSegment {
                 start: 0.0,
@@ -259,7 +277,14 @@ impl Engine {
             )
             .await?
         } else {
-            // Use Whisper engine
+            // Use Whisper engine. Context creation loads the model into the (GPU) backend
+            // and can stall on some drivers — log around it so a hang here is visible.
+            tracing::info!(
+                "Whisper: loading model context (model={}, use_gpu={:?})",
+                options.model,
+                self.cfg.use_gpu
+            );
+            let ctx_start = std::time::Instant::now();
             let ctx = crate::engines::whisper::create_context(
                 _model_path.as_path(),
                 &options.model,
@@ -270,6 +295,10 @@ impl Engine {
                 Some(num_samples),
             )
             .map_err(|e| eyre!("Failed to create Whisper context: {}", e))?;
+            tracing::info!(
+                "Whisper: model context ready in {:.2}s",
+                ctx_start.elapsed().as_secs_f64()
+            );
 
             crate::engines::whisper::run_transcription_pipeline(
                 ctx,
@@ -303,8 +332,23 @@ impl Engine {
             }
         }
 
-        // Build a config from the chosen preset; apply density, max_lines, and content formatting.
-        let mut pp_cfg = PostProcessConfig::for_language(effective_lang);
+        // Determine the final output language of the transcript.
+        // - Whisper built-in translate-to-English => "en"
+        // - Post-translation to a target => that target
+        // - Otherwise => effective (detected or user-specified) language
+        let output_lang: String = if suppress_post_translation {
+            "en".to_string()
+        } else if let Some(ref to_lang) = translate_to {
+            to_lang.clone()
+        } else {
+            effective_lang.to_string()
+        };
+
+        // Build a config from the output language, not the source language.
+        // Using the source language here was the cause of the spacing bug: when translating
+        // from a CJK language (e.g. Japanese) to English, the CJK profile (insert_interword_space=false)
+        // was applied to English output, stripping all inter-word spaces.
+        let mut pp_cfg = PostProcessConfig::for_language(&output_lang);
         if let Some(d) = density {
             pp_cfg.apply_density(d);
             // If custom density, set max_chars_per_line directly from the provided value
@@ -322,18 +366,6 @@ impl Engine {
             pp_cfg.remove_punctuation = cf.remove_punctuation;
             pp_cfg.censored_words = cf.censored_words;
         }
-
-        // Determine the final output language of the transcript.
-        // - Whisper built-in translate-to-English => "en"
-        // - Post-translation to a target => that target
-        // - Otherwise => effective (detected or user-specified) language
-        let output_lang: String = if suppress_post_translation {
-            "en".to_string()
-        } else if let Some(ref to_lang) = translate_to {
-            to_lang.clone()
-        } else {
-            effective_lang.to_string()
-        };
 
         // Run structural + content formatting to produce the display-ready segments,
         // while preserving the raw post-translation `segments` as `original_segments`

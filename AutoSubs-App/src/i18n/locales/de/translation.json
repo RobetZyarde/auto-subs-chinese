@@ -113,13 +113,9 @@
       "customCharsDescription": "Zeichen pro Zeile",
       "customPromptButton": "Prompt",
       "customPromptTitle": "Vokabular & Kontext",
-      "customPromptDescription": "Hilft Whisper, Namen, Marken, Fachsprache, Akronyme und bevorzugte Schreibweisen zu erkennen.",
-      "customPromptTermsTitle": "Wichtige Begriffe",
-      "customPromptTermsPlaceholder": "Namen, Marken, Akronyme oder Fachbegriffe eingeben...",
-      "customPromptTermsExample": "Beispiel: OpenAI, DaVinci Resolve, SubSlate, FFmpeg",
-      "customPromptContextTitle": "Kontext / Stilhinweis",
-      "customPromptContextPlaceholder": "Kurzes Thema oder bevorzugte Schreibweise eingeben...",
-      "customPromptContextExample": "Beispiel: Dies ist ein DaVinci Resolve Tutorial. Schreibe lieber „AutoSubs“ statt „Auto Subs“.",
+      "customPromptDescription": "Begriffe, Namen oder Kontext hinzufügen, um Whisper zu leiten.",
+      "customPromptPlaceholder": "Z.B. OpenAI, DaVinci Resolve – Tutorial über Untertitelbearbeitung.",
+      "customPromptLanguageWarning": "In der gleichen Sprache wie das Audio schreiben – ein Prompt in einer anderen Sprache kann zu falschen Transkriptionen führen.",
       "customPromptWhisperOnly": "Nur von Whisper-Modellen unterstuetzt."
     },
     "censor": {
@@ -128,7 +124,11 @@
       "dialogTitle": "Sensible Wörter zensieren",
       "dialogDescription": "Füge Wörter hinzu, die in Untertiteln zensiert werden sollen.",
       "inputPlaceholder": "Wort zum Zensieren hinzufügen",
-      "empty": "Noch keine zensierten Wörter."
+      "empty": "Noch keine zensierten Wörter.",
+      "lists": "Wortlisten",
+      "customSection": "Benutzerdefinierte Wörter",
+      "customSectionDescription": "Einzelne Wörter zur Zensur eingeben.",
+      "listWordCount": "{{count}} Wörter"
     },
     "speakers": {
       "title": "Sprecher-Labels",
@@ -349,6 +349,7 @@
   "completion": {
     "processingComplete": "Verarbeitung abgeschlossen",
     "subtitlesReady": "Deine Untertitel sind bereit!",
+    "noSpeechDetected": "Keine Sprache erkannt. Die Audiodatei enthält möglicherweise keine erkennbare Sprache.",
     "viewSubtitles": "Untertitel anzeigen",
     "exportToFile": "In Datei exportieren",
     "addToTimeline": "Zur Timeline hinzufügen"
@@ -441,6 +442,13 @@
     "status": {
       "disconnected": "Getrennt"
     },
+    "update": {
+      "downloading": "Update wird heruntergeladen",
+      "installing": "Update wird installiert",
+      "restarting": "AutoSubs wird neu gestartet",
+      "installUpdateNow": "Installieren und neu starten",
+      "newVersionAvailable": "Update verfügbar"
+    },
     "resolve": {
       "productName": "DaVinci Resolve",
       "description": "Workspace-Skripte-Integration",
@@ -476,6 +484,17 @@
     "toggle": "Theme umschalten"
   },
   "addToTimeline": {
+    "steps": {
+      "outputTrack": {
+        "title": "Spur"
+      },
+      "template": {
+        "title": "Stil"
+      },
+      "speakers": {
+        "title": "Sprecher"
+      }
+    },
     "title": "Zur Timeline hinzufügen",
     "ready": {
       "title": "Untertitel bereit",

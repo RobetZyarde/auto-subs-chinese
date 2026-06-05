@@ -419,7 +419,6 @@ impl ModelManager {
             "moonshine-tiny-uk" => "tiny-uk",
             "moonshine-tiny-vi" => "tiny-vi",
             "moonshine-base" => "base",
-            "moonshine-base-es" => "base-es",
             _ => bail!("Unknown Moonshine model: {}", model),
         };
 
@@ -479,14 +478,20 @@ impl ModelManager {
                 );
             }
 
+            let hf_endpoint = std::env::var("HF_ENDPOINT")
+                .unwrap_or_else(|_| "https://huggingface.co".to_string());
+            let hf_endpoint = hf_endpoint.trim_end_matches('/');
             let url = if *filename == "tokenizer.json" {
                 // The HF repo currently does not provide tokenizer.json under tiny/* variants.
                 // Tokenizer assets live under base/float and appear to be shared.
-                "https://huggingface.co/UsefulSensors/moonshine/resolve/main/onnx/merged/base/float/tokenizer.json".to_string()
+                format!(
+                    "{}/UsefulSensors/moonshine/resolve/main/onnx/merged/base/float/tokenizer.json",
+                    hf_endpoint
+                )
             } else {
                 format!(
-                    "https://huggingface.co/UsefulSensors/moonshine/resolve/main/onnx/merged/{}/{}/{}",
-                    folder, onnx_subdir, filename
+                    "{}/UsefulSensors/moonshine/resolve/main/onnx/merged/{}/{}/{}",
+                    hf_endpoint, folder, onnx_subdir, filename
                 )
             };
             download_to(&dest, &url).await?;
@@ -514,22 +519,80 @@ impl ModelManager {
     }
 
     /// Ensure the Silero VAD model exists locally. If not, download via hf-hub.
-    /// Uses the ggml-org/whisper-vad repository and the file `ggml-silero-v5.1.2.bin`.
+    /// Download the Silero VAD model (`ggml-silero-v5.1.2.bin` from `ggml-org/whisper-vad`).
+    ///
+    /// This uses a direct, timeout-bounded reqwest download instead of the blocking
+    /// hf-hub/ureq path. The blocking path has no read timeout, so a stalled connection
+    /// (proxy/firewall/AV interfering with the HF CDN) hangs the whole transcription
+    /// indefinitely with no error — see issue #530. An async download can be wrapped in
+    /// `tokio::time::timeout` and aborted cleanly, turning a silent hang into a
+    /// recoverable error.
     pub async fn ensure_vad_model(
         &self,
         progress: Option<&LabeledProgressFn>,
         is_cancelled: Option<&(dyn Fn() -> bool + Send + Sync)>,
     ) -> Result<PathBuf> {
-        self.ensure_hub_model(
-            "ggml-org/whisper-vad",
-            "ggml-silero-v5.1.2.bin",
-            progress,
-            is_cancelled,
-            0.0,
-            100.0,
-            "progressSteps.download",
+        const VAD_TIMEOUT_SECS: u64 = 120;
+
+        let hf_endpoint = std::env::var("HF_ENDPOINT")
+            .unwrap_or_else(|_| "https://huggingface.co".to_string());
+        let hf_endpoint = hf_endpoint.trim_end_matches('/');
+        let vad_url = format!(
+            "{}/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin",
+            hf_endpoint
+        );
+
+        if let Some(is_cancelled) = is_cancelled {
+            if is_cancelled() { bail!("Cancelled"); }
+        }
+
+        let dest = self
+            .model_cache_dir()?
+            .join("vad")
+            .join("ggml-silero-v5.1.2.bin");
+
+        // Fast path: already downloaded and valid — don't touch the network.
+        if dest.exists() && validate_model_file(&dest).is_ok() {
+            return Ok(dest);
+        }
+
+        // Remove any partial/corrupt file left by a previous interrupted attempt.
+        if dest.exists() {
+            let _ = fs::remove_file(&dest);
+        }
+
+        if let Some(cb) = progress {
+            cb(0, ProgressType::Download, "progressSteps.download");
+        }
+
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(VAD_TIMEOUT_SECS),
+            download_to(&dest, &vad_url),
         )
         .await
+        {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                let _ = fs::remove_file(&dest);
+                bail!("Failed to download Silero VAD model: {}", e);
+            }
+            Err(_) => {
+                let _ = fs::remove_file(&dest);
+                bail!(
+                    "Timed out downloading Silero VAD model after {}s (network stalled). \
+                     Check your connection / proxy / firewall and try again.",
+                    VAD_TIMEOUT_SECS
+                );
+            }
+        }
+
+        validate_model_file(&dest)
+            .with_context(|| format!("Silero VAD model validation failed: {}", dest.display()))?;
+
+        if let Some(cb) = progress {
+            cb(100, ProgressType::Download, "progressSteps.download");
+        }
+        Ok(dest)
     }
 
     pub async fn ensure_diarize_models(
@@ -1085,7 +1148,9 @@ impl ModelManager {
             }
         }
 
-        let api = ApiBuilder::new()
+        // from_env() reads HF_ENDPOINT (custom HuggingFace mirror) and HF_HOME from the
+        // environment. with_cache_dir() overrides HF_HOME so our own cache location is used.
+        let api = ApiBuilder::from_env()
             .with_cache_dir(cache_dir)
             .build()
             .with_context(|| format!("Failed to build hf-hub API for repo '{}'", repo_id))?;
@@ -1309,9 +1374,9 @@ fn validate_model_file(path: &Path) -> Result<()> {
     // The resolved blob path in HF caches is typically a hash with no extension.
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     let stem = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    // Whisper GGUF models follow the pattern "ggml-{model}.bin" (e.g. ggml-large-v3.bin,
-    // ggml-medium.en.bin). The VAD model is "ggml-silero-v5.1.2.bin" — a different binary
-    // format that is much smaller (~885 KB), so we must not apply Whisper-specific rules to it.
+    // whisper.cpp models use the ggml-{model}.bin naming convention. The VAD model
+    // is also named ggml-*.bin, but is much smaller and uses a different binary
+    // format, so keep Whisper-specific cache sanity checks away from it.
     let is_whisper_bin = ext == "bin" && stem.starts_with("ggml-") && !stem.contains("silero");
     let min_bytes: u64 = if is_whisper_bin {
         // Smallest Whisper model (tiny.en) is ~77 MB; 50 MB catches partial downloads that
@@ -1408,10 +1473,15 @@ fn parse_hf_blob_url(url: &str) -> Option<(String, String)> {
 }
 
 async fn download_to(dest_path: &Path, url: &str) -> Result<()> {
-    if let Some(parent) = dest_path.parent() {
-        fs::create_dir_all(parent).ok();
-    }
-    let resp = reqwest::get(url).await.context("Failed to GET url")?;
+    if let Some(parent) = dest_path.parent() { fs::create_dir_all(parent).ok(); }
+    // Explicit client with a connect timeout so a dead/blocked endpoint fails fast
+    // instead of hanging on connection setup. Callers that need a bound on the whole
+    // transfer (e.g. ensure_vad_model) wrap this in tokio::time::timeout.
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .build()
+        .context("Failed to build HTTP client")?;
+    let resp = client.get(url).send().await.context("Failed to GET url")?;
     if !resp.status().is_success() {
         bail!("Failed to download '{}': status {}", url, resp.status());
     }

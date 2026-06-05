@@ -80,10 +80,31 @@ if os_name == "Windows" then
         void* _wfopen(const WCHAR* filename, const WCHAR* mode);
         size_t fread(void* buffer, size_t size, size_t count, void* stream);
         int fclose(void* stream);
+
+        unsigned long GetEnvironmentVariableW(const WCHAR* lpName, WCHAR* lpBuffer, unsigned long nSize);
+        int WideCharToMultiByte(unsigned int CodePage, unsigned long dwFlags,
+            const WCHAR* lpWideCharStr, int cchWideChar,
+            char* lpMultiByteStr, int cbMultiByte,
+            const char* lpDefaultChar, int* lpUsedDefaultChar);
     ]]
 
+    -- Use the Wide API to get environment variables so special characters in
+    -- usernames (e.g. accented letters) are not corrupted by the ANSI fallback.
+    local function getenv_wide(name)
+        local wide_name = to_wide_string(name)
+        local size = ffi.C.GetEnvironmentVariableW(wide_name, nil, 0)
+        if size == 0 then return nil end
+        local buffer = ffi.new("WCHAR[?]", size)
+        ffi.C.GetEnvironmentVariableW(wide_name, buffer, size)
+        local utf8_size = ffi.C.WideCharToMultiByte(65001, 0, buffer, -1, nil, 0, nil, nil)
+        if utf8_size == 0 then return nil end
+        local utf8_buffer = ffi.new("char[?]", utf8_size)
+        ffi.C.WideCharToMultiByte(65001, 0, buffer, -1, utf8_buffer, utf8_size, nil, nil)
+        return ffi.string(utf8_buffer, utf8_size - 1)
+    end
+
     -- Get path to the main AutoSubs app and modules
-    local storage_path = os.getenv("APPDATA") ..
+    local storage_path = getenv_wide("APPDATA") ..
         "\\Blackmagic Design\\DaVinci Resolve\\Support\\Fusion\\Scripts\\Utility\\AutoSubs"
     local install_path = assert(read_file(join_path(storage_path, "install_path.txt")))
     app_executable = install_path .. "\\AutoSubs.exe"
@@ -104,6 +125,34 @@ end
 -- Set package path for module loading
 local modules_path = join_path(resources_folder, "modules")
 package.path = package.path .. ";" .. join_path(modules_path, "?.lua")
+
+-- Verify the AutoSubs resources actually exist before attempting to load them.
+-- This guards against stale/duplicate installs (e.g. an old app left in a
+-- different location) which otherwise produce a cryptic LuaJIT
+-- "module 'autosubs_core' not found" stack trace listing many paths.
+local function file_exists(path)
+    local f = io.open(path, "r")
+    if f then
+        f:close()
+        return true
+    end
+    return false
+end
+
+local core_module_path = join_path(modules_path, "autosubs_core.lua")
+if os_name ~= "Windows" and not file_exists(core_module_path) then
+    print("[AutoSubs] ERROR: Could not find the AutoSubs app resources.")
+    print("[AutoSubs] Expected to find: " .. core_module_path)
+    print("[AutoSubs] The AutoSubs app does not appear to be installed at the expected location.")
+    if os_name == "OSX" then
+        print("[AutoSubs] Looked for the app at: " .. app_executable)
+        print("[AutoSubs] If you have an older copy of AutoSubs installed elsewhere (e.g. /Applications/AutoSubs/AutoSubs.app),")
+        print("[AutoSubs] delete it, then re-run the AutoSubs installer so the app lives at /Applications/AutoSubs.app.")
+    else
+        print("[AutoSubs] Please re-run the AutoSubs installer, then restart DaVinci Resolve.")
+    end
+    error("AutoSubs resources not found - please reinstall AutoSubs (see messages above).")
+end
 
 -- Launch AutoSubs
 local AutoSubs = require("autosubs_core")

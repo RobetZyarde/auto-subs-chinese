@@ -40,7 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
   enableGpu: true, // gpu enabled by default on mac and linux, disabled by default on windows
   enableDiarize: false,
   maxSpeakers: null,
-  exportRange: "entire",
+  exportRange: "inout",
 
   // Text settings
   textDensity: "standard",
@@ -50,6 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
   removePunctuation: false,
   enableCensor: false,
   censoredWords: [],
+  activeCensorLists: [],
   customPrompt: "",
   customMaxCharsPerLine: 38,
 
@@ -141,8 +142,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isHydrated) return;
-    const id = requestAnimationFrame(() => setShouldShowChildren(true));
-    return () => cancelAnimationFrame(id);
+    requestAnimationFrame(() => setShouldShowChildren(true));
   }, [isHydrated]);
 
   useEffect(() => {
@@ -237,16 +237,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         isHydrated,
       }}
     >
-      {!isHydrated ? (
-        <div className="h-screen w-screen bg-background" />
-      ) : (
+      {isHydrated ? (
         <div
           className="h-screen w-screen bg-background transition-opacity duration-200"
           style={{ opacity: shouldShowChildren ? 1 : 0 }}
         >
           {children}
         </div>
-      )}
+      ) : null}
     </SettingsContext.Provider>
   );
 }
