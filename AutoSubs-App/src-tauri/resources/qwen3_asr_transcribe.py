@@ -8,6 +8,7 @@ from stdout. Diagnostics must go to stderr so stdout stays parseable.
 from __future__ import annotations
 
 import argparse
+import gc
 import importlib.util
 import json
 import os
@@ -64,6 +65,7 @@ SENTENCE_ENDINGS = set("。！？.!?\n")
 SEGMENT_GAP_SECONDS = 0.45
 PROGRESS_PREFIX = "AUTOSUBS_QWEN_PROGRESS "
 RUNTIME_PREFIX = "AUTOSUBS_QWEN_RUNTIME "
+CLEANUP_PREFIX = "AUTOSUBS_QWEN_CLEANUP "
 
 
 def should_use_flash_attention() -> bool:
@@ -96,6 +98,10 @@ def emit_progress(progress: int, label: str) -> None:
 
 def emit_runtime(payload: dict[str, Any]) -> None:
     print(f"{RUNTIME_PREFIX}{json.dumps(payload, ensure_ascii=False)}", file=sys.stderr, flush=True)
+
+
+def emit_cleanup(payload: dict[str, Any]) -> None:
+    print(f"{CLEANUP_PREFIX}{json.dumps(payload, ensure_ascii=False)}", file=sys.stderr, flush=True)
 
 
 def audio_duration_seconds(audio_path: str) -> float:
@@ -285,68 +291,102 @@ def build_segments(
 def transcribe(args: argparse.Namespace) -> dict[str, Any]:
     emit_progress(5, "progressSteps.qwenPreparing")
 
-    import torch
-    from qwen_asr import Qwen3ASRModel
+    torch_module = None
+    model = None
+    result = None
+    results = None
+    result_payload: dict[str, Any] | None = None
+    cleanup: dict[str, Any] = {}
+    try:
+        import torch as torch_module
+        from qwen_asr import Qwen3ASRModel
 
-    audio_path = str(Path(args.audio_path).resolve())
-    qwen_language = normalize_language_for_qwen(args.language)
-    device_map = args.device if args.device != "auto" else ("cuda:0" if torch.cuda.is_available() else "cpu")
-    use_cuda = str(device_map).startswith("cuda")
-    dtype = torch.bfloat16 if use_cuda else torch.float32
-    flash_attention_requested = should_use_flash_attention()
-    flash_attention_enabled = use_cuda and flash_attention_requested
+        audio_path = str(Path(args.audio_path).resolve())
+        qwen_language = normalize_language_for_qwen(args.language)
+        device_map = args.device if args.device != "auto" else ("cuda:0" if torch_module.cuda.is_available() else "cpu")
+        use_cuda = str(device_map).startswith("cuda")
+        dtype = torch_module.bfloat16 if use_cuda else torch_module.float32
+        flash_attention_requested = should_use_flash_attention()
+        flash_attention_enabled = use_cuda and flash_attention_requested
 
-    model_kwargs: dict[str, Any] = {
-        "dtype": dtype,
-        "device_map": device_map,
-        "max_inference_batch_size": args.max_batch_size,
-        "max_new_tokens": args.max_new_tokens,
-    }
-    if flash_attention_enabled:
-        model_kwargs["attn_implementation"] = "flash_attention_2"
-    if args.alignment:
-        model_kwargs["forced_aligner"] = ALIGNER_MODEL
-        model_kwargs["forced_aligner_kwargs"] = {"dtype": dtype, "device_map": device_map}
+        model_kwargs: dict[str, Any] = {
+            "dtype": dtype,
+            "device_map": device_map,
+            "max_inference_batch_size": args.max_batch_size,
+            "max_new_tokens": args.max_new_tokens,
+        }
+        if flash_attention_enabled:
+            model_kwargs["attn_implementation"] = "flash_attention_2"
+        if args.alignment:
+            model_kwargs["forced_aligner"] = ALIGNER_MODEL
+            model_kwargs["forced_aligner_kwargs"] = {"dtype": dtype, "device_map": device_map}
 
-    runtime = {
-        "device_map": device_map,
-        "dtype": str(dtype).replace("torch.", ""),
-        "cuda_available": bool(torch.cuda.is_available()),
-        "cuda_device_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
-        "flash_attn_importable": importlib.util.find_spec("flash_attn") is not None,
-        "flash_attention_requested": bool(flash_attention_requested),
-        "flash_attention_enabled": bool(flash_attention_enabled),
-        "attn_implementation": model_kwargs.get("attn_implementation"),
-        "forced_aligner": ALIGNER_MODEL if args.alignment else None,
-    }
-    emit_runtime(runtime)
+        runtime = {
+            "device_map": device_map,
+            "dtype": str(dtype).replace("torch.", ""),
+            "cuda_available": bool(torch_module.cuda.is_available()),
+            "cuda_device_name": torch_module.cuda.get_device_name(0) if torch_module.cuda.is_available() else None,
+            "flash_attn_importable": importlib.util.find_spec("flash_attn") is not None,
+            "flash_attention_requested": bool(flash_attention_requested),
+            "flash_attention_enabled": bool(flash_attention_enabled),
+            "attn_implementation": model_kwargs.get("attn_implementation"),
+            "forced_aligner": ALIGNER_MODEL if args.alignment else None,
+        }
+        emit_runtime(runtime)
 
-    emit_progress(15, "progressSteps.qwenLoadingModel")
-    model = Qwen3ASRModel.from_pretrained(ASR_MODEL, **model_kwargs)
+        emit_progress(15, "progressSteps.qwenLoadingModel")
+        model = Qwen3ASRModel.from_pretrained(ASR_MODEL, **model_kwargs)
 
-    emit_progress(35, "progressSteps.qwenInferencing")
-    results = model.transcribe(
-        audio=audio_path,
-        context=args.context or None,
-        language=qwen_language,
-        return_time_stamps=args.alignment,
-    )
-    result = results[0] if isinstance(results, (list, tuple)) else results
+        emit_progress(35, "progressSteps.qwenInferencing")
+        results = model.transcribe(
+            audio=audio_path,
+            context=args.context or None,
+            language=qwen_language,
+            return_time_stamps=args.alignment,
+        )
+        result = results[0] if isinstance(results, (list, tuple)) else results
 
-    emit_progress(85, "progressSteps.qwenPostProcessing")
-    result_text = str(get_field(result, "text") or "")
-    result_language = get_field(result, "language")
-    timestamps = extract_timestamps(get_field(result, "time_stamps", "timestamps"))
-    timestamps, result_text = merge_transcript_text(result_text, timestamps)
-    duration = audio_duration_seconds(audio_path)
-    segments = build_segments(result_text, timestamps, qwen_language, duration)
+        emit_progress(85, "progressSteps.qwenPostProcessing")
+        result_text = str(get_field(result, "text") or "")
+        result_language = get_field(result, "language")
+        timestamps = extract_timestamps(get_field(result, "time_stamps", "timestamps"))
+        timestamps, result_text = merge_transcript_text(result_text, timestamps)
+        duration = audio_duration_seconds(audio_path)
+        segments = build_segments(result_text, timestamps, qwen_language, duration)
 
-    return {
-        "segments": segments,
-        "language": normalize_language_for_autosubs(result_language, args.language),
-        "model": ASR_MODEL,
-        "runtime": runtime,
-    }
+        result_payload = {
+            "segments": segments,
+            "language": normalize_language_for_autosubs(result_language, args.language),
+            "model": ASR_MODEL,
+            "runtime": runtime,
+        }
+    finally:
+        cleanup = {"model_loaded": model is not None, "gc_collected": None, "cuda_empty_cache": False}
+        try:
+            model = None
+            result = None
+            results = None
+            cleanup["gc_collected"] = gc.collect()
+            if torch_module is not None and torch_module.cuda.is_available():
+                torch_module.cuda.empty_cache()
+                if hasattr(torch_module.cuda, "ipc_collect"):
+                    try:
+                        torch_module.cuda.ipc_collect()
+                        cleanup["cuda_ipc_collect"] = True
+                    except Exception as exc:
+                        cleanup["cuda_ipc_collect"] = False
+                        cleanup["cuda_ipc_collect_error"] = str(exc)
+                cleanup["cuda_empty_cache"] = True
+                cleanup["cuda_memory_allocated_after"] = int(torch_module.cuda.memory_allocated(0))
+                cleanup["cuda_memory_reserved_after"] = int(torch_module.cuda.memory_reserved(0))
+        except Exception as exc:
+            cleanup["error"] = str(exc)
+        emit_cleanup(cleanup)
+
+    if result_payload is None:
+        raise RuntimeError("Qwen3-ASR did not produce a result")
+    result_payload["cleanup"] = cleanup
+    return result_payload
 
 
 def parse_args() -> argparse.Namespace:
