@@ -1674,6 +1674,27 @@ function LaunchApp()
     end
 end
 
+local function ShutdownApp()
+    if ffi.os == "Windows" then
+        local SW_HIDE = 0
+        local shell32 = ffi.load("Shell32")
+        local result_shutdown = shell32.ShellExecuteA(nil, "open", "taskkill.exe", "/IM AutoSubs.exe /T /F", nil, SW_HIDE)
+
+        if result_shutdown > 32 then
+            print("AutoSubs shutdown requested.")
+        else
+            print("Failed to request AutoSubs shutdown. Error code:", result_shutdown)
+        end
+    else
+        local result_shutdown = ffi.C.system("pkill -f autosubs")
+        if result_shutdown == 0 then
+            print("AutoSubs shutdown requested.")
+        else
+            print("Failed to request AutoSubs shutdown. Error code:", result_shutdown)
+        end
+    end
+end
+
 -- Send a small HTTP POST to 127.0.0.1:PORT with {"func":"Exit"}
 local function send_exit_via_socket()
     local ok = pcall(function()
@@ -1814,7 +1835,7 @@ function StartServer()
                     -- success already defined above
                     success, err = pcall(function()
                         if data ~= nil then
-                            if data.func ~= "Ping" and data.func ~= "Exit" then
+                            if data.func ~= "Ping" and data.func ~= "Exit" and data.func ~= "ShutdownApp" then
                                 local bindingOk, bindingErr = refresh_resolve_project_binding()
                                 if not bindingOk then
                                     body = json.encode(bindingErr)
@@ -1880,6 +1901,13 @@ function StartServer()
                                 body = json.encode(result)
                             elseif data.func == "Exit" then
                                 body = safe_json({ message = "Server shutting down" })
+                                quitServer = true
+                            elseif data.func == "ShutdownApp" then
+                                body = safe_json({
+                                    message = "AutoSubs desktop app and link server shutting down",
+                                    shutdown_app = true
+                                })
+                                ShutdownApp()
                                 quitServer = true
                             elseif data.func == "Ping" then
                                 body = safe_json({ message = "Pong" })
