@@ -1,10 +1,63 @@
 import { Model } from "@/types";
+import manifestData from "../../models.json";
 
 /**
- * Centralized model definitions for AutoSubs
- * These model definitions are used throughout the application
- * to ensure consistency in model information display
+ * Centralized model definitions for AutoSubs.
+ *
+ * The list of models — and where each is downloaded from — is defined once in
+ * `AutoSubs-App/models.json`, which is also compiled into the Rust backend.
+ * This module derives the UI `Model[]` from that manifest so the frontend and
+ * backend can never drift. Display strings (label/description/details/badge)
+ * remain i18n keys resolved at render time; only structural metadata lives in
+ * the manifest.
  */
+
+/** UI metadata block as stored per model in models.json. */
+interface ManifestUi {
+  size: string;
+  ram: string;
+  image: string;
+  accuracy: number;
+  weight: number;
+  languageSupport: Model["languageSupport"];
+}
+
+interface ManifestModel {
+  id: string;
+  engine: string;
+  ui: ManifestUi;
+}
+
+interface ManifestFile {
+  models: ManifestModel[];
+  diarize: { id: string; ui: ManifestUi };
+}
+
+const manifest = manifestData as unknown as ManifestFile;
+
+/** Map a model id to its i18n key base (e.g. "tiny.en" -> "tiny_en"). */
+function i18nBase(id: string): string {
+  return id.replace(/[.-]/g, "_");
+}
+
+/** Build a UI `Model` from a manifest entry and its i18n key base. */
+function toModel(id: string, engine: string, ui: ManifestUi, keyBase: string): Model {
+  return {
+    value: id,
+    label: `models.${keyBase}.label`,
+    description: `models.${keyBase}.description`,
+    size: ui.size,
+    ram: ui.ram,
+    image: `/${ui.image}`,
+    details: `models.${keyBase}.details`,
+    badge: `models.${keyBase}.badge`,
+    engine,
+    languageSupport: ui.languageSupport,
+    accuracy: ui.accuracy as Model["accuracy"],
+    weight: ui.weight as Model["weight"],
+    isDownloaded: false,
+  };
+}
 
 /**
  * Predefined filter orders for models
@@ -13,202 +66,75 @@ import { Model } from "@/types";
 export const modelFilterOrders = {
   weight: [
     // 1GB RAM
-    "moonshine-tiny", "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja",
+    "moonshine-tiny", "tiny", "tiny.en", "base", "base.en",
+    "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja",
     "moonshine-tiny-ko", "moonshine-tiny-uk", "moonshine-tiny-vi",
-    "moonshine-base",
+    "moonshine-base", "sense-voice",
     // 2GB RAM
     "small.en", "small", "parakeet",
-    // 4GB+ RAM
-    "qwen3-asr", "medium.en", "medium", "large-v3-turbo",
+    // 3-4GB RAM
+    "canary", "cohere", "qwen3-asr",
+    // 5-6GB RAM
+    "medium.en", "medium", "large-v3-turbo",
     // 10GB RAM
     "large-v3"
   ],
   accuracy: [
-    "qwen3-asr", "large-v3", "large-v3-turbo", "parakeet", "moonshine-tiny-vi",
-    "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja", "moonshine-tiny-ko",
-    "medium.en", "medium", "moonshine-base", "small.en", "small", "moonshine-tiny-uk",
+    "qwen3-asr", "cohere", "parakeet", "canary", "large-v3", "large-v3-turbo",
+    "moonshine-tiny-vi", "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja", "moonshine-tiny-ko", "medium.en", "medium",
+    "sense-voice", "moonshine-base", "small.en", "small", "moonshine-tiny-uk",
     "tiny", "tiny.en", "base", "base.en", "moonshine-tiny"
   ],
   recommended: [
-    "qwen3-asr", "parakeet", "large-v3-turbo", "large-v3", "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja",
-    "moonshine-tiny-ko", "moonshine-tiny-uk", "moonshine-tiny-vi", "moonshine-base", "small.en", "small",
+    "qwen3-asr", "parakeet", "canary", "sense-voice", "cohere", "large-v3-turbo", "large-v3",
+    "moonshine-tiny-ar", "moonshine-tiny-zh", "moonshine-tiny-ja", "moonshine-tiny-ko", "moonshine-tiny-uk", "moonshine-tiny-vi",
+    "moonshine-base", "small.en", "small",
     "medium", "medium.en",
     "tiny", "tiny.en", "base", "base.en", "moonshine-tiny"
   ]
 };
 
-export const models: Model[] = [
-  {
-    value: "qwen3-asr",
-    label: "models.qwen3_asr.label",
-    description: "models.qwen3_asr.description",
-    size: "4GB+",
-    ram: "8GB+ VRAM",
-    image: "/phoenix.png",
-    details: "models.qwen3_asr.details",
-    badge: "models.qwen3_asr.badge",
-    languageSupport: { kind: "multilingual" },
-    accuracy: 4,
-    weight: 1,
-    isDownloaded: false,
-  },
-  {
-    value: "parakeet",
-    label: "models.parakeet.label",
-    description: "models.parakeet.description",
-    size: "700MB",
-    ram: "2GB",
-    image: "/parakeet.png",
-    details: "models.parakeet.details",
-    badge: "models.parakeet.badge",
-    languageSupport: {
-      kind: "restricted",
-      languages: [
-        "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it", "lv", "lt", "mt", "pl", "pt", "ro", "sk", "sl", "es", "sv", "ru", "uk"
-      ],
-    },
-    accuracy: 3,
-    weight: 3,
-    isDownloaded: false,
-  },
-  {
-    value: "moonshine-tiny",
-    label: "models.moonshine_tiny.label",
-    description: "models.moonshine_tiny.description",
-    size: "60MB",
-    ram: "1GB",
-    image: "/bat.png",
-    details: "models.moonshine_tiny.details",
-    badge: "models.moonshine_tiny.badge",
-    languageSupport: { kind: "single_language", language: "en" },
-    accuracy: 1,
-    weight: 4,
-    isDownloaded: false,
-  },
-  {
-    value: "moonshine-tiny-ar",
-    label: "models.moonshine_tiny_ar.label",
-    description: "models.moonshine_tiny_ar.description",
-    size: "120MB",
-    ram: "1GB",
-    image: "/bat.png",
-    details: "models.moonshine_tiny_ar.details",
-    badge: "models.moonshine_tiny_ar.badge",
-    languageSupport: { kind: "single_language", language: "ar" },
-    accuracy: 3,
-    weight: 4,
-    isDownloaded: false,
-  },
-  {
-    value: "moonshine-tiny-zh",
-    label: "models.moonshine_tiny_zh.label",
-    description: "models.moonshine_tiny_zh.description",
-    size: "120MB",
-    ram: "1GB",
-    image: "/bat.png",
-    details: "models.moonshine_tiny_zh.details",
-    badge: "models.moonshine_tiny_zh.badge",
-    languageSupport: { kind: "single_language", language: "zh" },
-    accuracy: 3,
-    weight: 4,
-    isDownloaded: false,
-  },
-  {
-    value: "moonshine-tiny-ja",
-    label: "models.moonshine_tiny_ja.label",
-    description: "models.moonshine_tiny_ja.description",
-    size: "120MB",
-    ram: "1GB",
-    image: "/bat.png",
-    details: "models.moonshine_tiny_ja.details",
-    badge: "models.moonshine_tiny_ja.badge",
-    languageSupport: { kind: "single_language", language: "ja" },
-    accuracy: 3,
-    weight: 4,
-    isDownloaded: false,
-  },
-  {
-    value: "moonshine-tiny-ko",
-    label: "models.moonshine_tiny_ko.label",
-    description: "models.moonshine_tiny_ko.description",
-    size: "120MB",
-    ram: "1GB",
-    image: "/bat.png",
-    details: "models.moonshine_tiny_ko.details",
-    badge: "models.moonshine_tiny_ko.badge",
-    languageSupport: { kind: "single_language", language: "ko" },
-    accuracy: 3,
-    weight: 4,
-    isDownloaded: false,
-  },
-  {
-    value: "moonshine-tiny-uk",
-    label: "models.moonshine_tiny_uk.label",
-    description: "models.moonshine_tiny_uk.description",
-    size: "120MB",
-    ram: "1GB",
-    image: "/bat.png",
-    details: "models.moonshine_tiny_uk.details",
-    badge: "models.moonshine_tiny_uk.badge",
-    languageSupport: { kind: "single_language", language: "uk" },
-    accuracy: 2,
-    weight: 4,
-    isDownloaded: false,
-  },
-  {
-    value: "moonshine-tiny-vi",
-    label: "models.moonshine_tiny_vi.label",
-    description: "models.moonshine_tiny_vi.description",
-    size: "120MB",
-    ram: "1GB",
-    image: "/bat.png",
-    details: "models.moonshine_tiny_vi.details",
-    badge: "models.moonshine_tiny_vi.badge",
-    languageSupport: { kind: "single_language", language: "vi" },
-    accuracy: 3,
-    weight: 4,
-    isDownloaded: false,
-  },
-  {
-    value: "moonshine-base",
-    label: "models.moonshine_base.label",
-    description: "models.moonshine_base.description",
-    size: "200MB",
-    ram: "1GB",
-    image: "/owl.png",
-    details: "models.moonshine_base.details",
-    badge: "models.moonshine_base.badge",
-    languageSupport: { kind: "single_language", language: "en" },
-    accuracy: 2,
-    weight: 4,
-    isDownloaded: false,
-  },
-];
+export const models: Model[] = manifest.models.map((m) =>
+  toModel(m.id, m.engine, m.ui, i18nBase(m.id))
+);
 
 /**
- * Diarization model definition
- * This is handled separately from transcription models
+ * Diarization model definition.
+ * Handled separately from transcription models; its i18n keys use the
+ * "diarize" base rather than being derived from its id ("speaker-diarize").
  */
-export const diarizeModel: Model = {
-  value: "speaker-diarize",
-  label: "models.diarize.label",
-  description: "models.diarize.description",
-  size: "40MB",
-  ram: "",
-  image: "/diarize.png",
-  details: "models.diarize.details",
-  badge: "models.diarize.badge",
-  languageSupport: { kind: "multilingual" },
-  accuracy: 3,
-  weight: 3,
-  isDownloaded: false, // Will be set to true when actually downloaded
-};
+export const diarizeModel: Model = toModel(
+  manifest.diarize.id,
+  "diarize",
+  manifest.diarize.ui,
+  "diarize"
+);
+
+/**
+ * Check if a model's engine supports automatic language detection.
+ * - Multilingual Whisper: yes (built-in auto-detection)
+ * - Single-language models (Whisper .en, Moonshine variants): no
+ * - Restricted models: depends on the engine — SenseVoice and Parakeet
+ *   support auto; Canary and Cohere do not.
+ */
+export function modelSupportsAutoDetect(model: Model): boolean {
+  switch (model.languageSupport.kind) {
+    case "multilingual":
+      return true
+    case "single_language":
+      return false
+    case "restricted":
+      return model.engine === "parakeet"
+    default:
+      return true
+  }
+}
 
 /**
  * Check if a model supports a specific language
  */
 export function modelSupportsLanguage(model: Model, language: string): boolean {
-  if (language === "auto") return true
+  if (language === "auto") return modelSupportsAutoDetect(model)
 
   switch (model.languageSupport.kind) {
     case "multilingual":

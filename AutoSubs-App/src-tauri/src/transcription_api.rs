@@ -284,27 +284,18 @@ pub async fn transcribe_audio<R: Runtime>(
             Some(0) => None,
             other => other,
         };
-        // Handle translation - use target_language from frontend
+        // Handle translation - use target_language from frontend.
+        // `translate_target` always carries the target (including "en").
+        // `use_native_translation` requests the model's built-in translation
+        // when it supports the (source, target) pair; the engine layer falls
+        // back to Google Translate post-pass when native isn't possible.
         if options.translate.unwrap_or(false) {
-            if let Some(target) = options.target_language {
-                if target == "en" {
-                    // English: use Whisper's built-in translation
-                    transcribe_options.whisper_to_english = Some(true);
-                    transcribe_options.translate_target = None;
-                } else {
-                    // Non-English: use post-translation via Google Translate
-                    transcribe_options.whisper_to_english = Some(false);
-                    transcribe_options.translate_target = Some(target);
-                }
-            } else {
-                // Default to English for backward compatibility
-                transcribe_options.whisper_to_english = Some(true);
-                transcribe_options.translate_target = None;
-            }
+            let target = options.target_language.unwrap_or_else(|| "en".to_string());
+            transcribe_options.translate_target = Some(target);
+            transcribe_options.use_native_translation = Some(true);
         } else {
-            // Translation disabled
-            transcribe_options.whisper_to_english = Some(false);
             transcribe_options.translate_target = None;
+            transcribe_options.use_native_translation = Some(false);
         }
 
         if let Some(prompt) = options.custom_prompt.as_deref().map(str::trim).filter(|prompt| !prompt.is_empty()) {
@@ -680,9 +671,20 @@ pub async fn reformat_subtitles(
         })
         .collect();
 
-    // Build config from language profile, then apply density and max_lines
+    // Build config from language profile, then apply density and max_lines.
+    // Some engines do not report a language, so keep reformatting consistent
+    // with initial transcription by inferring the dominant script for `auto`.
     let lang = options.language.as_deref().unwrap_or("en");
-    let mut config = PostProcessConfig::for_language(lang);
+    let mut config = if lang.eq_ignore_ascii_case("auto") {
+        let text = engine_segments
+            .iter()
+            .map(|segment| segment.text.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        PostProcessConfig::for_text(&text)
+    } else {
+        PostProcessConfig::for_language(lang)
+    };
 
     if let Some(ref density_str) = options.text_density {
         let density: TextDensity = match density_str.to_lowercase().as_str() {

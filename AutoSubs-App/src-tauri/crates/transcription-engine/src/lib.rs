@@ -1,20 +1,21 @@
 pub mod audio;
 pub mod engine;
 pub mod engines;
-pub mod formatting;
+pub mod manifest;
 pub mod model_manager;
-pub mod translate;
-pub mod types;
-pub mod utils;
 pub mod vad;
+pub mod types;
+pub mod translate;
+pub mod utils;
+pub mod formatting;
 
 // Re-exports (crate users only need these)
-pub use engine::{Callbacks, ContentFormatting, Engine, EngineConfig};
-pub use formatting::{PostProcessConfig, TextCase, TextDensity, process_segments};
-pub use model_manager::ModelManager;
-pub use types::{ProgressType, Segment, TranscribeOptions, WordTimestamp};
-pub use utils::{get_translate_languages, get_whisper_languages};
+pub use engine::{Engine, EngineConfig, Callbacks, ContentFormatting};
 pub use vad::get_segments;
+pub use types::{TranscribeOptions, Segment, WordTimestamp, ProgressType};
+pub use model_manager::ModelManager;
+pub use utils::{get_translate_languages, get_whisper_languages};
+pub use formatting::{PostProcessConfig, process_segments, TextCase, TextDensity};
 
 /// Install whisper.cpp logging hooks so output is routed through Rust's tracing system
 /// instead of raw stderr, allowing filters to suppress chatty internal logs.
@@ -23,9 +24,10 @@ pub use whisper_rs::install_logging_hooks;
 /// Convenience function to list all cached Whisper models.
 /// Creates a temporary Engine with default config (except cache_dir) to access the cache.
 pub fn list_cached_models(cache_dir: &std::path::Path) -> eyre::Result<Vec<String>> {
-    let mut config = EngineConfig::default();
-    config.cache_dir = cache_dir.to_path_buf();
-    let engine = Engine::new(config);
+    let engine = Engine::new(EngineConfig {
+        cache_dir: cache_dir.to_path_buf(),
+        ..Default::default()
+    });
     engine.list_cached_models()
 }
 
@@ -33,8 +35,9 @@ pub fn list_cached_models(cache_dir: &std::path::Path) -> eyre::Result<Vec<Strin
 /// Creates a temporary Engine with default config (except cache_dir) to access the cache.
 /// Returns true if successfully deleted, false if model doesn't exist or deletion failed.
 pub fn delete_cached_model(cache_dir: &std::path::Path, model_name: &str) -> bool {
-    let mut config = EngineConfig::default();
-    config.cache_dir = cache_dir.to_path_buf();
-    let engine = Engine::new(config);
+    let engine = Engine::new(EngineConfig {
+        cache_dir: cache_dir.to_path_buf(),
+        ..Default::default()
+    });
     engine.delete_cached_model(model_name)
 }

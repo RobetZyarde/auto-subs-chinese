@@ -3,14 +3,12 @@
 ---@diagnostic disable: undefined-global, deprecated
 local ffi = ffi
 
+-- Shared access to the Resolve / Fusion scripting environment (see resolve_env.lua).
+-- The entry scripts add the modules dir to package.path before requiring us.
+local resolve_env = require("resolve_env")
+
 -- resolve is provided implicitly by the Resolve environment - no need to call Resolve() unless running in terminal
-local resolve = rawget(_G, "resolve")
-if resolve == nil and type(rawget(_G, "Resolve")) == "function" then
-    local okResolve, initialResolve = pcall(Resolve)
-    if okResolve then
-        resolve = initialResolve
-    end
-end
+local resolve = resolve_env.get_resolve()
 
 local DEV_MODE = false
 
@@ -89,15 +87,71 @@ local resources_path
 local main_app
 local command_open
 
--- Resolve handles are refreshed at request time. Resolve can keep the Lua/HTTP
--- server alive while its current project binding goes stale after project
--- switches, restarts, or script reruns.
+-- Resolve handles are refreshed for every request. The Lua server can outlive
+-- the project objects it was started with after a project switch or restart.
 local projectManager = nil
 local project = nil
 local mediaPool = nil
 
 local ANIMATED_CAPTION = "AutoSubs Caption"
 local defaultTemplateImportAttempted = false
+local lastProjectId = nil
+
+-- Refresh the cached project / mediaPool references and detect project
+-- switches. When the user opens a different Resolve project the old
+-- mediaPool no longer contains the AutoSubs Caption template, so we
+-- must reset the one-shot import guard so get_templates() will try
+-- the import again.
+local function refresh_project()
+    local resolveOk, nextResolve = pcall(resolve_env.get_resolve)
+    if not resolveOk or nextResolve == nil then
+        return nil, {
+            error = "Resolve link unavailable",
+            detail = "Resolve scripting object is unavailable. Re-run Workspace > Scripts > AutoSubs inside DaVinci Resolve."
+        }
+    end
+
+    local managerOk, nextProjectManager = pcall(function()
+        return nextResolve:GetProjectManager()
+    end)
+    if not managerOk or nextProjectManager == nil then
+        return nil, {
+            error = "Resolve project link is stale",
+            detail = "resolve:GetProjectManager() failed or returned nil: " .. tostring(nextProjectManager)
+        }
+    end
+
+    local projectOk, nextProject = pcall(function()
+        return nextProjectManager:GetCurrentProject()
+    end)
+    if not projectOk or nextProject == nil then
+        return nil, {
+            error = "Resolve project link is stale",
+            detail = "projectManager:GetCurrentProject() failed or returned nil. Re-run Workspace > Scripts > AutoSubs."
+        }
+    end
+
+    local mediaPoolOk, nextMediaPool = pcall(function()
+        return nextProject:GetMediaPool()
+    end)
+    if not mediaPoolOk or nextMediaPool == nil then
+        return nil, {
+            error = "Resolve project link is stale",
+            detail = "project:GetMediaPool() failed or returned nil: " .. tostring(nextMediaPool)
+        }
+    end
+
+    resolve = nextResolve
+    projectManager = nextProjectManager
+    project = nextProject
+    mediaPool = nextMediaPool
+    local currentId = project:GetUniqueId()
+    if currentId ~= lastProjectId then
+        defaultTemplateImportAttempted = false
+        lastProjectId = currentId
+    end
+    return true
+end
 
 local STYLE_INDEX = {
     Fill = 1,
@@ -126,7 +180,9 @@ local currentExportJob = {
         offset = 0   -- offset on timeline in seconds (regardless of timeline start)
     },
     trackStates = nil,
-    clipBoundaries = nil
+    clipBoundaries = nil,
+    -- Captured before ExportAudio, restored by restore_user_state() in AddSubtitles.
+    savedMarks = nil       -- raw GetMarkInOut() dict (relative frame values)
 }
 
 -- UTF-8 aware character count
@@ -144,49 +200,6 @@ local function make_error(short, detail)
     return { error = short, detail = tostring(detail or "") }
 end
 
-local function refresh_resolve_project_binding()
-    if resolve == nil and type(rawget(_G, "Resolve")) == "function" then
-        local okResolve, nextResolve = pcall(Resolve)
-        if okResolve then
-            resolve = nextResolve
-        end
-    end
-
-    if resolve == nil then
-        return nil, make_error("Resolve link unavailable",
-            "Resolve scripting object is nil. Run Workspace > Scripts > AutoSubs inside DaVinci Resolve.")
-    end
-
-    local managerOk, nextProjectManager = pcall(function()
-        return resolve:GetProjectManager()
-    end)
-    if not managerOk or nextProjectManager == nil then
-        return nil, make_error("Resolve project link is stale",
-            "resolve:GetProjectManager() failed or returned nil: " .. tostring(nextProjectManager))
-    end
-
-    local projectOk, nextProject = pcall(function()
-        return nextProjectManager:GetCurrentProject()
-    end)
-    if not projectOk or nextProject == nil then
-        return nil, make_error("Resolve project link is stale",
-            "projectManager:GetCurrentProject() failed or returned nil. The AutoSubs Lua/HTTP server is still connected, but the Resolve project binding must be refreshed by re-running Workspace > Scripts > AutoSubs.")
-    end
-
-    local mediaPoolOk, nextMediaPool = pcall(function()
-        return nextProject:GetMediaPool()
-    end)
-    if not mediaPoolOk or nextMediaPool == nil then
-        return nil, make_error("Resolve project link is stale",
-            "project:GetMediaPool() failed or returned nil: " .. tostring(nextMediaPool))
-    end
-
-    projectManager = nextProjectManager
-    project = nextProject
-    mediaPool = nextMediaPool
-    return true
-end
-
 -- Function to read a JSON file. Returns the decoded table on success, or
 -- `nil, err` on failure so callers can surface the real reason.
 local function read_json_file(file_path)
@@ -196,6 +209,9 @@ local function read_json_file(file_path)
     end
 
     -- Parse the JSON content
+    if json == nil or json.decode == nil then
+        return nil, "JSON library not available"
+    end
     local data, _, err = json.decode(content, 1, nil)
     if err then
         return nil, tostring(err)
@@ -354,9 +370,8 @@ get_template_item = function(folder, templateName)
 end
 
 function GetTimelineInfo()
-    -- Get project and media pool
-    project = projectManager:GetCurrentProject()
-    mediaPool = project:GetMediaPool()
+    -- Get project and media pool (resets template-import flag on project switch)
+    refresh_project()
 
     -- Get timeline info
     local timelineInfo = {}
@@ -383,8 +398,7 @@ function GetTimelineInfo()
 end
 
 function GetTemplates()
-    project = projectManager:GetCurrentProject()
-    mediaPool = project:GetMediaPool()
+    refresh_project()
     return get_templates()
 end
 
@@ -435,6 +449,29 @@ local function reset_tracks()
         timeline:SetTrackEnable("audio", i, currentExportJob["trackStates"][i])
     end
     currentExportJob["clipBoundaries"] = nil
+end
+
+-- Restore the user's pre-export In/Out markers. No-ops if nothing was saved
+-- (standalone AddSubtitles without a prior export).
+local function restore_user_state()
+    if currentExportJob.savedMarks == nil then return end
+
+    local timeline = project:GetCurrentTimeline()
+    if timeline and timeline.SetMarkInOut then
+        for _, markType in ipairs({ "audio", "video" }) do
+            local m = currentExportJob.savedMarks[markType]
+            local ok = false
+            if m and m["in"] ~= nil and m["out"] ~= nil then
+                ok = pcall(timeline.SetMarkInOut, timeline, m["in"], m["out"], markType)
+            elseif timeline.ClearMarkInOut then
+                ok = pcall(timeline.ClearMarkInOut, timeline, markType)
+            end
+            if not ok then
+                print("[AutoSubs] restore_user_state: could not restore " .. markType .. " markers")
+            end
+        end
+    end
+    currentExportJob.savedMarks = nil
 end
 
 local function check_track_empty(trackIndex, markIn, markOut)
@@ -520,17 +557,45 @@ function GetExportProgress()
                     cancelled = true,
                     message = "Export was cancelled"
                 }
-            else
-                -- Normal completion
-                currentExportJob.progress = 100
+            end
+
+            -- IsRenderingInProgress() going false only means Resolve stopped
+            -- rendering — it does NOT mean the job actually succeeded. Check
+            -- the job's real status so a silently failed render (e.g. bad
+            -- output path, disk full, no encoder) is reported as an error
+            -- instead of a fabricated success with a non-existent file.
+            local jobStatus, jobError
+            if currentExportJob.pid then
+                local ok, status = pcall(function()
+                    return project:GetRenderJobStatus(currentExportJob.pid)
+                end)
+                if ok and type(status) == "table" then
+                    jobStatus = status["JobStatus"]
+                    jobError = status["Error"]
+                end
+            end
+
+            if jobStatus and jobStatus ~= "Complete" then
+                local detail = jobError or ("Render job status: " .. tostring(jobStatus))
+                print("[AutoSubs] Export did not complete successfully: " .. detail)
                 return {
                     active = false,
-                    progress = 100,
-                    completed = true,
-                    message = "Export completed successfully",
-                    audioInfo = currentExportJob.audioInfo
+                    progress = currentExportJob.progress,
+                    error = true,
+                    message = "Audio export failed in Resolve",
+                    detail = detail
                 }
             end
+
+            -- Normal completion
+            currentExportJob.progress = 100
+            return {
+                active = false,
+                progress = 100,
+                completed = true,
+                message = "Export completed successfully",
+                audioInfo = currentExportJob.audioInfo
+            }
         end
     else
         -- No PID available - something went wrong
@@ -650,7 +715,10 @@ local function get_marker_range(timeline)
     local startFrame = timeline:GetStartFrame()
     local endFrame = timeline:GetEndFrame()
 
-    local marks = timeline:GetMarkInOut() or {}
+    local marks = {}
+    if timeline.GetMarkInOut then
+        marks = timeline:GetMarkInOut() or {}
+    end
     -- Prefer audio markers; fall back to video if audio not present
     local m = marks["audio"] or marks["video"] or {}
 
@@ -769,12 +837,27 @@ function ExportAudio(outputDir, inputTracks, exportRange)
         rangeEnd = timeline:GetEndFrame()
     end
 
-    -- Trim to actual clip boundaries (skip leading/trailing silence) and apply to render
+    -- Trim to actual clip boundaries (skip leading/trailing silence). Fall back
+    -- to the full region if no clips are found (nil would crash the print below).
     if rangeStart then
         local exportStart, exportEnd = get_clip_boundaries(timeline, selected, rangeStart, rangeEnd)
+        if exportStart == nil or exportEnd == nil then
+            print("[AutoSubs] No clips found in export range — falling back to full region " ..
+                tostring(rangeStart) .. " - " .. tostring(rangeEnd))
+            exportStart = rangeStart
+            exportEnd = rangeEnd
+        end
         renderSettings.MarkIn = exportStart
         renderSettings.MarkOut = exportEnd
-        print("[AutoSubs] Export range: " .. exportStart .. " - " .. exportEnd)
+        print("[AutoSubs] Export range: " .. tostring(exportStart) .. " - " .. tostring(exportEnd))
+    end
+
+    -- Capture markers before the Deliver switch clobbers them.
+    currentExportJob.savedMarks = nil
+    if timeline.GetMarkInOut then
+        pcall(function()
+            currentExportJob.savedMarks = timeline:GetMarkInOut() or nil
+        end)
     end
 
     -- Must switch to Deliver page to start render and customise settings (wierd quirk of Resolve API)
@@ -795,30 +878,11 @@ function ExportAudio(outputDir, inputTracks, exportRange)
         local framesFromTimelineStart = jobInfo["MarkIn"] - timeline:GetStartFrame()
         local timeOffsetInSeconds = framesFromTimelineStart / timeline:GetSetting("timelineFrameRate")
 
-        -- Calculate relative offsets for each clip segment (relative to the exported audio start)
-        local segments = {}
-        for _, clip in ipairs(currentExportJob.individualClips or {}) do
-            table.insert(segments, {
-                start = clip.start - timeOffsetInSeconds,    -- Start time within the exported audio
-                ["end"] = clip["end"] - timeOffsetInSeconds, -- End time within the exported audio
-                timelineStart = clip.start,         -- Absolute start on timeline (for subtitle placement)
-                timelineEnd = clip["end"],
-                name = clip.name
-            })
-        end
-
-        -- Do not read OutputFilename back from GetRenderJobList here. Resolve can
-        -- return a stale render-job entry when the queue already contains video
-        -- jobs, which makes AutoSubs report the previous MP4 as the exported
-        -- audio path. The current audio-only render is named by CustomName.
-        local outputFilename = exportName .. ".wav"
-
-        audioInfo = {
-            path = join_path(jobInfo["TargetDir"], outputFilename),
+        local audioInfo = {
+            path = join_path(jobInfo["TargetDir"], jobInfo["OutputFilename"]),
             markIn = jobInfo["MarkIn"],
             markOut = jobInfo["MarkOut"],
-            offset = timeOffsetInSeconds,
-            segments = segments -- Individual clip segments for segment-based transcription
+            offset = timeOffsetInSeconds
         }
         currentExportJob.audioInfo = audioInfo
 
@@ -972,9 +1036,14 @@ local function get_mark_in_out(timeline, data)
 
     if not markIn or not markOut then
         local success, err = pcall(function()
-            local markInOut = timeline:GetMarkInOut()
-            markIn = (markInOut.audio["in"] and markInOut.audio["in"] + timelineStart) or timelineStart
-            markOut = (markInOut.audio["out"] and markInOut.audio["out"] + timelineStart) or timelineEnd
+            if timeline.GetMarkInOut then
+                local markInOut = timeline:GetMarkInOut()
+                markIn = (markInOut.audio["in"] and markInOut.audio["in"] + timelineStart) or timelineStart
+                markOut = (markInOut.audio["out"] and markInOut.audio["out"] + timelineStart) or timelineEnd
+            else
+                markIn = timelineStart
+                markOut = timelineEnd
+            end
         end)
 
         if not success then
@@ -1011,18 +1080,35 @@ local function get_template(rootFolder, templateName)
     end
 
     local templateItem = nil
+    local resolvedName = templateName -- tracks which template was actually found
     if templateName ~= nil and templateName ~= "" then
+        templateItem = get_template_item(rootFolder, templateName)
+    end
+    -- If the template wasn't found, trigger get_templates() which will
+    -- auto-import the default caption-bin.drb if it hasn't been tried for
+    -- this project yet, then retry the lookup.
+    if not templateItem and templateName ~= nil and templateName ~= "" then
+        get_templates()
         templateItem = get_template_item(rootFolder, templateName)
     end
     if not templateItem then
         templateItem = get_template_item(rootFolder, "Default Template")
+        resolvedName = "Default Template"
+    end
+    -- Final fallback: the bundled animated caption template.
+    if not templateItem then
+        templateItem = get_template_item(rootFolder, ANIMATED_CAPTION)
+        resolvedName = ANIMATED_CAPTION
     end
     if not templateItem then
-        return nil, nil, "Could not find subtitle template '" .. tostring(templateName) .. "' in media pool"
+        return nil, nil, "Could not find subtitle template '" .. tostring(templateName) ..
+            "' in media pool (also tried 'Default Template' and '" .. ANIMATED_CAPTION .. "')"
     end
 
     local template_frame_rate = templateItem:GetClipProperty()["FPS"]
-    return templateItem, template_frame_rate, nil
+    -- Return resolvedName so callers detect the animated caption template even
+    -- after a fallback (the isAnimated flag depends on it).
+    return templateItem, template_frame_rate, nil, resolvedName
 end
 
 local function apply_conflict_mode(timeline, subtitles, trackIndex, conflictMode, frame_rate, timelineStart)
@@ -1131,16 +1217,25 @@ local function build_clip_list(subtitles, speakers, speakersExist, trackIndex, t
     local joinThreshold = frame_rate
     local clipList = {}
     for i, subtitle in ipairs(subtitles) do
+        -- Skip malformed segments (nil start/end) instead of crashing in to_frames().
+        if subtitle["start"] == nil or subtitle["end"] == nil then
+            print(string.format("[AutoSubs] Skipping subtitle #%d with missing start/end time (start=%s, end=%s)",
+                i, tostring(subtitle["start"]), tostring(subtitle["end"])))
+            goto continue
+        end
         local start_frame = to_frames(subtitle["start"], frame_rate)
         local end_frame = to_frames(subtitle["end"], frame_rate)
         local timeline_pos = timelineStart + start_frame
         local clip_timeline_duration = end_frame - start_frame
 
         if i < #subtitles then
-            local next_start = timelineStart + to_frames(subtitles[i + 1]["start"], frame_rate)
-            local frames_between = next_start - (timeline_pos + clip_timeline_duration)
-            if frames_between < joinThreshold then
-                clip_timeline_duration = clip_timeline_duration + frames_between + 1
+            local nextSub = subtitles[i + 1]
+            if nextSub and nextSub["start"] ~= nil then
+                local next_start = timelineStart + to_frames(nextSub["start"], frame_rate)
+                local frames_between = next_start - (timeline_pos + clip_timeline_duration)
+                if frames_between < joinThreshold then
+                    clip_timeline_duration = clip_timeline_duration + frames_between + 1
+                end
             end
         end
 
@@ -1164,6 +1259,7 @@ local function build_clip_list(subtitles, speakers, speakersExist, trackIndex, t
         }
 
         table.insert(clipList, newClip)
+        ::continue::
     end
 
     return clipList
@@ -1194,6 +1290,7 @@ end
 local function apply_subtitle_text(timelineItems, subtitles, speakers, speakersExist, isAnimated, presetSettings)
     local hasPresetSettings = isAnimated and presetSettings ~= nil and next(presetSettings) ~= nil
     local failed = 0
+    local noFusionComp = 0
     local firstError = nil
     for i, timelineItem in ipairs(timelineItems) do
         local success, err = pcall(function()
@@ -1201,7 +1298,11 @@ local function apply_subtitle_text(timelineItems, subtitles, speakers, speakersE
             local subtitleText = subtitle["text"]
 
             local fusionCompCount = timelineItem:GetFusionCompCount()
-            if fusionCompCount and fusionCompCount > 0 then
+            if not fusionCompCount or fusionCompCount <= 0 then
+                noFusionComp = noFusionComp + 1
+                error("template clip has no Fusion composition (GetFusionCompCount returned nil or zero) — your DaVinci Resolve version may be incompatible")
+            end
+            if fusionCompCount > 0 then
                 local comp = timelineItem:GetFusionCompByIndex(1)
                 local template = comp:FindTool("Template") or comp:FindToolByID("TextPlus")
                 if isAnimated then
@@ -1210,6 +1311,15 @@ local function apply_subtitle_text(timelineItems, subtitles, speakers, speakersE
                     local autosubsTool = comp:FindTool("AutoSubs")
                     autosubsTool:SetData("WordTiming", wordTiming) -- Will be applied to keyframes when text is updated
                     template:SetInput("Text", subtitleText)        -- AutoSubs Macro uses custom text input
+
+                    -- Sync CharacterLevelStyling1.Text so the Follower1 -> CLS
+                    -- binding chain re-evaluates with the correct text on playback.
+                    -- The macro's ExecuteOnChange also does this, but setting it
+                    -- here covers cases where Fusion skips that callback.
+                    local clsTool = comp:FindTool("CharacterLevelStyling1")
+                    if clsTool then
+                        pcall(clsTool.SetInput, clsTool, "Text", subtitleText)
+                    end
 
                     -- Apply caption preset settings via the macro's built-in helper
                     -- so inspector values captured during a preset edit are faithfully
@@ -1248,17 +1358,16 @@ local function apply_subtitle_text(timelineItems, subtitles, speakers, speakersE
         end
     end
 
+    if noFusionComp > 0 then
+        print(string.format("[AutoSubs] %d of %d subtitle clips had no Fusion composition (GetFusionCompCount returned nil or zero). This usually means your DaVinci Resolve version is incompatible with the AutoSubs Caption template.",
+            noFusionComp, #timelineItems))
+    end
     if failed > 0 then
         print(string.format("[AutoSubs] Failed to place %d of %d subtitles. First error: %s",
             failed, #timelineItems, tostring(firstError)))
     end
 
-    return { failed = failed, total = #timelineItems, firstError = firstError }
-end
-
--- Forces timeline view to update and show new subtitle clips
-local function refresh_timeline(timeline)
-    timeline:SetCurrentTimecode(timeline:GetCurrentTimecode())
+    return { failed = failed, total = #timelineItems, firstError = firstError, noFusionComp = noFusionComp }
 end
 
 -- Add subtitles to the timeline using the specified template
@@ -1266,8 +1375,13 @@ end
 -- presetSettings: optional opaque table of AutoSubs Caption macro input values
 -- (captured via StartPresetEdit/CapturePresetSettings). Ignored for non-animated templates.
 function AddSubtitles(filePath, trackIndex, templateName, conflictMode, presetSettings)
+    refresh_project()
     resolve:OpenPage("edit")
 
+    -- Wrap placement so restore_user_state() runs on every exit path.
+    local result
+    local ok, err = pcall(function()
+        result = (function()
     local data, loadErr = load_subtitle_data(filePath)
     if not data then
         return make_error("Failed to load subtitle file", loadErr)
@@ -1308,7 +1422,7 @@ function AddSubtitles(filePath, trackIndex, templateName, conflictMode, presetSe
     speakers = sanitize_speaker_tracks(timeline, speakers, trackIndex, markIn, markOut)
 
     local rootFolder = mediaPool:GetRootFolder()
-    local templateItem, template_frame_rate, templateErr = get_template(rootFolder, templateName)
+    local templateItem, template_frame_rate, templateErr, resolvedTemplateName = get_template(rootFolder, templateName)
     if not templateItem then
         return make_error("Template not found", templateErr)
     end
@@ -1316,20 +1430,50 @@ function AddSubtitles(filePath, trackIndex, templateName, conflictMode, presetSe
     local clipList = build_clip_list(subtitles, speakers, speakersExist, trackIndex, templateItem, frame_rate,
         template_frame_rate, timelineStart)
 
-    -- AppendToTimeline can fail (e.g. locked timeline, invalid clips). Surface
-    -- the real Resolve error instead of silently returning an empty table.
+    -- Temporarily unlock locked target tracks so AppendToTimeline doesn't
+    -- silently return an empty table. Re-lock them afterwards.
+    local lockedTracks = {}
+    if timeline.GetIsTrackLocked and timeline.SetTrackLock then
+        local trackSet = {}
+        for _, clip in ipairs(clipList) do
+            trackSet[clip.trackIndex] = true
+        end
+        for ti in pairs(trackSet) do
+            local isLocked = false
+            pcall(function()
+                isLocked = timeline:GetIsTrackLocked("video", ti) or false
+            end)
+            if isLocked then
+                pcall(timeline.SetTrackLock, timeline, "video", ti, false)
+                lockedTracks[ti] = true
+                print("[AutoSubs] Temporarily unlocked video track " .. ti .. " for placement")
+            end
+        end
+    end
+
     local appendOk, timelineItems = pcall(function()
         return mediaPool:AppendToTimeline(clipList)
     end)
+
+    for ti in pairs(lockedTracks) do
+        pcall(timeline.SetTrackLock, timeline, "video", ti, true)
+        print("[AutoSubs] Re-locked video track " .. ti)
+    end
+
     if not appendOk then
         return make_error("Failed to add subtitles to timeline", timelineItems)
     end
     if type(timelineItems) ~= "table" or #timelineItems == 0 then
         return make_error("Failed to add subtitles to timeline",
-            "Resolve did not return any timeline items from AppendToTimeline")
+            "Resolve did not return any timeline items from AppendToTimeline. " ..
+            "This can happen if the template clip is invalid/corrupt or the target " ..
+            "track index is out of range. Try re-importing the template or choosing " ..
+            "a different track.")
     end
 
-    local isAnimated = templateName == ANIMATED_CAPTION and true or false
+    -- Use the resolved template name so a fallback to ANIMATED_CAPTION still
+    -- enables the animated-text path.
+    local isAnimated = resolvedTemplateName == ANIMATED_CAPTION and true or false
 
     -- Auto-swap the caption Font for non-Latin transcript languages when the
     -- user is still on the macro's default font. Uses the transcript JSON's
@@ -1342,25 +1486,43 @@ function AddSubtitles(filePath, trackIndex, templateName, conflictMode, presetSe
 
     local applyStats = apply_subtitle_text(timelineItems, subtitles, speakers, speakersExist, isAnimated,
         presetSettings)
-    refresh_timeline(timeline)
+
+    -- Force timeline refresh by jumping to the first subtitle
+    if subtitles and #subtitles > 0 then
+        JumpToTime(subtitles[1].start)
+    end
 
     -- If some (but not all) clips failed to receive text/styling, still report
     -- success but include a warning summary so the UI can mention it.
     if applyStats and applyStats.failed > 0 and applyStats.failed < applyStats.total then
+        local warning = string.format("Failed to place %d of %d subtitles", applyStats.failed, applyStats.total)
+        if applyStats.noFusionComp and applyStats.noFusionComp > 0 then
+            warning = warning .. string.format(" (%d had no Fusion composition — your Resolve version may be incompatible)", applyStats.noFusionComp)
+        end
         return {
             ok = true,
             fontSwap = fontSwap,
-            warning = string.format("Failed to place %d of %d subtitles", applyStats.failed, applyStats.total),
+            warning = warning,
             detail = applyStats.firstError
         }
     elseif applyStats and applyStats.failed == applyStats.total and applyStats.total > 0 then
-        return make_error(
-            string.format("Failed to place all %d subtitles", applyStats.total),
-            applyStats.firstError
-        )
+        local short = string.format("Failed to place all %d subtitles", applyStats.total)
+        if applyStats.noFusionComp and applyStats.noFusionComp == applyStats.total then
+            short = short .. " — template clips had no Fusion composition. Check that your DaVinci Resolve version supports the AutoSubs Caption template."
+        end
+        return make_error(short, applyStats.firstError)
     end
 
     return { ok = true, fontSwap = fontSwap }
+        end)() -- end of inner placement function
+    end)
+
+    restore_user_state()
+
+    if not ok then
+        return make_error("Failed to add subtitles", err)
+    end
+    return result
 end
 
 local function extract_frame(comp, exportDir)
@@ -1419,6 +1581,7 @@ end
 -- `language` (optional): ISO code of the transcript this preview represents,
 -- used for language-aware font fallback on the AutoSubs Caption macro.
 function GeneratePreview(speaker, templateName, presetSettings, exportDir, language)
+    refresh_project()
     local timeline = project:GetCurrentTimeline()
     if not timeline then
         return make_error("Failed to generate preview", "No active timeline in Resolve")
@@ -1427,6 +1590,11 @@ function GeneratePreview(speaker, templateName, presetSettings, exportDir, langu
 
     -- Resolve the template item
     local templateItem = get_template_item(rootFolder, templateName)
+    if not templateItem then
+        -- Template missing — trigger auto-import and retry
+        get_templates()
+        templateItem = get_template_item(rootFolder, templateName)
+    end
     if not templateItem then
         return make_error("Failed to generate preview",
             "Could not find subtitle template '" .. tostring(templateName) .. "' in media pool")
@@ -1467,8 +1635,7 @@ function GeneratePreview(speaker, templateName, presetSettings, exportDir, langu
 
     local outputPath = nil
     local success, err = pcall(function()
-        local fusionCompCount = timelineItem:GetFusionCompCount() or 0
-        if fusionCompCount > 0 then
+        if timelineItem:GetFusionCompCount() > 0 then
             local comp = timelineItem:GetFusionCompByIndex(1)
             local tool = comp:FindToolByID("TextPlus")
             tool:SetInput("StyledText", "Subtitle Example Text")
@@ -1535,6 +1702,7 @@ function StartPresetEdit(initialSettings)
         return { error = "A preset edit is already in progress" }
     end
 
+    refresh_project()
     local timeline = project:GetCurrentTimeline()
     if not timeline then
         return { error = "No active timeline" }
@@ -1542,6 +1710,11 @@ function StartPresetEdit(initialSettings)
 
     local rootFolder = mediaPool:GetRootFolder()
     local templateItem = get_template_item(rootFolder, ANIMATED_CAPTION)
+    if not templateItem then
+        -- Template missing — trigger auto-import and retry
+        get_templates()
+        templateItem = get_template_item(rootFolder, ANIMATED_CAPTION)
+    end
     if not templateItem then
         return { error = "Could not find '" .. ANIMATED_CAPTION .. "' template in media pool" }
     end
@@ -1678,7 +1851,8 @@ local function ShutdownApp()
     if ffi.os == "Windows" then
         local SW_HIDE = 0
         local shell32 = ffi.load("Shell32")
-        local result_shutdown = shell32.ShellExecuteA(nil, "open", "taskkill.exe", "/IM AutoSubs.exe /T /F", nil, SW_HIDE)
+        local result_shutdown = shell32.ShellExecuteA(nil, "open", "taskkill.exe", "/IM AutoSubs.exe /T /F", nil,
+            SW_HIDE)
 
         if result_shutdown > 32 then
             print("AutoSubs shutdown requested.")
@@ -1729,30 +1903,15 @@ function StartServer()
     assert(server:set_option("nodelay", true, "tcp"))
     assert(server:set_option("reuseaddr", true))
 
-    -- Bind and listen. If an older AutoSubs Lua server still owns the port,
-    -- ask it to exit and retry instead of leaving users stuck until reboot.
-    local bound = false
-    local lastBindErr = nil
-    for attempt = 1, 8 do
-        local success, err = pcall(function()
-            assert(server:bind(info))
-        end)
+    -- Bind and listen
+    local success, err = pcall(function()
+        assert(server:bind(info))
+    end)
 
-        if success then
-            bound = true
-            break
-        end
-
-        lastBindErr = err
-        print("[AutoSubs Server] Port " .. tostring(PORT) ..
-            " is busy; asking existing AutoSubs link to exit (attempt " .. tostring(attempt) .. "/8)")
+    if not success then
         send_exit_via_socket()
-        sleep(math.min(0.25 * attempt, 1.5))
-    end
-
-    if not bound then
-        error("Failed to bind AutoSubs link server on port " .. tostring(PORT) ..
-            " after resetting the existing link: " .. tostring(lastBindErr))
+        sleep(0.5)
+        assert(server:bind(info))
     end
 
     assert(server:listen())
@@ -1836,9 +1995,9 @@ function StartServer()
                     success, err = pcall(function()
                         if data ~= nil then
                             if data.func ~= "Ping" and data.func ~= "Exit" and data.func ~= "ShutdownApp" then
-                                local bindingOk, bindingErr = refresh_resolve_project_binding()
+                                local bindingOk, bindingErr = refresh_project()
                                 if not bindingOk then
-                                    body = json.encode(bindingErr)
+                                    body = safe_json(bindingErr)
                                     quitServer = true
                                     return
                                 end
@@ -1847,38 +2006,38 @@ function StartServer()
                             if data.func == "GetTimelineInfo" then
                                 print("[AutoSubs Server] Retrieving Timeline Info...")
                                 local timelineInfo = GetTimelineInfo()
-                                body = json.encode(timelineInfo)
+                                body = safe_json(timelineInfo)
                             elseif data.func == "GetTemplates" then
                                 print("[AutoSubs Server] Retrieving Templates...")
                                 local templates = GetTemplates()
-                                body = json.encode(templates)
+                                body = safe_json(templates)
                             elseif data.func == "JumpToTime" then
                                 print("[AutoSubs Server] Jumping to time...")
                                 JumpToTime(data.seconds)
-                                body = json.encode({
+                                body = safe_json({
                                     message = "Jumped to time"
                                 })
                             elseif data.func == "ExportAudio" then
                                 print("[AutoSubs Server] Exporting audio...")
                                 local audioInfo = ExportAudio(data.outputDir, data.inputTracks, data.exportRange)
-                                body = json.encode(audioInfo)
+                                body = safe_json(audioInfo)
                             elseif data.func == "GetExportProgress" then
                                 print("[AutoSubs Server] Getting export progress...")
                                 local progressInfo = GetExportProgress()
-                                body = json.encode(progressInfo)
+                                body = safe_json(progressInfo)
                             elseif data.func == "CancelExport" then
                                 print("[AutoSubs Server] Cancelling export...")
                                 local cancelResult = CancelExport()
-                                body = json.encode(cancelResult)
+                                body = safe_json(cancelResult)
                             elseif data.func == "CheckTrackConflicts" then
                                 print("[AutoSubs Server] Checking track conflicts...")
                                 local conflictInfo = CheckTrackConflicts(data.filePath, data.trackIndex)
-                                body = json.encode(conflictInfo)
+                                body = safe_json(conflictInfo)
                             elseif data.func == "AddSubtitles" then
                                 print("[AutoSubs Server] Adding subtitles to timeline...")
                                 local result = AddSubtitles(data.filePath, data.trackIndex, data.templateName,
                                     data.conflictMode, data.presetSettings)
-                                body = json.encode({
+                                body = safe_json({
                                     message = "Job completed",
                                     result = result
                                 })
@@ -1886,19 +2045,19 @@ function StartServer()
                                 print("[AutoSubs Server] Generating preview...")
                                 local previewResult = GeneratePreview(data.speaker, data.templateName,
                                     data.presetSettings, data.exportPath, data.language)
-                                body = json.encode(previewResult)
+                                body = safe_json(previewResult)
                             elseif data.func == "StartPresetEdit" then
                                 print("[AutoSubs Server] Starting caption preset edit...")
                                 local result = StartPresetEdit(data.initialSettings)
-                                body = json.encode(result)
+                                body = safe_json(result)
                             elseif data.func == "CapturePresetSettings" then
                                 print("[AutoSubs Server] Capturing caption preset settings...")
                                 local result = CapturePresetSettings()
-                                body = json.encode(result)
+                                body = safe_json(result)
                             elseif data.func == "CancelPresetEdit" then
                                 print("[AutoSubs Server] Cancelling caption preset edit...")
                                 local result = CancelPresetEdit()
-                                body = json.encode(result)
+                                body = safe_json(result)
                             elseif data.func == "Exit" then
                                 body = safe_json({ message = "Server shutting down" })
                                 quitServer = true

@@ -51,9 +51,21 @@ pub async fn resolve_bridge(args: ResolveBridgeArgs) -> Result<String, String> {
         .send()
         .await
         .map_err(|e| {
-            // "Resolve offline" is normal if Resolve isn't running or the user is in standalone mode.
             tracing::debug!("resolve_bridge: could not connect to Resolve (this is normal if Resolve is closed): {}", e);
-            format!("resolve request failed: {}", e)
+            // Distinguish "Resolve offline" from timeouts so the frontend can show
+            // a user-facing message instead of a generic error.
+            if e.is_connect() {
+                "DaVinci Resolve is not running or the AutoSubs bridge is unavailable. \
+                 Please open DaVinci Resolve and launch the AutoSubs script from \
+                 Workspace → Scripts → AutoSubs."
+                    .to_string()
+            } else if e.is_timeout() {
+                format!("DaVinci Resolve did not respond within {} seconds. \
+                         It may be busy or unresponsive — try again, or restart the \
+                         AutoSubs script in Resolve.", timeout.as_secs())
+            } else {
+                format!("resolve request failed: {}", e)
+            }
         })?;
 
     let status = response.status();

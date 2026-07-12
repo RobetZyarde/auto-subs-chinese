@@ -1,38 +1,40 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use reqwest::Client;
 use serde_json::json;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
 use std::time::Duration;
-use tauri::Emitter; // for app.emit
 use tauri::{Manager, RunEvent};
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
-use tauri_plugin_updater::UpdaterExt;
+use tauri::Emitter; // for app.emit
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
+use std::sync::Arc;
 use tokio::sync::Notify;
+use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 
 // Import plugins
-use tauri_plugin_clipboard_manager::init as clipboard_plugin;
 use tauri_plugin_fs::init as fs_plugin;
 use tauri_plugin_http::init as http_plugin;
-use tauri_plugin_opener::init as opener_plugin;
 use tauri_plugin_process::init as process_plugin;
 use tauri_plugin_shell::init as shell_plugin;
-use tauri_plugin_single_instance::init as single_instance_plugin;
+use tauri_plugin_shell::ShellExt; // for app.shell()
 use tauri_plugin_store::Builder as StoreBuilder;
+use tauri_plugin_clipboard_manager::init as clipboard_plugin;
+use tauri_plugin_opener::init as opener_plugin;
+use tauri_plugin_single_instance::init as single_instance_plugin;
+use tokio::process::Command as TokioCommand;
 
-mod adobe_bridge;
 mod audio_preprocess;
-mod cli;
 mod ffmpeg;
-mod logging;
 mod models;
 mod python_env;
-mod resolve_bridge;
-#[cfg(target_os = "macos")]
-mod traffic_lights;
-mod transcript_types;
 mod transcription_api;
+mod transcript_types;
+mod logging;
+mod resolve_bridge;
+mod adobe_bridge;
+mod cli;
+#[cfg(target_os = "macos")]
 
 // Include integration-like tests that need crate visibility
 #[cfg(test)]
@@ -164,16 +166,11 @@ fn setup_proxy_env() {}
 #[cfg(target_os = "linux")]
 fn is_newer_version(latest: &str, current: &str) -> bool {
     let parse = |s: &str| -> Option<(u32, u32, u32)> {
-        let parts: Vec<u32> = s
-            .trim_start_matches('v')
+        let parts: Vec<u32> = s.trim_start_matches('v')
             .split('.')
             .filter_map(|p| p.parse().ok())
             .collect();
-        if parts.len() >= 3 {
-            Some((parts[0], parts[1], parts[2]))
-        } else {
-            None
-        }
+        if parts.len() >= 3 { Some((parts[0], parts[1], parts[2])) } else { None }
     };
     matches!((parse(latest), parse(current)), (Some(l), Some(c)) if l > c)
 }
@@ -207,7 +204,12 @@ fn create_main_window(app: &tauri::AppHandle) -> tauri::Result<tauri::WebviewWin
 
     #[cfg(target_os = "macos")]
     {
+        // Empty native title for the overlay title bar (no centered text), set
+        // at creation so we don't need a post-creation set_title that would
+        // trigger an AppKit relayout. Traffic-light position is left to Tauri's
+        // built-in `traffic_light_position`.
         builder = builder
+            .title("")
             .title_bar_style(tauri::TitleBarStyle::Overlay)
             .traffic_light_position(tauri::LogicalPosition::new(16.0_f64, 25.0_f64));
     }
@@ -294,21 +296,6 @@ fn main() {
                 }
             }
 
-            // Set traffic light position programmatically on macOS.
-            // `trafficLightPosition` in tauri.conf.json is only applied at window
-            // creation and AppKit resets the button layout on various lifecycle
-            // events in packaged builds, so re-apply it here and on window events.
-            #[cfg(target_os = "macos")]
-            {
-                if let Some(window) = app.get_webview_window("main") {
-                    // Clearing the title triggers an AppKit titlebar relayout that
-                    // resets the traffic lights (tauri-apps/tauri#13044), so do it
-                    // BEFORE installing our positioner — otherwise the immediate
-                    // apply inside `install` is undone right after it runs.
-                    let _ = window.set_title("");
-                    crate::traffic_lights::install(&window);
-                }
-            }
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
@@ -322,20 +309,46 @@ fn main() {
                     let mut ffmpeg_ok = false;
                     let mut ffmpeg_version = String::new();
 
-                    match crate::ffmpeg::check_ffmpeg_version(&app_handle).await {
-                        Ok(out) => {
-                            ffmpeg_ok = out.success;
-                            let stdout = String::from_utf8_lossy(&out.stdout);
-                            ffmpeg_version = stdout.lines().next().unwrap_or("").to_string();
-                            tracing::info!(
-                                "ffmpeg check ({}): ok={}, version=\"{}\"",
-                                out.source,
-                                ffmpeg_ok,
-                                ffmpeg_version
-                            );
+                    // ffmpeg -version (sidecar first, then system fallback)
+                    match app_handle.shell().sidecar("ffmpeg") {
+                        Ok(cmd) => {
+                            match cmd.args(["-version"]).output().await {
+                                Ok(out) if out.status.success() => {
+                                    ffmpeg_ok = true;
+                                    let stdout = String::from_utf8_lossy(&out.stdout);
+                                    ffmpeg_version = stdout.lines().next().unwrap_or("").to_string();
+                                    tracing::info!("ffmpeg check (sidecar): ok=true, version=\"{}\"", ffmpeg_version);
+                                }
+                                Ok(out) => {
+                                    let stderr = String::from_utf8_lossy(&out.stderr);
+                                    tracing::warn!("ffmpeg sidecar -version exited non-zero. stderr: {}", stderr);
+                                    // fallback to system
+                                    if let Ok(sys) = TokioCommand::new("ffmpeg").arg("-version").output().await {
+                                        ffmpeg_ok = sys.status.success();
+                                        let stdout = String::from_utf8_lossy(&sys.stdout);
+                                        ffmpeg_version = stdout.lines().next().unwrap_or("").to_string();
+                                        tracing::info!("ffmpeg check (system): ok={}, version=\"{}\"", ffmpeg_ok, ffmpeg_version);
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!("ffmpeg sidecar execution failed: {:?}", e);
+                                    if let Ok(sys) = TokioCommand::new("ffmpeg").arg("-version").output().await {
+                                        ffmpeg_ok = sys.status.success();
+                                        let stdout = String::from_utf8_lossy(&sys.stdout);
+                                        ffmpeg_version = stdout.lines().next().unwrap_or("").to_string();
+                                        tracing::info!("ffmpeg check (system): ok={}, version=\"{}\"", ffmpeg_ok, ffmpeg_version);
+                                    }
+                                }
+                            }
                         }
                         Err(e) => {
-                            tracing::warn!("ffmpeg check failed: {}", e);
+                            tracing::warn!("ffmpeg sidecar not found/failed to init: {:?}", e);
+                            if let Ok(sys) = TokioCommand::new("ffmpeg").arg("-version").output().await {
+                                ffmpeg_ok = sys.status.success();
+                                let stdout = String::from_utf8_lossy(&sys.stdout);
+                                ffmpeg_version = stdout.lines().next().unwrap_or("").to_string();
+                                tracing::info!("ffmpeg check (system): ok={}, version=\"{}\"", ffmpeg_ok, ffmpeg_version);
+                            }
                         }
                     }
 
@@ -488,13 +501,6 @@ fn main() {
                                 let _ = window.show();
                                 let _ = window.unminimize();
                                 let _ = window.set_focus();
-                                // These late show()/set_focus() calls trigger an AppKit
-                                // titlebar relayout that resets the traffic lights, and
-                                // set_focus() on an already-focused window emits no
-                                // Focused event — so the install()-registered listener
-                                // won't fire. Re-apply explicitly to keep them aligned.
-                                #[cfg(target_os = "macos")]
-                                crate::traffic_lights::position_on_main_thread(&window);
                             }
                         }
                     });
@@ -573,12 +579,12 @@ fn main() {
                         let app_handle = app.clone();
                         tauri::async_runtime::spawn(async move {
                             // short timeout to avoid hanging on exit
-                            let client = reqwest::Client::builder()
+                            let client = Client::builder()
                                 .no_proxy()
                                 .tcp_nodelay(true)
                                 .timeout(Duration::from_millis(750))
                                 .build()
-                                .unwrap_or_else(|_| reqwest::Client::new());
+                                .unwrap_or_else(|_| Client::new());
 
                             let url = "http://127.0.0.1:56002/";
                             let _ = client

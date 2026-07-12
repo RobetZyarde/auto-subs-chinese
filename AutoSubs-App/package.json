@@ -1,13 +1,12 @@
 {
   "name": "autosubs",
   "private": true,
-  "version": "3.6.1",
+  "version": "3.6.2",
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev.js",
     "build": "npm run build:web",
-    "build:web": "tsc && vite build --logLevel error",
-    "build:verbose": "tsc && vite build",
+    "build:web": "tsc && vite build",
     "build:adobe-extension": "npm --prefix ../Adobe-Extension run build",
     "build:tauri-prep": "npm run build:adobe-extension && npm run build:web",
     "preview": "vite preview",
@@ -16,20 +15,17 @@
     "dev:mac:arm64": "tauri dev --features mac-aarch -- --no-default-features",
     "dev:mac:x86_64": "tauri dev --features mac-x86_64 -- --no-default-features",
     "dev:win": "tauri dev --features windows -- --no-default-features",
-    "dev:win:vulkan": "tauri dev --features windows-vulkan -- --no-default-features",
-    "build:win": "npm run tauri build -- --runner ..\\scripts\\quiet-cargo.cmd -- --no-default-features --features windows",
-    "build:win:unsigned": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:AUTOSUBS_SKIP_SIGN='1'; Remove-Item Env:HTTP_PROXY,Env:HTTPS_PROXY,Env:ALL_PROXY,Env:http_proxy,Env:https_proxy,Env:all_proxy -ErrorAction SilentlyContinue; npm run build:win\"",
-    "build:win:vulkan": "npm run tauri build -- --runner ..\\scripts\\quiet-cargo.cmd -- --no-default-features --features windows-vulkan",
     "dev:linux": "tauri dev --features linux -- --no-default-features",
+    "build:win": "npm run tauri build -- -- --no-default-features --features windows",
     "build:linux": "npm run tauri build -- --no-default-features --features linux",
     "build:mac:arm64": "npm run tauri build -- -- --no-default-features --features mac-aarch",
     "build:mac:x86_64": "npm run tauri build -- -- --no-default-features --features mac-x86_64",
     "build:mac:arm64:local": "dotenv -- npm run build:mac:arm64",
     "build:mac:x86_64:local": "dotenv -- npm run build:mac:x86_64",
     "build:win:local": "dotenv -- npm run build:win",
-    "check:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/quiet-cargo.ps1 check --manifest-path src-tauri/Cargo.toml --no-default-features --features windows",
-    "test:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/quiet-cargo.ps1 test --manifest-path src-tauri/Cargo.toml --no-default-features --features windows",
-    "sync-version": "node scripts/update-version.js"
+    "bump-version": "node scripts/bump-version.mjs",
+    "setup-resolve": "node scripts/setup-resolve-dev.js",
+    "test:resolve-caption-contract": "node scripts/test-resolve-caption-contract.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.2.10",
@@ -106,7 +102,8 @@
     "tailwind-merge": "^2.5.3",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@tauri-apps/api": "^2.7.0",

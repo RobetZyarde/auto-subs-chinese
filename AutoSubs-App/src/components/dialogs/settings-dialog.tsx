@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Gauge, Clock, GraduationCap, Terminal } from "lucide-react";
 import { DeleteIcon, type DeleteIconHandle } from "@/components/ui/icons/delete";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettingsStore } from "@/stores/settings-store";
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
@@ -28,6 +28,7 @@ import { Field, FieldGroup } from "@/components/ui/field";
 import { initI18n, normalizeUiLanguage } from "@/i18n";
 import { uiLanguages } from "@/lib/languages";
 import { useRef } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -35,9 +36,28 @@ interface SettingsDialogProps {
 }
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const { settings, updateSetting, resetSettings } = useSettings();
+  const uiLanguage = useSettingsStore((s) => s.uiLanguage);
+  const enableGpu = useSettingsStore((s) => s.enableGpu);
+  const enableDTW = useSettingsStore((s) => s.enableDTW);
+  const updateSetting = useSettingsStore((s) => s.updateSetting);
+  const resetSettings = useSettingsStore((s) => s.resetSettings);
   const { t, i18n } = useTranslation();
   const deleteIconRef = useRef<DeleteIconHandle>(null);
+  const [appVersion, setAppVersion] = React.useState<string>("");
+
+  React.useEffect(() => {
+    let cancelled = false;
+    getVersion()
+      .then((v) => {
+        if (!cancelled) setAppVersion(v);
+      })
+      .catch(() => {
+        if (!cancelled) setAppVersion("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleResetSettings = async () => {
     const shouldReset = await ask(t("settings.reset.confirm"), {
@@ -115,6 +135,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <DialogTitle>{t("settings.title")}</DialogTitle>
             <DialogDescription className="text-xs">
               {t("settings.description")}
+              {appVersion && (
+                <span className="ml-1 text-muted-foreground/70">
+                  · v{appVersion}
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -137,7 +162,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
                     <ItemActions className="w-[170px] shrink-0 justify-end">
                       <Select
-                        value={normalizeUiLanguage(settings.uiLanguage)}
+                        value={normalizeUiLanguage(uiLanguage)}
                         onValueChange={(value) => {
                           const normalized = normalizeUiLanguage(value);
                           updateSetting("uiLanguage", normalized);
@@ -201,7 +226,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     </ItemContent>
                     <ItemActions>
                       <Switch
-                        checked={settings.enableGpu}
+                        checked={enableGpu}
                         onCheckedChange={(checked) => updateSetting("enableGpu", checked)}
                       />
                     </ItemActions>
@@ -221,7 +246,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     </ItemContent>
                     <ItemActions>
                       <Switch
-                        checked={settings.enableDTW}
+                        checked={enableDTW}
                         onCheckedChange={(checked) => updateSetting("enableDTW", checked)}
                       />
                     </ItemActions>

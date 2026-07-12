@@ -1,16 +1,10 @@
-use crate::types::{
-    LabeledProgressFn, NewSegmentFn, ProgressType, Segment, SpeechSegment, TranscribeOptions,
-    WordTimestamp,
-};
-use crate::utils::{calculate_dtw_mem_size, cs_to_s};
-use eyre::{OptionExt, Result, WrapErr, bail};
-use std::panic::{AssertUnwindSafe, catch_unwind};
+use crate::types::{SpeechSegment, Segment, WordTimestamp, TranscribeOptions, LabeledProgressFn, NewSegmentFn, ProgressType};
+use eyre::{Result, bail, WrapErr, OptionExt};
 use std::path::Path;
+use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperSegment, DtwParameters, DtwMode, DtwModelPreset};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Mutex;
-use whisper_rs::{
-    DtwMode, DtwModelPreset, DtwParameters, FullParams, SamplingStrategy, WhisperContext,
-    WhisperContextParameters, WhisperSegment,
-};
+use crate::utils::{calculate_dtw_mem_size, cs_to_s, push_segment_clamped};
 
 type ProgressCallbackType = once_cell::sync::Lazy<Mutex<Option<Box<dyn Fn(i32) + Send + Sync>>>>;
 static PROGRESS_CALLBACK: ProgressCallbackType = once_cell::sync::Lazy::new(|| Mutex::new(None));
@@ -22,21 +16,12 @@ pub static SHOULD_CANCEL: once_cell::sync::Lazy<Mutex<bool>> =
 // Latest progress values updated from hot compute loops (blocking threads)
 // Emission to the frontend is throttled via a periodic Tokio task.
 
-fn setup_params(options: &TranscribeOptions) -> FullParams<'_, '_> {
+fn setup_params(options: &TranscribeOptions) -> FullParams {
     // Determine the beam size or best_of value, defaulting to 5
-    let beam_size_or_best_of = options
-        .advanced
-        .as_ref()
-        .and_then(|a| a.best_of_or_beam_size)
-        .unwrap_or(5)
-        .max(1);
+    let beam_size_or_best_of = options.advanced.as_ref().and_then(|a| a.best_of_or_beam_size).unwrap_or(5).max(1);
 
     // Decide on the sampling strategy
-    let sampling_strategy = match options
-        .advanced
-        .as_ref()
-        .and_then(|a| a.sampling_strategy.as_deref())
-    {
+    let sampling_strategy = match options.advanced.as_ref().and_then(|a| a.sampling_strategy.as_deref()) {
         Some("greedy") => SamplingStrategy::Greedy {
             best_of: beam_size_or_best_of,
         },
@@ -72,8 +57,12 @@ fn setup_params(options: &TranscribeOptions) -> FullParams<'_, '_> {
         params.set_language(Some(lang));
     }
 
-    // Set translation options (Whisper built-in to English)
-    if options.whisper_to_english.unwrap_or(false) {
+    // Set translation options (Whisper built-in to English).
+    // Whisper can only natively translate to English, so we activate it only
+    // when use_native_translation is requested and the target is "en".
+    if options.use_native_translation.unwrap_or(false)
+        && options.translate_target.as_deref() == Some("en")
+    {
         params.set_translate(true);
     }
 
@@ -151,10 +140,7 @@ pub fn create_context(
         };
 
         let dtw_mem_size = calculate_dtw_mem_size(num_samples.unwrap_or(0));
-        tracing::info!(
-            "DTW enabled: allocating {} MB for DTW memory",
-            dtw_mem_size / 1024 / 1024
-        );
+        tracing::info!("DTW enabled: allocating {} MB for DTW memory", dtw_mem_size / 1024 / 1024);
         ctx_params.dtw_parameters(DtwParameters {
             mode: DtwMode::ModelPreset { model_preset },
             dtw_mem_size,
@@ -197,15 +183,10 @@ use crate::utils::interpolate_word_timestamps;
 // Returns true if `s` is *only* a control marker like "[_BEG_]" or "[_TT_320]".
 fn is_whole_control_token(s: &str) -> bool {
     let t = s.trim_matches('\0').trim();
-    if !(t.starts_with("[_") && t.ends_with(']')) {
-        return false;
-    }
+    if !(t.starts_with("[_") && t.ends_with(']')) { return false; }
     // ensure inner is all A–Z / 0–9 / '_' (how whisper.cpp prints its markers)
-    let inner = &t[2..t.len() - 1];
-    !inner.is_empty()
-        && inner
-            .chars()
-            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+    let inner = &t[2..t.len()-1];
+    !inner.is_empty() && inner.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
 }
 
 // Strips embedded control markers from tokens (e.g., remove "[_TT_320]" from middle of text)
@@ -261,48 +242,30 @@ fn get_token_timestamps(seg: &WhisperSegment) -> Vec<WordTimestamp> {
     let mut pend_probs: Vec<f32> = Vec::new();
 
     for i in 0..n {
-        let Some(tok) = seg.get_token(i as i32) else {
-            continue;
-        };
-        let Ok(raw_bytes) = tok.to_bytes() else {
-            continue;
-        };
+        let Some(tok) = seg.get_token(i as i32) else { continue };
+        let Ok(raw_bytes) = tok.to_bytes() else { continue };
 
         // Defensive: trim any trailing NULs.
         let mut end = raw_bytes.len();
-        while end > 0 && raw_bytes[end - 1] == 0 {
-            end -= 1;
-        }
+        while end > 0 && raw_bytes[end - 1] == 0 { end -= 1; }
         let bytes = &raw_bytes[..end];
-        if bytes.is_empty() {
-            continue;
-        }
+        if bytes.is_empty() { continue; }
 
         // Whole control markers like "[_BEG_]" / "[_TT_320]" are pure ASCII;
         // detect on raw bytes and skip without touching the pending buffer.
         if let Ok(s) = std::str::from_utf8(bytes) {
-            if is_whole_control_token(s) {
-                continue;
-            }
+            if is_whole_control_token(s) { continue; }
         }
 
         let td = tok.token_data();
-        let anchor = if td.t_dtw >= 0 {
-            Some(cs_to_s(td.t_dtw))
-        } else {
-            None
-        };
+        let anchor = if td.t_dtw >= 0 { Some(cs_to_s(td.t_dtw)) } else { None };
         let t0 = cs_to_s(td.t0);
         let t1 = cs_to_s(td.t1);
 
-        if pending.is_empty() {
-            pend_t0 = Some(t0);
-        }
+        if pending.is_empty() { pend_t0 = Some(t0); }
         pending.extend_from_slice(bytes);
         pend_t1 = t1;
-        if anchor.is_some() {
-            pend_anchor = anchor;
-        }
+        if anchor.is_some() { pend_anchor = anchor; }
         pend_probs.push(td.p);
 
         // If the buffer now ends on a complete codepoint, flush it.
@@ -353,10 +316,7 @@ fn get_token_timestamps(seg: &WhisperSegment) -> Vec<WordTimestamp> {
     // Token bounds via DTW midpoints when anchors exist; fallback to t0/t1.
     let mut bounds = Vec::with_capacity(toks.len());
     for i in 0..toks.len() {
-        let a_prev = i
-            .checked_sub(1)
-            .and_then(|j| toks.get(j))
-            .and_then(|t| t.anchor);
+        let a_prev = i.checked_sub(1).and_then(|j| toks.get(j)).and_then(|t| t.anchor);
         let a_here = toks[i].anchor;
         let a_next = toks.get(i + 1).and_then(|t| t.anchor);
 
@@ -400,6 +360,7 @@ pub async fn run_transcription_pipeline(
     let mut state = ctx.create_state().context("failed to create state")?;
     let mut params = setup_params(&options);
 
+
     // DEFINE ABORT CALLBACK
     if let Some(abort_callback) = abort_callback {
         params.set_abort_callback_safe(abort_callback);
@@ -408,9 +369,7 @@ pub async fn run_transcription_pipeline(
     // DEFINE PROGRESS CALLBACK (no-op bridge; per-segment progress is emitted below)
     params.set_progress_callback_safe(|progress| {
         if let Ok(mut cb) = PROGRESS_CALLBACK.lock() {
-            if let Some(cb) = cb.as_mut() {
-                cb(progress);
-            }
+            if let Some(cb) = cb.as_mut() { cb(progress); }
         }
     });
 
@@ -423,6 +382,7 @@ pub async fn run_transcription_pipeline(
     // List for subtitle segments
     let mut segments: Vec<Segment> = Vec::with_capacity(speech_segments.len());
     let mut detected_lang: Option<String> = None;
+
 
     if let Some(lang) = options.lang.as_deref() {
         if lang != "auto" {
@@ -446,9 +406,7 @@ pub async fn run_transcription_pipeline(
         // in `setup_params`.
 
         // Transcribe the segment
-        state
-            .full(params.clone(), &samples)
-            .context("failed to transcribe")?;
+        state.full(params.clone(), &samples).context("failed to transcribe")?;
 
         // If no language was specified, detect it
         if detected_lang.is_none() {
@@ -475,10 +433,7 @@ pub async fn run_transcription_pipeline(
 
             tracing::debug!(
                 "Seg approx [{:.2}-{:.2}] text_len={} text={:?}",
-                approx_start,
-                approx_end,
-                text.len(),
-                text
+                approx_start, approx_end, text.len(), text
             );
 
             if text.trim().is_empty() {
@@ -488,53 +443,31 @@ pub async fn run_transcription_pipeline(
                 empty_segments += 1;
                 tracing::debug!(
                     "Skipping empty/whitespace seg in [{:.2}-{:.2}]",
-                    approx_start,
-                    approx_end
+                    approx_start, approx_end
                 );
                 continue;
             }
 
             // Choose word timestamps strategy and apply offset where needed in one place
-            let translated = options.whisper_to_english.unwrap_or(false);
+            let translated = options.use_native_translation.unwrap_or(false)
+                && options.translate_target.as_deref() == Some("en");
             let word_timestamps: Vec<WordTimestamp> = if translated {
                 // Interpolated times are already absolute via approx_* (which include base_offset)
                 interpolate_word_timestamps(&text, approx_start, approx_end)
             } else {
                 let mut w = get_token_timestamps(&seg);
-                for t in &mut w {
-                    t.start += base_offset;
-                    t.end += base_offset;
-                } // Offset all word timestamps by base_offset
+                for t in &mut w { t.start += base_offset; t.end += base_offset; } // Offset all word timestamps by base_offset
                 w
             };
 
             // Derive segment bounds with sensible fallbacks, and include words if any
-            let seg_start = word_timestamps
-                .first()
-                .map(|w| w.start)
-                .unwrap_or(approx_start);
+            let seg_start = word_timestamps.first().map(|w| w.start).unwrap_or(approx_start);
             let seg_end = word_timestamps.last().map(|w| w.end).unwrap_or(approx_end);
             tracing::debug!(
                 "Seg word_timestamps count={} bounds [{:.2}-{:.2}]",
-                word_timestamps.len(),
-                seg_start,
-                seg_end
+                word_timestamps.len(), seg_start, seg_end
             );
             let words_opt = (!word_timestamps.is_empty()).then_some(word_timestamps);
-
-            // prevent slight overlaps with previous segment
-            if let Some(last) = segments.last_mut() {
-                if last.end > seg_start {
-                    last.end = seg_start;
-                }
-                if let Some(words) = &mut last.words {
-                    if let Some(last_word) = words.last_mut() {
-                        if last_word.end > last.end {
-                            last_word.end = last.end;
-                        }
-                    }
-                }
-            }
 
             // Embedding and speaker identification (speaker diarization) - if enabled
             let mut speaker_id = None;
@@ -561,13 +494,9 @@ pub async fn run_transcription_pipeline(
             if let Some(progress_callback) = progress_callback {
                 tracing::trace!("progress: {} * {} / 100", i, speech_segments.len());
                 let progress = ((i + 1) as f64 / speech_segments.len() as f64 * 100.0) as i32;
-                progress_callback(
-                    progress,
-                    ProgressType::Transcribe,
-                    "progressSteps.transcribe",
-                );
+                progress_callback(progress, ProgressType::Transcribe, "progressSteps.transcribe");
             }
-            segments.push(segment);
+            push_segment_clamped(&mut segments, segment);
         }
     }
 
@@ -576,9 +505,7 @@ pub async fn run_transcription_pipeline(
     tracing::debug!("Segments: {}", segments.len());
 
     // Clear progress bridge to avoid dangling references beyond this async call
-    if let Ok(mut slot) = PROGRESS_CALLBACK.lock() {
-        *slot = None;
-    }
+    if let Ok(mut slot) = PROGRESS_CALLBACK.lock() { *slot = None; }
 
-    return Ok((segments, detected_lang));
+    Ok((segments, detected_lang))
 }

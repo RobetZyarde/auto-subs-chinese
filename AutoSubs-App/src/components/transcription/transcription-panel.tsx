@@ -5,7 +5,8 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { useModels } from "@/contexts/ModelsContext";
 import { useProgress } from "@/contexts/ProgressContext";
 import { useSubtitleDocument } from "@/contexts/SubtitleDocumentContext";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useShallow } from "zustand/react/shallow";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useResolve } from "@/contexts/ResolveContext";
 import { useAdobe } from "@/contexts/AdobeContext";
 import { useIntegration } from "@/contexts/IntegrationContext";
@@ -45,7 +46,50 @@ export function TranscriptionPanel({
     exportSubtitlesAs,
     loadSubtitles,
   } = useSubtitleDocument();
-  const { settings, updateSetting } = useSettings();
+  const {
+    selectedInputTracksByApp,
+    model,
+    language,
+    translate,
+    targetLanguage,
+    audioInputMode,
+    enableDTW,
+    enableGpu,
+    enableDiarize,
+    maxSpeakers,
+    textDensity,
+    maxLinesPerSubtitle,
+    customMaxCharsPerLine,
+    textCase,
+    removePunctuation,
+    enableCensor,
+    customPrompt,
+    transcriptionsCompleted,
+    subSlateMilestoneShown,
+  } = useSettingsStore(
+    useShallow((s) => ({
+      selectedInputTracksByApp: s.selectedInputTracksByApp,
+      model: s.model,
+      language: s.language,
+      translate: s.translate,
+      targetLanguage: s.targetLanguage,
+      audioInputMode: s.audioInputMode,
+      enableDTW: s.enableDTW,
+      enableGpu: s.enableGpu,
+      enableDiarize: s.enableDiarize,
+      maxSpeakers: s.maxSpeakers,
+      textDensity: s.textDensity,
+      maxLinesPerSubtitle: s.maxLinesPerSubtitle,
+      customMaxCharsPerLine: s.customMaxCharsPerLine,
+      textCase: s.textCase,
+      removePunctuation: s.removePunctuation,
+      enableCensor: s.enableCensor,
+      customPrompt: s.customPrompt,
+      transcriptionsCompleted: s.transcriptionsCompleted,
+      subSlateMilestoneShown: s.subSlateMilestoneShown,
+    })),
+  );
+  const updateSetting = useSettingsStore((s) => s.updateSetting);
   const { modelsState, downloadedModelValues, checkDownloadedModels } =
     useModels();
   const {
@@ -101,7 +145,7 @@ export function TranscriptionPanel({
 
   // Senior Pattern: derive active tracks from the app-aware map instead of a global list
   const activeSelectedTracks =
-    settings.selectedInputTracksByApp[selectedIntegration] || [];
+    selectedInputTracksByApp[selectedIntegration] || [];
   const cancelExport = resolveCancelExport; // Fallback for cancel
   const setIsExporting = resolveSetIsExporting; // Fallback
   const setExportProgress = resolveSetExportProgress; // Fallback
@@ -173,34 +217,35 @@ export function TranscriptionPanel({
     }
   }, [processingSteps]);
 
-  const isModelCached = modelsState[settings.model]?.isDownloaded ?? false;
+  const selectedModel = modelsState[model];
+  const isModelCached = selectedModel?.engine === "qwen3_asr" || selectedModel?.isDownloaded || false;
   const isDiarizeModelDownloaded = downloadedModelValues.includes(
     diarizeModel.value,
   );
   const hasPendingDownloads =
-    !isModelCached || (settings.enableDiarize && !isDiarizeModelDownloaded);
+    !isModelCached || (enableDiarize && !isDiarizeModelDownloaded);
 
   React.useEffect(() => {
     const cleanup = setupEventListeners({
-      targetLanguage: settings.targetLanguage,
-      language: settings.language,
-      isResolveMode: settings.audioInputMode === "timeline",
+      targetLanguage,
+      language,
+      isResolveMode: audioInputMode === "timeline",
       hasPendingDownloads,
-      enableDiarize: settings.enableDiarize,
+      enableDiarize,
     });
 
     return cleanup;
   }, [
     setupEventListeners,
-    settings.targetLanguage,
-    settings.language,
-    settings.audioInputMode,
+    targetLanguage,
+    language,
+    audioInputMode,
     hasPendingDownloads,
-    settings.enableDiarize,
+    enableDiarize,
   ]);
 
   React.useEffect(() => {
-    if (settings.audioInputMode === "timeline" && isExporting) {
+    if (audioInputMode === "timeline" && isExporting) {
       updateProgressStep({
         progress: exportProgress,
         type: "Export",
@@ -209,7 +254,7 @@ export function TranscriptionPanel({
   }, [
     isExporting,
     exportProgress,
-    settings.audioInputMode,
+    audioInputMode,
     updateProgressStep,
   ]);
 
@@ -260,33 +305,32 @@ export function TranscriptionPanel({
     setLabeledProgress(null);
     cancelRequestedRef.current = false;
     setFileInput(null);
-    if (settings.audioInputMode === "timeline") {
+    if (audioInputMode === "timeline") {
       await refreshAudioTracks();
     }
   }, [
     cancelRequestedRef,
     clearProgressSteps,
     refreshAudioTracks,
-    settings.audioInputMode,
+    audioInputMode,
     setExportProgress,
     setIsExporting,
     setFileInput,
   ]);
 
   const handleStartTranscription = async () => {
-    if (settings.audioInputMode === "timeline" && !timelineInfo.timelineId) {
+    if (audioInputMode === "timeline" && !timelineInfo.timelineId) {
       console.error("No timeline selected");
       return;
     }
 
     cancelRequestedRef.current = false;
-    if (settings.audioInputMode === "file" && !fileInput) {
+    if (audioInputMode === "file" && !fileInput) {
       console.error("No file selected");
       return;
     }
 
     // Check Python environment for Qwen3-ASR model
-    const selectedModel = modelsState[settings.model];
     if (selectedModel?.value === "qwen3-asr") {
       try {
         const pythonStatus = await invoke<string>("check_python_env");
@@ -306,16 +350,16 @@ export function TranscriptionPanel({
     clearProgressSteps();
 
     setupEventListeners({
-      targetLanguage: settings.targetLanguage,
-      language: settings.language,
-      isResolveMode: settings.audioInputMode === "timeline",
+      targetLanguage,
+      language,
+      isResolveMode: audioInputMode === "timeline",
       hasPendingDownloads,
-      enableDiarize: settings.enableDiarize,
+      enableDiarize,
     });
 
     try {
       const audioInfo = await getSourceAudio(
-        settings.audioInputMode,
+        audioInputMode,
         fileInput,
         activeSelectedTracks,
       );
@@ -330,24 +374,24 @@ export function TranscriptionPanel({
       const options: TranscriptionOptions = {
         audioPath: audioInfo.path,
         offset: Math.round(audioInfo.offset * 1000) / 1000,
-        model: modelsState[settings.model].value,
-        lang: settings.language,
-        translate: settings.translate,
-        targetLanguage: settings.targetLanguage,
-        enableDtw: settings.enableDTW,
-        enableGpu: settings.enableGpu,
-        enableDiarize: settings.enableDiarize,
-        maxSpeakers: settings.maxSpeakers,
-        density: settings.textDensity,
-        maxLines: settings.maxLinesPerSubtitle,
+        model: modelsState[model].value,
+        lang: language,
+        translate,
+        targetLanguage,
+        enableDtw: enableDTW,
+        enableGpu,
+        enableDiarize,
+        maxSpeakers,
+        density: textDensity,
+        maxLines: maxLinesPerSubtitle,
         customMaxCharsPerLine:
-          settings.textDensity === "custom"
-            ? settings.customMaxCharsPerLine
+          textDensity === "custom"
+            ? customMaxCharsPerLine
             : undefined,
-        textCase: settings.textCase,
-        removePunctuation: settings.removePunctuation,
-        censoredWords: settings.enableCensor ? getActiveCensorWords(settings) : [],
-        customPrompt: settings.customPrompt.trim() || undefined,
+        textCase,
+        removePunctuation,
+        censoredWords: enableCensor ? getActiveCensorWords(useSettingsStore.getState()) : [],
+        customPrompt: customPrompt.trim() || undefined,
       };
 
       const transcript = await invoke("transcribe_audio", { options });
@@ -356,16 +400,16 @@ export function TranscriptionPanel({
 
       await processTranscriptionResults(
         transcript as any,
-        settings,
+        useSettingsStore.getState(),
         fileInput,
         timelineInfo.timelineId,
       );
       await onTranscriptCreated?.();
       onViewSubtitles?.();
 
-      const nextCount = (settings.transcriptionsCompleted ?? 0) + 1;
+      const nextCount = (transcriptionsCompleted ?? 0) + 1;
       updateSetting("transcriptionsCompleted", nextCount);
-      if (nextCount >= 10 && !settings.subSlateMilestoneShown) {
+      if (nextCount >= 10 && !subSlateMilestoneShown) {
         setShowSubSlate(true);
       }
     } catch (error) {
@@ -441,8 +485,8 @@ export function TranscriptionPanel({
         <div className="flex-1 min-h-0">
           <TranscriptionPanelView
             modelsState={modelsState}
-            selectedModelIndex={settings.model}
-            selectedLanguage={settings.language}
+            selectedModelIndex={model}
+            selectedLanguage={language}
             onSelectModel={(modelIndex) => {
               updateSetting("model", modelIndex);
             }}
@@ -451,7 +495,7 @@ export function TranscriptionPanel({
             openModelSelector={openModelSelector}
             onOpenModelSelectorChange={setOpenModelSelector}
             isSmallScreen={isSmallScreen}
-            audioInputMode={settings.audioInputMode}
+            audioInputMode={audioInputMode}
             onAudioInputModeChange={(mode) =>
               updateSetting("audioInputMode", mode)
             }
@@ -465,7 +509,6 @@ export function TranscriptionPanel({
             onTranscriptDocumentsRefresh={onTranscriptDocumentsRefresh}
             isSubtitleViewerOpen={isSubtitleViewerOpen}
             livePreviewSegments={livePreviewSegments}
-            settings={settings}
             timelineInfo={timelineInfo}
             templates={isPremiereActive ? [] : resolveTemplates}
             templatesLoading={isPremiereActive ? false : resolveTemplatesLoading}
