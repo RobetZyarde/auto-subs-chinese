@@ -212,7 +212,7 @@ py -3.12 -m venv .venv
 当前应用默认使用这个缓存目录：
 
 ```text
-C:\Users\33287\AppData\Local\com.autosubs\models
+%LOCALAPPDATA%\com.autosubs\models
 ```
 
 安装 Hugging Face CLI：
@@ -224,9 +224,10 @@ C:\Users\33287\AppData\Local\com.autosubs\models
 下载模型：
 
 ```powershell
-$env:HF_HOME = "C:\Users\33287\AppData\Local\com.autosubs\models"
-$env:HF_HUB_CACHE = "C:\Users\33287\AppData\Local\com.autosubs\models"
-$env:TRANSFORMERS_CACHE = "C:\Users\33287\AppData\Local\com.autosubs\models"
+$modelCache = Join-Path $env:LOCALAPPDATA "com.autosubs\models"
+$env:HF_HOME = $modelCache
+$env:HF_HUB_CACHE = $modelCache
+$env:TRANSFORMERS_CACHE = $modelCache
 
 .\.venv\Scripts\huggingface-cli.exe download Qwen/Qwen3-ASR-1.7B
 .\.venv\Scripts\huggingface-cli.exe download Qwen/Qwen3-ForcedAligner-0.6B

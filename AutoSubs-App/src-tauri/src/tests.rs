@@ -112,23 +112,16 @@ mod tests {
     // run with: cargo test transcribe_audio_qwen3_smoke -- --nocapture
     #[tokio::test(flavor = "multi_thread")]
     async fn transcribe_audio_qwen3_smoke() {
+        let model_cache = dirs::data_local_dir()
+            .expect("local app data directory is unavailable")
+            .join("com.autosubs")
+            .join("models");
+
         unsafe {
-            std::env::set_var(
-                "HF_HOME",
-                r"C:\Users\33287\AppData\Local\com.autosubs\models",
-            );
-            std::env::set_var(
-                "HF_HUB_CACHE",
-                r"C:\Users\33287\AppData\Local\com.autosubs\models",
-            );
-            std::env::set_var(
-                "TRANSFORMERS_CACHE",
-                r"C:\Users\33287\AppData\Local\com.autosubs\models",
-            );
-            std::env::set_var(
-                "AUTOSUBS_MODEL_CACHE_DIR",
-                r"C:\Users\33287\AppData\Local\com.autosubs\models",
-            );
+            std::env::set_var("HF_HOME", &model_cache);
+            std::env::set_var("HF_HUB_CACHE", &model_cache);
+            std::env::set_var("TRANSFORMERS_CACHE", &model_cache);
+            std::env::set_var("AUTOSUBS_MODEL_CACHE_DIR", &model_cache);
         }
 
         let app = mock_builder()
