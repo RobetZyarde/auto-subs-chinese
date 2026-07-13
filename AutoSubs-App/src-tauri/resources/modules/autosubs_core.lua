@@ -96,6 +96,7 @@ local mediaPool = nil
 local ANIMATED_CAPTION = "AutoSubs Caption"
 local defaultTemplateImportAttempted = false
 local lastProjectId = nil
+local ensure_fusion_composition
 
 -- Refresh the cached project / mediaPool references and detect project
 -- switches. When the user opens a different Resolve project the old
@@ -761,6 +762,18 @@ local function get_clip_boundaries(timeline, selectedTracks, rangeStart, rangeEn
     return earliestStart, latestEnd
 end
 
+local function find_render_job_by_id(renderJobList, pid)
+    if type(renderJobList) ~= "table" then
+        return nil
+    end
+    for _, jobInfo in pairs(renderJobList) do
+        if type(jobInfo) == "table" and tostring(jobInfo["JobId"]) == tostring(pid) then
+            return jobInfo
+        end
+    end
+    return nil
+end
+
 
 -- Export audio from selected tracks
 -- inputTracks is a table of track indices to export
@@ -868,20 +881,34 @@ function ExportAudio(outputDir, inputTracks, exportRange)
 
     local success, err = pcall(function()
         local pid = project:AddRenderJob()
+        if not pid or pid == "" then
+            error("AddRenderJob returned no job ID")
+        end
         currentExportJob.pid = pid
-        project:StartRendering(pid)
+        local renderStarted = project:StartRendering(pid)
+        if not renderStarted then
+            error("StartRendering returned false for job " .. tostring(pid))
+        end
 
-        local renderJobList = project:GetRenderJobList()
-        local jobInfo = renderJobList[#renderJobList]
+        local listOk, renderJobList = pcall(project.GetRenderJobList, project)
+        local jobInfo = listOk and find_render_job_by_id(renderJobList, pid) or nil
+
+        -- GetRenderJobList can briefly return nil/empty after StartRendering.
+        -- The submitted settings are authoritative enough to construct the
+        -- expected WAV path and timing until the job becomes queryable.
+        local jobMarkIn = jobInfo and jobInfo["MarkIn"] or renderSettings.MarkIn or timeline:GetStartFrame()
+        local jobMarkOut = jobInfo and jobInfo["MarkOut"] or renderSettings.MarkOut or timeline:GetEndFrame()
+        local jobTargetDir = jobInfo and jobInfo["TargetDir"] or outputDir
+        local jobOutputFilename = jobInfo and jobInfo["OutputFilename"] or (exportName .. ".wav")
 
         -- Calculate offset to align subtitles back to timeline (exported audio starts at mark in, not timeline 0)
-        local framesFromTimelineStart = jobInfo["MarkIn"] - timeline:GetStartFrame()
+        local framesFromTimelineStart = jobMarkIn - timeline:GetStartFrame()
         local timeOffsetInSeconds = framesFromTimelineStart / timeline:GetSetting("timelineFrameRate")
 
         local audioInfo = {
-            path = join_path(jobInfo["TargetDir"], jobInfo["OutputFilename"]),
-            markIn = jobInfo["MarkIn"],
-            markOut = jobInfo["MarkOut"],
+            path = join_path(jobTargetDir, jobOutputFilename),
+            markIn = jobMarkIn,
+            markOut = jobMarkOut,
             offset = timeOffsetInSeconds
         }
         currentExportJob.audioInfo = audioInfo
@@ -1297,18 +1324,23 @@ local function apply_subtitle_text(timelineItems, subtitles, speakers, speakersE
             local subtitle = subtitles[i]
             local subtitleText = subtitle["text"]
 
-            local fusionCompCount = timelineItem:GetFusionCompCount()
-            if not fusionCompCount or fusionCompCount <= 0 then
+            local comp, compErr = ensure_fusion_composition(timelineItem, isAnimated)
+            if not comp then
                 noFusionComp = noFusionComp + 1
-                error("template clip has no Fusion composition (GetFusionCompCount returned nil or zero) — your DaVinci Resolve version may be incompatible")
+                error(compErr)
             end
-            if fusionCompCount > 0 then
-                local comp = timelineItem:GetFusionCompByIndex(1)
+            do
                 local template = comp:FindTool("Template") or comp:FindToolByID("TextPlus")
+                if not template then
+                    error("Fusion composition is missing its TextPlus template")
+                end
                 if isAnimated then
                     local framerate = tonumber(comp:GetPrefs("Comp.FrameFormat.Rate"))
                     local wordTiming = to_word_timing(subtitle.words, framerate, subtitle.start)
                     local autosubsTool = comp:FindTool("AutoSubs")
+                    if not autosubsTool then
+                        error("Fusion composition is missing the AutoSubs macro")
+                    end
                     autosubsTool:SetData("WordTiming", wordTiming) -- Will be applied to keyframes when text is updated
                     template:SetInput("Text", subtitleText)        -- AutoSubs Macro uses custom text input
 
@@ -1845,6 +1877,87 @@ function LaunchApp()
             return
         end
     end
+end
+
+local function caption_macro_path()
+    if DEV_MODE then
+        local sep = package.config:sub(1, 1)
+        return resources_path .. sep .. ".." .. sep .. ".." .. sep .. ".." .. sep ..
+            "Resolve-Integration" .. sep .. "autosubs-macro.setting"
+    end
+    return join_path(assets_path, "autosubs-macro.setting")
+end
+
+local function load_caption_macro_settings()
+    local path = caption_macro_path()
+
+    if bmd and bmd.readfile then
+        local readOk, settings = pcall(bmd.readfile, path)
+        if readOk and type(settings) == "table" then
+            return settings
+        end
+    end
+
+    local contentOk, content = pcall(read_file, path)
+    if not contentOk then
+        return nil, tostring(content)
+    end
+    local chunk, compileErr = loadstring("return " .. content, "@" .. path)
+    if not chunk then
+        return nil, tostring(compileErr)
+    end
+    local evalOk, settings = pcall(chunk)
+    if not evalOk or type(settings) ~= "table" then
+        return nil, tostring(settings)
+    end
+    return settings
+end
+
+-- Some Resolve versions append the bundled DRB title as a timeline item with
+-- no Fusion composition. Rebuild it from the canonical caption macro.
+ensure_fusion_composition = function(timelineItem, isAnimated)
+    local countOk, count = pcall(timelineItem.GetFusionCompCount, timelineItem)
+    if countOk and tonumber(count) and tonumber(count) > 0 then
+        local compOk, comp = pcall(timelineItem.GetFusionCompByIndex, timelineItem, 1)
+        if compOk and comp then
+            return comp
+        end
+    end
+
+    if not isAnimated then
+        return nil, "template clip has no Fusion composition"
+    end
+
+    local addOk, comp = pcall(timelineItem.AddFusionComp, timelineItem)
+    if not addOk or not comp then
+        return nil, "could not add a Fusion composition: " .. tostring(comp)
+    end
+
+    local settings, settingsErr = load_caption_macro_settings()
+    if not settings then
+        return nil, "could not load bundled caption macro: " .. tostring(settingsErr)
+    end
+
+    local pasteOk, pasted = pcall(comp.Paste, comp, settings)
+    if not pasteOk or pasted == false then
+        return nil, "could not paste bundled caption macro: " .. tostring(pasted)
+    end
+
+    local autosubsTool = comp:FindTool("AutoSubs")
+    local mediaOut = comp:FindTool("MediaOut1") or comp:FindToolByID("MediaOut")
+    if not autosubsTool or not mediaOut then
+        return nil, "rebuilt composition is missing AutoSubs or MediaOut"
+    end
+
+    local connectOk, connectErr = pcall(function()
+        mediaOut.Input = autosubsTool.Output
+    end)
+    if not connectOk then
+        return nil, "could not connect AutoSubs to MediaOut: " .. tostring(connectErr)
+    end
+
+    print("[AutoSubs] Rebuilt missing Fusion composition from bundled caption macro")
+    return comp
 end
 
 local function ShutdownApp()

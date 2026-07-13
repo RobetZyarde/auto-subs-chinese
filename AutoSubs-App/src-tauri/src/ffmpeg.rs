@@ -102,7 +102,3 @@ pub async fn run_ffmpeg<R: Runtime>(app: &AppHandle<R>, args: &[String]) -> Resu
 
     bail!("ffmpeg unavailable: {}", failures.join("; "))
 }
-
-pub async fn check_ffmpeg_version<R: Runtime>(app: &AppHandle<R>) -> Result<FfmpegOutput> {
-    run_ffmpeg(app, &[String::from("-version")]).await
-}

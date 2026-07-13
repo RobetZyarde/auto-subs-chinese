@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Template, TimelineInfo } from '@/types';
-import { getTimelineInfo, getTemplates, cancelExport, addSubtitlesToTimeline, closeResolveLink, ResolveApiError } from '@/api/resolve-api';
+import { getTimelineInfo, getTemplates, cancelExport, addSubtitlesToTimeline, closeResolveLink, exportAudio, getExportProgress, jumpToTime as resolveJump, ResolveApiError } from '@/api/resolve-api';
 import { useIntegration } from '@/contexts/IntegrationContext';
 import { useSettingsStore } from '@/stores/settings-store';
 import { validateExportedAudioFile } from '@/utils/file-utils';
@@ -190,9 +190,6 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
       setExportProgress(0);
 
       try {
-        // Import the required functions directly
-        const { exportAudio, getExportProgress } = await import('@/api/resolve-api');
-
         // Start the export (non-blocking)
         const exportResult = await exportAudio(inputTracks, exportRange || "entire");
         console.log("Export started:", exportResult);
@@ -323,7 +320,6 @@ export function ResolveProvider({ children }: { children: React.ReactNode }) {
       setExportProgress,
       cancelExport,
       jumpToTime: async (seconds: number) => {
-        const { jumpToTime: resolveJump } = await import("@/api/resolve-api");
         await resolveJump(seconds);
       },
     }}>

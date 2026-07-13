@@ -39,9 +39,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "resources/"
-    ],
+    "resources": {
+      "resources/": "resources/",
+      "../../Resolve-Integration/autosubs-macro.setting": "resources/AutoSubs/autosubs-macro.setting"
+    },
     "macOS": {
       "minimumSystemVersion": "13.3"
     },

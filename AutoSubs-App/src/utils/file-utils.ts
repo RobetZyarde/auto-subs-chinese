@@ -196,7 +196,11 @@ function sanitizeFilenamePart(value: string): string {
 function createTranscriptId(): string {
   const timestamp = new Date()
     .toISOString()
-    .replace(/[-:.TZ]/g, "")
+    .split("-").join("")
+    .split(":").join("")
+    .split(".").join("")
+    .split("T").join("")
+    .split("Z").join("")
     .slice(0, 14);
   const randomPart =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"

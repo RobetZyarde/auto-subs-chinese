@@ -11,6 +11,7 @@ use crate::types::{LabeledProgressFn, NewSegmentFn, Segment, SpeechSegment, Tran
 use crate::manifest::Engine as ModelEngine;
 use eyre::{eyre, Result};
 use std::path::Path;
+use transcribe_rs::{set_ort_accelerator, OrtAccelerator};
 
 pub mod whisper;
 
@@ -31,6 +32,27 @@ pub use moonshine::transcribe_moonshine;
 pub use parakeet::transcribe_parakeet;
 pub use sense_voice::transcribe_sense_voice;
 
+fn ort_accelerator_for(use_gpu: Option<bool>) -> OrtAccelerator {
+    if use_gpu == Some(false) {
+        return OrtAccelerator::CpuOnly;
+    }
+
+    #[cfg(feature = "directml")]
+    return OrtAccelerator::DirectMl;
+
+    #[cfg(all(not(feature = "directml"), feature = "coreml"))]
+    return OrtAccelerator::CoreMl;
+
+    #[cfg(not(any(feature = "directml", feature = "coreml")))]
+    OrtAccelerator::Auto
+}
+
+fn configure_ort_accelerator(use_gpu: Option<bool>) -> OrtAccelerator {
+    let accelerator = ort_accelerator_for(use_gpu);
+    set_ort_accelerator(accelerator);
+    accelerator
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn run_engine(
     engine_kind: ModelEngine,
@@ -45,6 +67,23 @@ pub async fn run_engine(
     abort_callback: Option<Box<dyn Fn() -> bool + Send + Sync>>,
 ) -> Result<(Vec<Segment>, Option<String>)> {
     let num_samples: usize = speech_segments.iter().map(|s| s.samples.len()).sum();
+
+    if matches!(
+        engine_kind,
+        ModelEngine::Parakeet
+            | ModelEngine::Moonshine
+            | ModelEngine::Canary
+            | ModelEngine::Cohere
+            | ModelEngine::Gigaam
+            | ModelEngine::SenseVoice
+    ) {
+        let accelerator = configure_ort_accelerator(cfg.use_gpu);
+        tracing::info!(
+            "ONNX: loading model with accelerator={} (use_gpu={:?})",
+            accelerator,
+            cfg.use_gpu
+        );
+    }
 
     match engine_kind {
         ModelEngine::Parakeet => {
@@ -158,5 +197,27 @@ pub async fn run_engine(
             other,
             options.model
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disabling_gpu_forces_ort_cpu() {
+        assert_eq!(ort_accelerator_for(Some(false)), OrtAccelerator::CpuOnly);
+    }
+
+    #[cfg(feature = "directml")]
+    #[test]
+    fn windows_gpu_uses_directml_for_ort_models() {
+        assert_eq!(ort_accelerator_for(Some(true)), OrtAccelerator::DirectMl);
+    }
+
+    #[cfg(all(not(feature = "directml"), feature = "coreml"))]
+    #[test]
+    fn mac_gpu_uses_coreml_for_ort_models() {
+        assert_eq!(ort_accelerator_for(Some(true)), OrtAccelerator::CoreMl);
     }
 }

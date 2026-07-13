@@ -70,6 +70,22 @@ Always install dependencies inside `AutoSubs-App/` and compile using these targe
 
 ---
 
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs use repo-local markdown under `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage uses the default `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix` roles. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Domain documentation uses a single-context layout rooted at `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
+
+---
+
 ## Related Documentation
 
 - **[Main README](README.md)** - Installation and general usage

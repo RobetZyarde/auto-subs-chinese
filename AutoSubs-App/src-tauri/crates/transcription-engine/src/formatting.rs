@@ -524,20 +524,21 @@ fn censored_replacement(clean: &str) -> String {
     }
 }
 
-/// Lowercase then uppercase the first letter of every "word" (separated by non-word chars).
-/// Mirrors JS `.toLocaleLowerCase().replace(/\b\w/g, c => c.toUpperCase())`.
+/// Lowercase then uppercase the first letter of every word. Apostrophes and
+/// censor markers remain inside the current word instead of opening a new one.
 fn titlecase_latin(s: &str) -> String {
     let lower = s.to_lowercase();
     let mut out = String::with_capacity(lower.len());
     let mut prev_is_word = false;
     for c in lower.chars() {
-        let is_word = c.is_alphanumeric() || c == '_';
-        if is_word && !prev_is_word {
+        let is_word_char = c.is_alphanumeric() || c == '_';
+        let is_internal_marker = c == '\'' || c == '\u{2019}' || c == '*';
+        if c.is_alphanumeric() && !prev_is_word {
             for uc in c.to_uppercase() { out.push(uc); }
         } else {
             out.push(c);
         }
-        prev_is_word = is_word;
+        prev_is_word = is_word_char || (prev_is_word && is_internal_marker);
     }
     out
 }
@@ -1371,6 +1372,18 @@ mod tests {
         assert!(joined.contains("Hello"), "expected Hello in: {}", joined);
         assert!(joined.contains("Fantastic"), "expected Fantastic in: {}", joined);
         assert!(joined.contains("World"), "expected World in: {}", joined);
+    }
+
+    #[test]
+    fn titlecase_preserves_internal_apostrophes() {
+        assert_eq!(titlecase_latin("THERE'S IT'S DON'T"), "There's It's Don't");
+        assert_eq!(titlecase_latin("l’amour d’angelo"), "L’amour D’angelo");
+        assert_eq!(titlecase_latin("'HELLO' ‘WORLD’"), "'Hello' ‘World’");
+    }
+
+    #[test]
+    fn titlecase_preserves_censor_word_boundaries() {
+        assert_eq!(titlecase_latin("f*******c d**n b***h"), "F*******c D**n B***h");
     }
 
     #[test]

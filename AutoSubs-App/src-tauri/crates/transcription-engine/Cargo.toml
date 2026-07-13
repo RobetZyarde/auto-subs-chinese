@@ -27,8 +27,8 @@ tokio-util = "0.7"
 unicode-segmentation = "1.11"
 
 [features]
-coreml = ["whisper-rs/coreml", "diarize/coreml"]
-directml = ["diarize/directml"]
+coreml = ["whisper-rs/coreml", "diarize/coreml", "transcribe-rs/ort-coreml"]
+directml = ["diarize/directml", "transcribe-rs/ort-directml"]
 cuda = ["whisper-rs/cuda", "diarize/load-dynamic"]
 openblas = ["whisper-rs/openblas"]
 metal = ["whisper-rs/metal"]
