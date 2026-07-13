@@ -42,6 +42,21 @@ assert.match(
 );
 assert.match(
   lua,
+  /GetCurrentPage[\s\S]*?OpenPage\("fusion"\)[\s\S]*?LoadFusionCompByName[\s\S]*?Paste/,
+  "Resolve Lua bridge must activate the Fusion page and composition before Paste",
+);
+assert.match(
+  lua,
+  /previousPage ~= "fusion"[\s\S]*?pcall\(resolve\.OpenPage, resolve, previousPage\)/,
+  "Resolve Lua bridge must restore the user's page after composition recovery",
+);
+assert.match(
+  lua,
+  /FindMainOutput\(1\)[\s\S]*?mediaOut\.Input:ConnectTo\(mainOutput\)[\s\S]*?GetConnectedOutput/,
+  "Resolve Lua bridge must connect the macro's published main output to MediaOut",
+);
+assert.match(
+  lua,
   /ensure_fusion_composition\(timelineItem, isAnimated\)/,
   "subtitle placement must invoke the Fusion composition recovery path",
 );
@@ -64,6 +79,11 @@ assert.match(
   lua,
   /local renderStarted = project:StartRendering\(pid\)[\s\S]*?if not renderStarted then/,
   "audio export must reject StartRendering failures",
+);
+assert.match(
+  lua,
+  /CompletionPercentage[\s\S]*?completionPercentage >= 100[\s\S]*?jobStatus ~= "Complete"/,
+  "audio export completion must use the locale-independent percentage",
 );
 
 console.log("Resolve caption contract verified");

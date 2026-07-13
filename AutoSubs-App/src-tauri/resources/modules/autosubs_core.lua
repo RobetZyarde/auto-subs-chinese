@@ -565,7 +565,7 @@ function GetExportProgress()
             -- the job's real status so a silently failed render (e.g. bad
             -- output path, disk full, no encoder) is reported as an error
             -- instead of a fabricated success with a non-existent file.
-            local jobStatus, jobError
+            local jobStatus, jobError, completionPercentage
             if currentExportJob.pid then
                 local ok, status = pcall(function()
                     return project:GetRenderJobStatus(currentExportJob.pid)
@@ -573,10 +573,12 @@ function GetExportProgress()
                 if ok and type(status) == "table" then
                     jobStatus = status["JobStatus"]
                     jobError = status["Error"]
+                    completionPercentage = tonumber(status["CompletionPercentage"])
                 end
             end
 
-            if jobStatus and jobStatus ~= "Complete" then
+            local renderComplete = completionPercentage and completionPercentage >= 100
+            if jobStatus and not renderComplete and jobStatus ~= "Complete" then
                 local detail = jobError or ("Render job status: " .. tostring(jobStatus))
                 print("[AutoSubs] Export did not complete successfully: " .. detail)
                 return {
@@ -1916,11 +1918,21 @@ end
 -- Some Resolve versions append the bundled DRB title as a timeline item with
 -- no Fusion composition. Rebuild it from the canonical caption macro.
 ensure_fusion_composition = function(timelineItem, isAnimated)
+    local comp = nil
+    local compName = nil
     local countOk, count = pcall(timelineItem.GetFusionCompCount, timelineItem)
     if countOk and tonumber(count) and tonumber(count) > 0 then
-        local compOk, comp = pcall(timelineItem.GetFusionCompByIndex, timelineItem, 1)
+        local compOk, existingComp = pcall(timelineItem.GetFusionCompByIndex, timelineItem, 1)
+        comp = compOk and existingComp or nil
         if compOk and comp then
-            return comp
+            if not isAnimated or comp:FindTool("AutoSubs") then
+                return comp
+            end
+
+            local namesOk, names = pcall(timelineItem.GetFusionCompNameList, timelineItem)
+            if namesOk and type(names) == "table" then
+                compName = names[1]
+            end
         end
     end
 
@@ -1928,9 +1940,21 @@ ensure_fusion_composition = function(timelineItem, isAnimated)
         return nil, "template clip has no Fusion composition"
     end
 
-    local addOk, comp = pcall(timelineItem.AddFusionComp, timelineItem)
-    if not addOk or not comp then
-        return nil, "could not add a Fusion composition: " .. tostring(comp)
+    if not comp then
+        local addOk, addedComp = pcall(timelineItem.AddFusionComp, timelineItem)
+        if not addOk or not addedComp then
+            return nil, "could not add a Fusion composition: " .. tostring(addedComp)
+        end
+        comp = addedComp
+
+        local namesOk, names = pcall(timelineItem.GetFusionCompNameList, timelineItem)
+        if namesOk and type(names) == "table" then
+            compName = names[#names]
+        end
+    end
+
+    if not compName then
+        return nil, "could not determine the Fusion composition name"
     end
 
     local settings, settingsErr = load_caption_macro_settings()
@@ -1938,26 +1962,53 @@ ensure_fusion_composition = function(timelineItem, isAnimated)
         return nil, "could not load bundled caption macro: " .. tostring(settingsErr)
     end
 
-    local pasteOk, pasted = pcall(comp.Paste, comp, settings)
-    if not pasteOk or pasted == false then
-        return nil, "could not paste bundled caption macro: " .. tostring(pasted)
-    end
+    local pageOk, previousPage = pcall(resolve.GetCurrentPage, resolve)
+    local recoveryOk, recoveredComp = pcall(function()
+        if not resolve:OpenPage("fusion") then
+            error("could not open the Fusion page")
+        end
 
-    local autosubsTool = comp:FindTool("AutoSubs")
-    local mediaOut = comp:FindTool("MediaOut1") or comp:FindToolByID("MediaOut")
-    if not autosubsTool or not mediaOut then
-        return nil, "rebuilt composition is missing AutoSubs or MediaOut"
-    end
+        local loadedComp = timelineItem:LoadFusionCompByName(compName)
+        if not loadedComp then
+            error("could not load Fusion composition " .. tostring(compName))
+        end
+        comp = loadedComp
 
-    local connectOk, connectErr = pcall(function()
-        mediaOut.Input = autosubsTool.Output
+        local pasted = comp:Paste(settings)
+        if pasted == false then
+            error("could not paste bundled caption macro")
+        end
+
+        local autosubsTool = comp:FindTool("AutoSubs")
+        local mediaOut = comp:FindTool("MediaOut1") or comp:FindToolByID("MediaOut")
+        if not autosubsTool or not mediaOut then
+            error("rebuilt composition is missing AutoSubs or MediaOut")
+        end
+
+        local mainOutput = autosubsTool:FindMainOutput(1)
+        if not mainOutput then
+            error("rebuilt AutoSubs macro has no main output")
+        end
+        if not mediaOut.Input:ConnectTo(mainOutput) then
+            error("could not connect AutoSubs to MediaOut")
+        end
+        if not mediaOut.Input:GetConnectedOutput() then
+            error("could not connect AutoSubs to MediaOut")
+        end
+
+        return comp
     end)
-    if not connectOk then
-        return nil, "could not connect AutoSubs to MediaOut: " .. tostring(connectErr)
+
+    if pageOk and previousPage and previousPage ~= "fusion" then
+        pcall(resolve.OpenPage, resolve, previousPage)
+    end
+
+    if not recoveryOk then
+        return nil, tostring(recoveredComp)
     end
 
     print("[AutoSubs] Rebuilt missing Fusion composition from bundled caption macro")
-    return comp
+    return recoveredComp
 end
 
 local function ShutdownApp()
